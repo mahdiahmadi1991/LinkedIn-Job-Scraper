@@ -14,21 +14,25 @@ public class JobsController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Index(CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(
+        [FromQuery] JobsDashboardQuery query,
+        CancellationToken cancellationToken)
     {
-        var snapshot = await _jobsDashboardService.GetSnapshotAsync(cancellationToken);
+        var snapshot = await _jobsDashboardService.GetSnapshotAsync(query, cancellationToken);
         return View(snapshot);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> FetchAndScore(CancellationToken cancellationToken)
+    public async Task<IActionResult> FetchAndScore(
+        [FromForm] JobsDashboardQuery query,
+        CancellationToken cancellationToken)
     {
         var result = await _jobsDashboardService.RunFetchAndScoreAsync(cancellationToken);
         TempData["JobsAlertMessage"] = result.Message;
         TempData["JobsAlertSeverity"] = result.Severity;
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), BuildRouteValues(query));
     }
 
     [HttpPost]
@@ -36,12 +40,26 @@ public class JobsController : Controller
     public async Task<IActionResult> UpdateStatus(
         Guid jobId,
         JobWorkflowStatus status,
+        [FromForm] JobsDashboardQuery query,
         CancellationToken cancellationToken)
     {
         var result = await _jobsDashboardService.UpdateStatusAsync(jobId, status, cancellationToken);
         TempData["JobsAlertMessage"] = result.Message;
         TempData["JobsAlertSeverity"] = result.Severity;
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), BuildRouteValues(query));
+    }
+
+    private static object BuildRouteValues(JobsDashboardQuery query)
+    {
+        return new
+        {
+            search = string.IsNullOrWhiteSpace(query.Search) ? null : query.Search,
+            filterStatus = query.FilterStatus,
+            aiLabel = string.IsNullOrWhiteSpace(query.AiLabel) ? null : query.AiLabel,
+            onlyUnscored = query.OnlyUnscored ? (bool?)true : null,
+            minScore = query.MinScore,
+            sortBy = query.GetNormalizedSortBy()
+        };
     }
 }

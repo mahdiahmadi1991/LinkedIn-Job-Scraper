@@ -21,6 +21,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - Job detail enrichment tolerates partial GraphQL errors and only depends on the main job node being present
 - AI scoring uses OpenAI with a persisted default behavioral profile in SQL Server until the UI editor is added
 - The MVP jobs UI centers on a single `Fetch & Score` action and manual per-job status updates
+- The jobs dashboard now supports server-side filtering and sorting based on stored job fields
 
 ## Product Intent
 

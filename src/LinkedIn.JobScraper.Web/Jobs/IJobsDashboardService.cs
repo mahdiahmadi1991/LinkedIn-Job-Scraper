@@ -5,7 +5,9 @@ namespace LinkedIn.JobScraper.Web.Jobs;
 
 public interface IJobsDashboardService
 {
-    Task<JobsDashboardSnapshot> GetSnapshotAsync(CancellationToken cancellationToken);
+    Task<JobsDashboardSnapshot> GetSnapshotAsync(
+        JobsDashboardQuery query,
+        CancellationToken cancellationToken);
 
     Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(CancellationToken cancellationToken);
 
@@ -17,10 +19,39 @@ public interface IJobsDashboardService
 
 public sealed record JobsDashboardSnapshot(
     int TotalJobs,
+    int FilteredJobs,
     int ScoredJobs,
     int StrongMatches,
     int UnscoredJobs,
+    JobsDashboardQuery Query,
     IReadOnlyList<JobDashboardRow> Jobs);
+
+public sealed class JobsDashboardQuery
+{
+    public string? Search { get; set; }
+
+    public JobWorkflowStatus? FilterStatus { get; set; }
+
+    public string? AiLabel { get; set; }
+
+    public bool OnlyUnscored { get; set; }
+
+    public int? MinScore { get; set; }
+
+    public string SortBy { get; set; } = "last-seen";
+
+    public string GetNormalizedSortBy()
+    {
+        return SortBy switch
+        {
+            "listed" => "listed",
+            "score" => "score",
+            "title" => "title",
+            "company" => "company",
+            _ => "last-seen"
+        };
+    }
+}
 
 public sealed record JobDashboardRow(
     Guid Id,

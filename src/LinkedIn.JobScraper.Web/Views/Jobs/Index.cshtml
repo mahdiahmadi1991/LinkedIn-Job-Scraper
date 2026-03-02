@@ -6,6 +6,7 @@
     ViewData["Title"] = "Jobs";
     var alertMessage = TempData["JobsAlertMessage"] as string;
     var alertSeverity = TempData["JobsAlertSeverity"] as string ?? "info";
+    var query = Model.Query;
 }
 
 <div class="d-flex flex-column gap-4">
@@ -16,6 +17,12 @@
         </div>
         <form asp-action="FetchAndScore" method="post" data-fetch-score-form>
             @Html.AntiForgeryToken()
+            <input type="hidden" name="Search" value="@query.Search" />
+            <input type="hidden" name="FilterStatus" value="@query.FilterStatus" />
+            <input type="hidden" name="AiLabel" value="@query.AiLabel" />
+            <input type="hidden" name="OnlyUnscored" value="@query.OnlyUnscored" />
+            <input type="hidden" name="MinScore" value="@query.MinScore" />
+            <input type="hidden" name="SortBy" value="@query.GetNormalizedSortBy()" />
             <button type="submit" class="btn btn-primary btn-lg" data-fetch-score-button>
                 <span data-idle-text>Fetch &amp; Score</span>
                 <span class="d-none" data-busy-text>Running fetch, enrich, and scoring...</span>
@@ -29,6 +36,62 @@
             @alertMessage
         </div>
     }
+
+    <section class="card">
+        <div class="card-body">
+            <form asp-action="Index" method="get" class="row g-3 align-items-end">
+                <div class="col-12 col-xl-4">
+                    <label class="form-label" for="Search">Keyword</label>
+                    <input class="form-control" type="text" id="Search" name="Search" value="@query.Search" placeholder="Title, company, location, summary" />
+                </div>
+                <div class="col-6 col-md-3 col-xl-2">
+                    <label class="form-label" for="FilterStatus">Status</label>
+                    <select class="form-select" id="FilterStatus" name="FilterStatus">
+                        <option value="">All</option>
+                        @foreach (var status in Enum.GetValues<JobWorkflowStatus>())
+                        {
+                            <option value="@status" selected="@(query.FilterStatus == status ? "selected" : null)">@status</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-6 col-md-3 col-xl-2">
+                    <label class="form-label" for="AiLabel">AI Label</label>
+                    <select class="form-select" id="AiLabel" name="AiLabel">
+                        <option value="">All</option>
+                        <option value="StrongMatch" selected="@(query.AiLabel == "StrongMatch" ? "selected" : null)">StrongMatch</option>
+                        <option value="Review" selected="@(query.AiLabel == "Review" ? "selected" : null)">Review</option>
+                        <option value="Skip" selected="@(query.AiLabel == "Skip" ? "selected" : null)">Skip</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-3 col-xl-1">
+                    <label class="form-label" for="MinScore">Min Score</label>
+                    <input class="form-control" type="number" min="0" max="100" id="MinScore" name="MinScore" value="@query.MinScore" />
+                </div>
+                <div class="col-6 col-md-3 col-xl-2">
+                    <label class="form-label" for="SortBy">Sort</label>
+                    <select class="form-select" id="SortBy" name="SortBy">
+                        <option value="last-seen" selected="@(query.GetNormalizedSortBy() == "last-seen" ? "selected" : null)">Last Seen</option>
+                        <option value="listed" selected="@(query.GetNormalizedSortBy() == "listed" ? "selected" : null)">Listed Date</option>
+                        <option value="score" selected="@(query.GetNormalizedSortBy() == "score" ? "selected" : null)">AI Score</option>
+                        <option value="title" selected="@(query.GetNormalizedSortBy() == "title" ? "selected" : null)">Title</option>
+                        <option value="company" selected="@(query.GetNormalizedSortBy() == "company" ? "selected" : null)">Company</option>
+                    </select>
+                </div>
+                <div class="col-12 col-xl-2">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="OnlyUnscored" name="OnlyUnscored" value="true" checked="@query.OnlyUnscored" />
+                        <label class="form-check-label" for="OnlyUnscored">Only unscored</label>
+                    </div>
+                    <input type="hidden" name="OnlyUnscored" value="false" />
+                </div>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-outline-primary">Apply Filters</button>
+                    <a class="btn btn-outline-secondary" asp-action="Index">Clear</a>
+                    <span class="small text-muted align-self-center">Showing @Model.FilteredJobs of @Model.TotalJobs stored jobs.</span>
+                </div>
+            </form>
+        </div>
+    </section>
 
     <section class="row g-3">
         <div class="col-6 col-xl-3">
@@ -136,6 +199,12 @@
                                     <form asp-action="UpdateStatus" method="post" class="d-flex flex-column gap-2">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="jobId" value="@job.Id" />
+                                        <input type="hidden" name="Search" value="@query.Search" />
+                                        <input type="hidden" name="FilterStatus" value="@query.FilterStatus" />
+                                        <input type="hidden" name="AiLabel" value="@query.AiLabel" />
+                                        <input type="hidden" name="OnlyUnscored" value="@query.OnlyUnscored" />
+                                        <input type="hidden" name="MinScore" value="@query.MinScore" />
+                                        <input type="hidden" name="SortBy" value="@query.GetNormalizedSortBy()" />
                                         <select class="form-select form-select-sm" name="status">
                                             @foreach (var status in Enum.GetValues<JobWorkflowStatus>())
                                             {
