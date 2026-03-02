@@ -9,6 +9,7 @@ using LinkedIn.JobScraper.Web.LinkedIn.Search;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using LinkedIn.JobScraper.Web.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.Composition;
 
@@ -28,15 +29,31 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISqlServerConnectionStringProvider, ConfiguredSqlServerConnectionStringProvider>();
         services.AddSingleton<ILinkedInSessionStore, DatabaseLinkedInSessionStore>();
         services.AddSingleton<ILinkedInBrowserLoginService, PlaywrightLinkedInBrowserLoginService>();
-        services.AddSingleton<IJobScoringGateway, OpenAiJobScoringGateway>();
+        services.AddTransient<IAiBehaviorSettingsService, AiBehaviorSettingsService>();
         services.AddTransient<ILinkedInJobDetailService, LinkedInJobDetailService>();
         services.AddTransient<ILinkedInJobSearchService, LinkedInJobSearchService>();
         services.AddTransient<IJobImportService, JobImportService>();
         services.AddTransient<IJobEnrichmentService, JobEnrichmentService>();
+        services.AddTransient<IJobBatchScoringService, JobBatchScoringService>();
         services.AddDbContextFactory<LinkedInJobScraperDbContext>(ConfigureSqlServerDbContext);
 
         services.AddHttpClient<ILinkedInApiClient, LinkedInApiClient>()
             .ConfigurePrimaryHttpMessageHandler(CreateLinkedInHttpHandler);
+
+        services.AddHttpClient<IJobScoringGateway, OpenAiJobScoringGateway>(
+            static (serviceProvider, client) =>
+            {
+                var options = serviceProvider
+                    .GetRequiredService<IOptions<OpenAiSecurityOptions>>()
+                    .Value;
+
+                var baseUrl = string.IsNullOrWhiteSpace(options.BaseUrl)
+                    ? "https://api.openai.com/v1"
+                    : options.BaseUrl.TrimEnd('/');
+
+                client.BaseAddress = new Uri(baseUrl);
+                client.Timeout = TimeSpan.FromSeconds(45);
+            });
 
         services.AddTransient<LinkedInFeasibilityProbe>();
 

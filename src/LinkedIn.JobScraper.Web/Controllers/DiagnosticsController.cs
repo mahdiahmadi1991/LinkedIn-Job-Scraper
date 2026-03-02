@@ -1,3 +1,4 @@
+using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Diagnostics;
 using LinkedIn.JobScraper.Web.Jobs;
 using Microsoft.AspNetCore.Mvc;
@@ -7,6 +8,7 @@ namespace LinkedIn.JobScraper.Web.Controllers;
 [Route("diagnostics")]
 public class DiagnosticsController : Controller
 {
+    private readonly IJobBatchScoringService _jobBatchScoringService;
     private readonly LinkedInFeasibilityProbe _linkedInFeasibilityProbe;
     private readonly IJobEnrichmentService _jobEnrichmentService;
     private readonly IJobImportService _jobImportService;
@@ -14,11 +16,13 @@ public class DiagnosticsController : Controller
     public DiagnosticsController(
         LinkedInFeasibilityProbe linkedInFeasibilityProbe,
         IJobImportService jobImportService,
-        IJobEnrichmentService jobEnrichmentService)
+        IJobEnrichmentService jobEnrichmentService,
+        IJobBatchScoringService jobBatchScoringService)
     {
         _linkedInFeasibilityProbe = linkedInFeasibilityProbe;
         _jobImportService = jobImportService;
         _jobEnrichmentService = jobEnrichmentService;
+        _jobBatchScoringService = jobBatchScoringService;
     }
 
     [HttpGet("linkedin-feasibility")]
@@ -68,6 +72,21 @@ public class DiagnosticsController : Controller
         CancellationToken cancellationToken = default)
     {
         var result = await _jobEnrichmentService.EnrichIncompleteJobsAsync(count, cancellationToken);
+
+        if (!result.Success)
+        {
+            return StatusCode(result.StatusCode, result);
+        }
+
+        return Json(result);
+    }
+
+    [HttpPost("score-ready-jobs")]
+    public async Task<IActionResult> ScoreReadyJobs(
+        [FromQuery] int count = 3,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _jobBatchScoringService.ScoreReadyJobsAsync(count, cancellationToken);
 
         if (!result.Success)
         {

@@ -19,6 +19,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - Controlled-browser manual login is the selected MVP approach for acquiring a reusable LinkedIn session
 - The search import pipeline stores search-card fields first and deduplicates by LinkedIn job id while refreshing `LastSeenAtUtc`
 - Job detail enrichment tolerates partial GraphQL errors and only depends on the main job node being present
+- AI scoring uses OpenAI with a persisted default behavioral profile in SQL Server until the UI editor is added
 
 ## Product Intent
 
