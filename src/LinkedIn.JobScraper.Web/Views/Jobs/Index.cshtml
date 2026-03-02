@@ -30,6 +30,44 @@
         </form>
     </section>
 
+    <section class="card d-none" data-fetch-progress aria-live="polite">
+        <div class="card-body d-flex flex-column gap-3">
+            <div class="d-flex justify-content-between align-items-center gap-3">
+                <div>
+                    <div class="small text-muted text-uppercase">Fetch Workflow</div>
+                    <div class="fw-semibold" data-progress-status>Preparing workflow...</div>
+                </div>
+                <div class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></div>
+            </div>
+            <div class="progress" role="progressbar" aria-label="Fetch and score progress" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 8%;" data-progress-bar></div>
+            </div>
+            <div class="row g-2" data-progress-stages>
+                <div class="col-12 col-md-4">
+                    <div class="border rounded p-3 bg-light" data-progress-stage="0">
+                        <div class="small text-muted text-uppercase">Step 1</div>
+                        <div class="fw-semibold">Fetch new jobs</div>
+                        <div class="small text-body-secondary">Replays the stored LinkedIn search and refreshes what is already known.</div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="border rounded p-3 bg-light" data-progress-stage="1">
+                        <div class="small text-muted text-uppercase">Step 2</div>
+                        <div class="fw-semibold">Enrich details</div>
+                        <div class="small text-body-secondary">Loads richer job detail data for the most relevant incomplete records.</div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="border rounded p-3 bg-light" data-progress-stage="2">
+                        <div class="small text-muted text-uppercase">Step 3</div>
+                        <div class="fw-semibold">Run AI scoring</div>
+                        <div class="small text-body-secondary">Scores ready jobs using the current OpenAI behavior profile.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     @if (!string.IsNullOrWhiteSpace(alertMessage))
     {
         <div class="alert alert-@alertSeverity mb-0" role="alert">
@@ -287,6 +325,15 @@
             const button = form.querySelector("[data-fetch-score-button]");
             const idleText = form.querySelector("[data-idle-text]");
             const busyText = form.querySelector("[data-busy-text]");
+            const progressPanel = document.querySelector("[data-fetch-progress]");
+            const progressBar = document.querySelector("[data-progress-bar]");
+            const progressStatus = document.querySelector("[data-progress-status]");
+            const stageNodes = Array.from(document.querySelectorAll("[data-progress-stage]"));
+            const stageMessages = [
+                "Fetching the latest jobs from LinkedIn...",
+                "Enriching newly discovered job details...",
+                "Scoring ready jobs with AI..."
+            ];
 
             form.addEventListener("submit", () => {
                 if (button) {
@@ -300,6 +347,36 @@
                 if (busyText) {
                     busyText.classList.remove("d-none");
                 }
+
+                if (progressPanel) {
+                    progressPanel.classList.remove("d-none");
+                }
+
+                let stageIndex = 0;
+
+                const applyStage = (index) => {
+                    if (progressStatus && stageMessages[index]) {
+                        progressStatus.textContent = stageMessages[index];
+                    }
+
+                    if (progressBar) {
+                        const widths = ["34%", "68%", "96%"];
+                        progressBar.style.width = widths[index] ?? "96%";
+                    }
+
+                    stageNodes.forEach((node, currentIndex) => {
+                        node.classList.toggle("border-primary", currentIndex === index);
+                        node.classList.toggle("bg-primary-subtle", currentIndex === index);
+                        node.classList.toggle("text-primary-emphasis", currentIndex === index);
+                    });
+                };
+
+                applyStage(stageIndex);
+
+                window.setInterval(() => {
+                    stageIndex = Math.min(stageIndex + 1, stageMessages.length - 1);
+                    applyStage(stageIndex);
+                }, 1800);
             });
         })();
     </script>
