@@ -1,20 +1,12 @@
 using System.Net;
+using LinkedIn.JobScraper.Web.Composition;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddHealthChecks();
-builder.Services
-    .AddHttpClient<LinkedIn.JobScraper.Web.Diagnostics.LinkedInFeasibilityProbe>()
-    .ConfigurePrimaryHttpMessageHandler(
-        static () => new HttpClientHandler
-        {
-            UseCookies = false,
-            AutomaticDecompression = DecompressionMethods.GZip |
-                                     DecompressionMethods.Deflate |
-                                     DecompressionMethods.Brotli
-        });
+builder.Services.AddMvpApplication(builder.Configuration);
 
 var app = builder.Build();
 

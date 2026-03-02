@@ -1,28 +1,21 @@
 using System.Net;
 using System.Text.Json;
+using LinkedIn.JobScraper.Web.LinkedIn.Api;
 
 namespace LinkedIn.JobScraper.Web.Diagnostics;
 
 public sealed class LinkedInFeasibilityProbe
 {
-    private static readonly HashSet<string> SkippedHeaders = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "Accept-Encoding",
-        "Connection",
-        "Host",
-        "TE"
-    };
-
-    private readonly HttpClient _httpClient;
     private readonly IWebHostEnvironment _environment;
+    private readonly ILinkedInApiClient _linkedInApiClient;
     private readonly ILogger<LinkedInFeasibilityProbe> _logger;
 
     public LinkedInFeasibilityProbe(
-        HttpClient httpClient,
+        ILinkedInApiClient linkedInApiClient,
         IWebHostEnvironment environment,
         ILogger<LinkedInFeasibilityProbe> logger)
     {
-        _httpClient = httpClient;
+        _linkedInApiClient = linkedInApiClient;
         _environment = environment;
         _logger = logger;
     }
@@ -52,34 +45,20 @@ public sealed class LinkedInFeasibilityProbe
             return LinkedInFeasibilityResult.Failed(parsedRequest.ErrorMessage!);
         }
 
-        using var requestMessage = new HttpRequestMessage(HttpMethod.Get, parsedRequest.Url);
-        requestMessage.Version = HttpVersion.Version20;
-        requestMessage.VersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
-
-        foreach (var header in parsedRequest.Headers)
-        {
-            if (SkippedHeaders.Contains(header.Key))
-            {
-                continue;
-            }
-
-            requestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value);
-        }
-
-        using var response = await _httpClient.SendAsync(
-            requestMessage,
-            HttpCompletionOption.ResponseHeadersRead,
+        var response = await _linkedInApiClient.GetAsync(
+            parsedRequest.Url!,
+            parsedRequest.Headers,
             cancellationToken);
 
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        var body = response.Body;
 
-        if (response.StatusCode != HttpStatusCode.OK)
+        if (response.StatusCode != (int)HttpStatusCode.OK)
         {
-            Log.LinkedInProbeReturnedNonSuccessStatusCode(_logger, (int)response.StatusCode);
+            Log.LinkedInProbeReturnedNonSuccessStatusCode(_logger, response.StatusCode);
 
             return LinkedInFeasibilityResult.Failed(
-                $"LinkedIn request failed with HTTP {(int)response.StatusCode}.",
-                (int)response.StatusCode,
+                $"LinkedIn request failed with HTTP {response.StatusCode}.",
+                response.StatusCode,
                 Truncate(body, 600));
         }
 
@@ -91,7 +70,7 @@ public sealed class LinkedInFeasibilityProbe
             {
                 return LinkedInFeasibilityResult.Failed(
                     "Response JSON did not contain a top-level 'data' node.",
-                    (int)response.StatusCode,
+                    response.StatusCode,
                     Truncate(body, 600));
             }
 
@@ -143,8 +122,8 @@ public sealed class LinkedInFeasibilityProbe
             Log.LinkedInProbeFailedToParseJson(_logger, exception);
 
             return LinkedInFeasibilityResult.Failed(
-                "LinkedIn response was not valid JSON.",
-                (int)response.StatusCode,
+                    "LinkedIn response was not valid JSON.",
+                response.StatusCode,
                 Truncate(body, 600));
         }
     }

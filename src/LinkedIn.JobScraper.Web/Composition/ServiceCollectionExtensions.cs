@@ -1,0 +1,43 @@
+using System.Net;
+using LinkedIn.JobScraper.Web.AI;
+using LinkedIn.JobScraper.Web.Configuration;
+using LinkedIn.JobScraper.Web.Diagnostics;
+using LinkedIn.JobScraper.Web.LinkedIn.Api;
+using LinkedIn.JobScraper.Web.LinkedIn.Session;
+using LinkedIn.JobScraper.Web.Persistence;
+
+namespace LinkedIn.JobScraper.Web.Composition;
+
+public static class ServiceCollectionExtensions
+{
+    public static IServiceCollection AddMvpApplication(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<SqlServerOptions>()
+            .Bind(configuration.GetSection(SqlServerOptions.SectionName));
+
+        services.AddOptions<OpenAiSecurityOptions>()
+            .Bind(configuration.GetSection(OpenAiSecurityOptions.SectionName));
+
+        services.AddSingleton<ISqlServerConnectionStringProvider, ConfiguredSqlServerConnectionStringProvider>();
+        services.AddSingleton<ILinkedInSessionStore, InMemoryLinkedInSessionStore>();
+        services.AddSingleton<IJobScoringGateway, OpenAiJobScoringGateway>();
+
+        services.AddHttpClient<ILinkedInApiClient, LinkedInApiClient>()
+            .ConfigurePrimaryHttpMessageHandler(CreateLinkedInHttpHandler);
+
+        services.AddTransient<LinkedInFeasibilityProbe>();
+
+        return services;
+    }
+
+    private static HttpClientHandler CreateLinkedInHttpHandler()
+    {
+        return new HttpClientHandler
+        {
+            UseCookies = false,
+            AutomaticDecompression = DecompressionMethods.GZip |
+                                     DecompressionMethods.Deflate |
+                                     DecompressionMethods.Brotli
+        };
+    }
+}

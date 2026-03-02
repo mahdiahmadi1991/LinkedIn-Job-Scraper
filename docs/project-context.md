@@ -13,6 +13,8 @@ Build a simple local web application for personal use that helps collect LinkedI
 - LinkedIn job collection and AI evaluation are core features
 - Initial AI scope is ranking and flagging the best job matches for manual apply
 - CI/CD and automated tests are intentionally deferred until after MVP
+- Browser-session request replay has been proven feasible for LinkedIn job search
+- The MVP will keep ASP.NET Core MVC and add thin service boundaries for LinkedIn, AI, and persistence
 
 ## Product Intent
 
@@ -26,6 +28,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The availability of official LinkedIn APIs for personal job-search automation is not yet confirmed as a viable path for this project.
 - As of March 2, 2026, LinkedIn's public developer documentation emphasizes approved partner access and product-specific programs rather than an openly available personal-use job search API.
 - We should validate the ingestion strategy before building around an API-first assumption.
+- Direct credential-post login should still be treated as unstable; controlled-browser manual login remains the safer MVP path.
 
 ## Reference Notes
 
