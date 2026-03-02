@@ -3,6 +3,8 @@ namespace LinkedIn.JobScraper.Web.AI;
 public interface IAiBehaviorSettingsService
 {
     Task<AiBehaviorProfile> GetActiveAsync(CancellationToken cancellationToken);
+
+    Task<AiBehaviorProfile> SaveAsync(AiBehaviorProfile profile, CancellationToken cancellationToken);
 }
 
 public sealed record AiBehaviorProfile(

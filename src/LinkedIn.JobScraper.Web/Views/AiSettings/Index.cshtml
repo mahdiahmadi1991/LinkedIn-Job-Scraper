@@ -1,0 +1,74 @@
+@model AiSettingsPageViewModel
+
+@{
+    ViewData["Title"] = "AI Settings";
+    var alertSeverity = Model.StatusSucceeded ? "success" : "warning";
+}
+
+<div class="d-flex flex-column gap-4">
+    <section class="d-flex flex-column gap-2">
+        <div>
+            <h1 class="h2 mb-1">AI Settings</h1>
+            <p class="text-muted mb-0">Adjust the behavioral profile used when scoring LinkedIn jobs. API keys stay in configuration, but scoring preferences live here.</p>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-@alertSeverity mb-0" role="alert">
+            @Model.StatusMessage
+        </div>
+    }
+
+    <section class="row g-4">
+        <div class="col-12 col-xl-8">
+            <div class="card">
+                <div class="card-body">
+                    <form asp-action="Save" method="post" class="d-flex flex-column gap-3">
+                        @Html.AntiForgeryToken()
+                        <div>
+                            <label asp-for="ProfileName" class="form-label"></label>
+                            <input asp-for="ProfileName" class="form-control" />
+                            <span asp-validation-for="ProfileName" class="text-danger small"></span>
+                        </div>
+                        <div>
+                            <label asp-for="BehavioralInstructions" class="form-label"></label>
+                            <textarea asp-for="BehavioralInstructions" class="form-control" rows="6"></textarea>
+                            <span asp-validation-for="BehavioralInstructions" class="text-danger small"></span>
+                        </div>
+                        <div>
+                            <label asp-for="PrioritySignals" class="form-label"></label>
+                            <textarea asp-for="PrioritySignals" class="form-control" rows="5"></textarea>
+                            <span asp-validation-for="PrioritySignals" class="text-danger small"></span>
+                        </div>
+                        <div>
+                            <label asp-for="ExclusionSignals" class="form-label"></label>
+                            <textarea asp-for="ExclusionSignals" class="form-control" rows="5"></textarea>
+                            <span asp-validation-for="ExclusionSignals" class="text-danger small"></span>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Save Behavior Settings</button>
+                            <a asp-action="Index" class="btn btn-outline-secondary">Reset</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h5">What this controls</h2>
+                    <ul class="mb-0 ps-3">
+                        <li>The tone and priorities used in AI scoring</li>
+                        <li>The positive signals that should increase the fit score</li>
+                        <li>The mismatch signals that should push jobs toward review or skip</li>
+                    </ul>
+                    <hr />
+                    <p class="small text-muted mb-0">
+                        Security settings such as the OpenAI API key, model, and base URL remain in <code>appsettings*.json</code>.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>

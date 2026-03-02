@@ -17,6 +17,33 @@ public sealed class AiBehaviorSettingsService : IAiBehaviorSettingsService
     {
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
+        var record = await GetOrCreateActiveRecordAsync(dbContext, cancellationToken);
+
+        return Map(record);
+    }
+
+    public async Task<AiBehaviorProfile> SaveAsync(AiBehaviorProfile profile, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var record = await GetOrCreateActiveRecordAsync(dbContext, cancellationToken);
+        record.ProfileName = profile.ProfileName.Trim();
+        record.BehavioralInstructions = profile.BehavioralInstructions.Trim();
+        record.PrioritySignals = profile.PrioritySignals.Trim();
+        record.ExclusionSignals = profile.ExclusionSignals.Trim();
+        record.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Map(record);
+    }
+
+    private static async Task<AiBehaviorSettingsRecord> GetOrCreateActiveRecordAsync(
+        LinkedInJobScraperDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
         var record = await dbContext.AiBehaviorSettings
             .OrderBy(static settings => settings.Id)
             .FirstOrDefaultAsync(cancellationToken);
@@ -39,6 +66,11 @@ public sealed class AiBehaviorSettingsService : IAiBehaviorSettingsService
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        return record;
+    }
+
+    private static AiBehaviorProfile Map(AiBehaviorSettingsRecord record)
+    {
         return new AiBehaviorProfile(
             record.ProfileName,
             record.BehavioralInstructions,
