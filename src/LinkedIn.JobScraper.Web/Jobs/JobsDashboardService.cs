@@ -122,6 +122,8 @@ public sealed class JobsDashboardService : IJobsDashboardService
                         job.AiScore,
                         job.AiLabel,
                         job.AiSummary,
+                        job.AiWhyMatched,
+                        job.AiConcerns,
                         job.CompanyApplyUrl))
                 .ToArray());
     }

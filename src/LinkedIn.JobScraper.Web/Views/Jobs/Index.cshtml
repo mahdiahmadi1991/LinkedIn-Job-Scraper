@@ -180,6 +180,25 @@
                                             @job.AiSummary
                                         </div>
                                     }
+                                    @if (!string.IsNullOrWhiteSpace(job.AiWhyMatched) || !string.IsNullOrWhiteSpace(job.AiConcerns))
+                                    {
+                                        <div class="small mt-2 d-flex flex-column gap-1">
+                                            @if (!string.IsNullOrWhiteSpace(job.AiWhyMatched))
+                                            {
+                                                <div>
+                                                    <span class="fw-semibold text-success">Why matched:</span>
+                                                    <span class="text-body-secondary">@job.AiWhyMatched</span>
+                                                </div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(job.AiConcerns))
+                                            {
+                                                <div>
+                                                    <span class="fw-semibold text-warning-emphasis">Concerns:</span>
+                                                    <span class="text-body-secondary">@job.AiConcerns</span>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
                                 </td>
                                 <td>
                                     @if (job.AiScore.HasValue)

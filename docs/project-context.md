@@ -23,6 +23,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The MVP jobs UI centers on a single `Fetch & Score` action and manual per-job status updates
 - The jobs dashboard now supports server-side filtering and sorting based on stored job fields
 - AI behavior settings are now editable in the UI while OpenAI security settings remain in configuration
+- The jobs dashboard now exposes AI summary, why-matched, and concern text directly in each job row for faster review
 
 ## Product Intent
 

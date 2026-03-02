@@ -65,6 +65,8 @@ public sealed record JobDashboardRow(
     int? AiScore,
     string? AiLabel,
     string? AiSummary,
+    string? AiWhyMatched,
+    string? AiConcerns,
     string? CompanyApplyUrl);
 
 public sealed record FetchAndScoreWorkflowResult(
