@@ -1,4 +1,5 @@
 using LinkedIn.JobScraper.Web.Diagnostics;
+using LinkedIn.JobScraper.Web.Jobs;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LinkedIn.JobScraper.Web.Controllers;
@@ -7,10 +8,14 @@ namespace LinkedIn.JobScraper.Web.Controllers;
 public class DiagnosticsController : Controller
 {
     private readonly LinkedInFeasibilityProbe _linkedInFeasibilityProbe;
+    private readonly IJobImportService _jobImportService;
 
-    public DiagnosticsController(LinkedInFeasibilityProbe linkedInFeasibilityProbe)
+    public DiagnosticsController(
+        LinkedInFeasibilityProbe linkedInFeasibilityProbe,
+        IJobImportService jobImportService)
     {
         _linkedInFeasibilityProbe = linkedInFeasibilityProbe;
+        _jobImportService = jobImportService;
     }
 
     [HttpGet("linkedin-feasibility")]
@@ -36,6 +41,19 @@ public class DiagnosticsController : Controller
         if (!result.Success)
         {
             return StatusCode(result.StatusCode ?? StatusCodes.Status502BadGateway, result);
+        }
+
+        return Json(result);
+    }
+
+    [HttpPost("import-current-search")]
+    public async Task<IActionResult> ImportCurrentSearch(CancellationToken cancellationToken)
+    {
+        var result = await _jobImportService.ImportCurrentSearchAsync(cancellationToken);
+
+        if (!result.Success)
+        {
+            return StatusCode(result.StatusCode, result);
         }
 
         return Json(result);

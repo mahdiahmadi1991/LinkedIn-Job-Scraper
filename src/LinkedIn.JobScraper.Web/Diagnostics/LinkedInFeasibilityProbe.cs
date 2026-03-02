@@ -61,7 +61,7 @@ public sealed class LinkedInFeasibilityProbe
         }
 
         var fileContent = await File.ReadAllTextAsync(requestFilePath, cancellationToken);
-        var parsedRequest = LinkedInCurlRequestParser.Parse(fileContent);
+        var parsedRequest = LinkedInCapturedRequestParser.Parse(fileContent);
 
         if (!parsedRequest.IsValid)
         {
@@ -181,137 +181,6 @@ public sealed class LinkedInFeasibilityProbe
 
         return merged;
     }
-}
-
-internal static class LinkedInCurlRequestParser
-{
-    public static ParsedCurlRequest Parse(string curlText)
-    {
-        var lines = curlText
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .Select(static line => line.Trim())
-            .Where(static line => !string.IsNullOrWhiteSpace(line))
-            .ToArray();
-
-        if (lines.Length == 0)
-        {
-            return ParsedCurlRequest.Invalid("The cURL sample file is empty.");
-        }
-
-        var firstLine = lines[0];
-        var firstQuoteIndex = firstLine.IndexOf("^\"", StringComparison.Ordinal);
-
-        if (firstQuoteIndex < 0)
-        {
-            return ParsedCurlRequest.Invalid("Could not find the request URL in the first cURL line.");
-        }
-
-        var lastQuoteIndex = firstLine.LastIndexOf("^\"", StringComparison.Ordinal);
-
-        if (lastQuoteIndex <= firstQuoteIndex)
-        {
-            return ParsedCurlRequest.Invalid("Could not parse the quoted request URL.");
-        }
-
-        var rawUrl = firstLine.Substring(firstQuoteIndex + 2, lastQuoteIndex - (firstQuoteIndex + 2));
-        var decodedUrl = DecodeWindowsCurlEscapes(rawUrl);
-
-        if (!Uri.TryCreate(decodedUrl, UriKind.Absolute, out var url))
-        {
-            return ParsedCurlRequest.Invalid("The decoded request URL is not a valid absolute URI.");
-        }
-
-        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var line in lines)
-        {
-            if (!line.StartsWith("-H ", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            var headerStart = line.IndexOf("^\"", StringComparison.Ordinal);
-            var headerEnd = line.LastIndexOf("^\"", StringComparison.Ordinal);
-
-            if (headerStart < 0 || headerEnd <= headerStart)
-            {
-                continue;
-            }
-
-            var rawHeader = line.Substring(headerStart + 2, headerEnd - (headerStart + 2));
-            var decodedHeader = DecodeWindowsCurlEscapes(rawHeader);
-            var separatorIndex = decodedHeader.IndexOf(':');
-
-            if (separatorIndex <= 0)
-            {
-                continue;
-            }
-
-            var name = decodedHeader[..separatorIndex].Trim();
-            var value = decodedHeader[(separatorIndex + 1)..].Trim();
-
-            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(value))
-            {
-                continue;
-            }
-
-            headers[name] = value;
-        }
-
-        return ParsedCurlRequest.Valid(url, headers);
-    }
-
-    private static string DecodeWindowsCurlEscapes(string value)
-    {
-        value = value.Replace("^\\^\"", "\"", StringComparison.Ordinal);
-
-        var buffer = new List<char>(value.Length);
-
-        for (var index = 0; index < value.Length; index++)
-        {
-            var current = value[index];
-
-            if (current == '^' && index + 1 < value.Length)
-            {
-                index++;
-                buffer.Add(value[index]);
-                continue;
-            }
-
-            buffer.Add(current);
-        }
-
-        return new string([.. buffer]);
-    }
-}
-
-internal sealed class ParsedCurlRequest
-{
-    private ParsedCurlRequest(
-        bool isValid,
-        Uri? url,
-        IReadOnlyDictionary<string, string> headers,
-        string? errorMessage)
-    {
-        IsValid = isValid;
-        Url = url;
-        Headers = headers;
-        ErrorMessage = errorMessage;
-    }
-
-    public bool IsValid { get; }
-
-    public string? ErrorMessage { get; }
-
-    public IReadOnlyDictionary<string, string> Headers { get; }
-
-    public Uri? Url { get; }
-
-    public static ParsedCurlRequest Invalid(string errorMessage) =>
-        new(false, null, new Dictionary<string, string>(), errorMessage);
-
-    public static ParsedCurlRequest Valid(Uri url, IReadOnlyDictionary<string, string> headers) =>
-        new(true, url, headers, null);
 }
 
 public sealed class LinkedInFeasibilityResult

@@ -5,11 +5,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LinkedIn.JobScraper.Web.LinkedIn.Session;
 
-public sealed class DatabaseLinkedInSessionStore : ILinkedInSessionStore
+public sealed class DatabaseLinkedInSessionStore : ILinkedInSessionStore, IDisposable
 {
     private const string PrimarySessionKey = "primary";
 
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
+    private readonly SemaphoreSlim _initializationGate = new(1, 1);
+    private volatile bool _databaseEnsured;
 
     public DatabaseLinkedInSessionStore(IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory)
     {
@@ -18,8 +20,9 @@ public sealed class DatabaseLinkedInSessionStore : ILinkedInSessionStore
 
     public async Task<LinkedInSessionSnapshot?> GetCurrentAsync(CancellationToken cancellationToken)
     {
+        await EnsureDatabaseAsync(cancellationToken);
+
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await dbContext.Database.MigrateAsync(cancellationToken);
 
         var record = await dbContext.LinkedInSessions
             .AsNoTracking()
@@ -40,8 +43,9 @@ public sealed class DatabaseLinkedInSessionStore : ILinkedInSessionStore
 
     public async Task SaveAsync(LinkedInSessionSnapshot sessionSnapshot, CancellationToken cancellationToken)
     {
+        await EnsureDatabaseAsync(cancellationToken);
+
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await dbContext.Database.MigrateAsync(cancellationToken);
 
         var existingRecord = await dbContext.LinkedInSessions.SingleOrDefaultAsync(
             static session => session.SessionKey == PrimarySessionKey,
@@ -64,5 +68,36 @@ public sealed class DatabaseLinkedInSessionStore : ILinkedInSessionStore
         existingRecord.LastValidatedAtUtc = null;
 
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnsureDatabaseAsync(CancellationToken cancellationToken)
+    {
+        if (_databaseEnsured)
+        {
+            return;
+        }
+
+        await _initializationGate.WaitAsync(cancellationToken);
+
+        try
+        {
+            if (_databaseEnsured)
+            {
+                return;
+            }
+
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            await dbContext.Database.MigrateAsync(cancellationToken);
+            _databaseEnsured = true;
+        }
+        finally
+        {
+            _initializationGate.Release();
+        }
+    }
+
+    public void Dispose()
+    {
+        _initializationGate.Dispose();
     }
 }
