@@ -23,3 +23,4 @@ node_modules/
 .DS_Store
 
 docs/api-sample/
+src/LinkedIn.JobScraper.Web/bin\\Debug/

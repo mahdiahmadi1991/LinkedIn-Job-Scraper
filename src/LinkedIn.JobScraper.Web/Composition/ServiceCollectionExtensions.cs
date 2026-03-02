@@ -5,6 +5,7 @@ using LinkedIn.JobScraper.Web.Diagnostics;
 using LinkedIn.JobScraper.Web.LinkedIn.Api;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using LinkedIn.JobScraper.Web.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace LinkedIn.JobScraper.Web.Composition;
 
@@ -21,6 +22,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISqlServerConnectionStringProvider, ConfiguredSqlServerConnectionStringProvider>();
         services.AddSingleton<ILinkedInSessionStore, InMemoryLinkedInSessionStore>();
         services.AddSingleton<IJobScoringGateway, OpenAiJobScoringGateway>();
+        services.AddDbContext<LinkedInJobScraperDbContext>(ConfigureSqlServerDbContext);
 
         services.AddHttpClient<ILinkedInApiClient, LinkedInApiClient>()
             .ConfigurePrimaryHttpMessageHandler(CreateLinkedInHttpHandler);
@@ -39,5 +41,17 @@ public static class ServiceCollectionExtensions
                                      DecompressionMethods.Deflate |
                                      DecompressionMethods.Brotli
         };
+    }
+
+    private static void ConfigureSqlServerDbContext(
+        IServiceProvider serviceProvider,
+        DbContextOptionsBuilder optionsBuilder)
+    {
+        var connectionStringProvider = serviceProvider.GetRequiredService<ISqlServerConnectionStringProvider>();
+        var connectionString = connectionStringProvider.IsConfigured
+            ? connectionStringProvider.GetRequiredConnectionString()
+            : "Server=localhost;Database=LinkedInJobScraper;Integrated Security=True;TrustServerCertificate=True";
+
+        optionsBuilder.UseSqlServer(connectionString);
     }
 }
