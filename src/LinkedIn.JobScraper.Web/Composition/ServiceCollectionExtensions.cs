@@ -19,10 +19,14 @@ public static class ServiceCollectionExtensions
         services.AddOptions<OpenAiSecurityOptions>()
             .Bind(configuration.GetSection(OpenAiSecurityOptions.SectionName));
 
+        services.AddOptions<LinkedInBrowserAutomationOptions>()
+            .Bind(configuration.GetSection(LinkedInBrowserAutomationOptions.SectionName));
+
         services.AddSingleton<ISqlServerConnectionStringProvider, ConfiguredSqlServerConnectionStringProvider>();
-        services.AddSingleton<ILinkedInSessionStore, InMemoryLinkedInSessionStore>();
+        services.AddSingleton<ILinkedInSessionStore, DatabaseLinkedInSessionStore>();
+        services.AddSingleton<ILinkedInBrowserLoginService, PlaywrightLinkedInBrowserLoginService>();
         services.AddSingleton<IJobScoringGateway, OpenAiJobScoringGateway>();
-        services.AddDbContext<LinkedInJobScraperDbContext>(ConfigureSqlServerDbContext);
+        services.AddDbContextFactory<LinkedInJobScraperDbContext>(ConfigureSqlServerDbContext);
 
         services.AddHttpClient<ILinkedInApiClient, LinkedInApiClient>()
             .ConfigurePrimaryHttpMessageHandler(CreateLinkedInHttpHandler);

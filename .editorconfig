@@ -19,3 +19,6 @@ indent_size = 2
 
 [*.cshtml]
 indent_size = 4
+
+[src/LinkedIn.JobScraper.Web/Persistence/Migrations/*.cs]
+dotnet_diagnostic.CA1861.severity = none

@@ -14,9 +14,24 @@ public class DiagnosticsController : Controller
     }
 
     [HttpGet("linkedin-feasibility")]
-    public async Task<IActionResult> LinkedInFeasibility(CancellationToken cancellationToken)
+    public async Task<IActionResult> LinkedInFeasibility(
+        [FromQuery] bool useStoredSession,
+        CancellationToken cancellationToken)
     {
-        var result = await _linkedInFeasibilityProbe.RunAsync(cancellationToken);
+        LinkedInFeasibilityResult result;
+
+        try
+        {
+            result = useStoredSession
+                ? await _linkedInFeasibilityProbe.RunUsingStoredSessionAsync(cancellationToken)
+                : await _linkedInFeasibilityProbe.RunAsync(cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            result = LinkedInFeasibilityResult.Failed(
+                $"Feasibility probe failed: {exception.Message}",
+                StatusCodes.Status503ServiceUnavailable);
+        }
 
         if (!result.Success)
         {

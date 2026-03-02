@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using LinkedIn.JobScraper.Web.LinkedIn.Api;
+using LinkedIn.JobScraper.Web.LinkedIn.Session;
 
 namespace LinkedIn.JobScraper.Web.Diagnostics;
 
@@ -9,18 +10,40 @@ public sealed class LinkedInFeasibilityProbe
     private readonly IWebHostEnvironment _environment;
     private readonly ILinkedInApiClient _linkedInApiClient;
     private readonly ILogger<LinkedInFeasibilityProbe> _logger;
+    private readonly ILinkedInSessionStore _sessionStore;
 
     public LinkedInFeasibilityProbe(
         ILinkedInApiClient linkedInApiClient,
+        ILinkedInSessionStore sessionStore,
         IWebHostEnvironment environment,
         ILogger<LinkedInFeasibilityProbe> logger)
     {
         _linkedInApiClient = linkedInApiClient;
+        _sessionStore = sessionStore;
         _environment = environment;
         _logger = logger;
     }
 
     public async Task<LinkedInFeasibilityResult> RunAsync(CancellationToken cancellationToken)
+    {
+        return await RunCoreAsync(null, cancellationToken);
+    }
+
+    public async Task<LinkedInFeasibilityResult> RunUsingStoredSessionAsync(CancellationToken cancellationToken)
+    {
+        var sessionSnapshot = await _sessionStore.GetCurrentAsync(cancellationToken);
+
+        if (sessionSnapshot is null)
+        {
+            return LinkedInFeasibilityResult.Failed("No stored LinkedIn session is available yet.");
+        }
+
+        return await RunCoreAsync(sessionSnapshot, cancellationToken);
+    }
+
+    private async Task<LinkedInFeasibilityResult> RunCoreAsync(
+        LinkedInSessionSnapshot? sessionSnapshot,
+        CancellationToken cancellationToken)
     {
         var requestFilePath = Path.GetFullPath(
             Path.Combine(
@@ -45,9 +68,11 @@ public sealed class LinkedInFeasibilityProbe
             return LinkedInFeasibilityResult.Failed(parsedRequest.ErrorMessage!);
         }
 
+        var requestHeaders = MergeHeaders(parsedRequest.Headers, sessionSnapshot);
+
         var response = await _linkedInApiClient.GetAsync(
             parsedRequest.Url!,
-            parsedRequest.Headers,
+            requestHeaders,
             cancellationToken);
 
         var body = response.Body;
@@ -136,6 +161,25 @@ public sealed class LinkedInFeasibilityProbe
         }
 
         return $"{value[..maxLength]}...";
+    }
+
+    private static IReadOnlyDictionary<string, string> MergeHeaders(
+        IReadOnlyDictionary<string, string> requestHeaders,
+        LinkedInSessionSnapshot? sessionSnapshot)
+    {
+        if (sessionSnapshot is null)
+        {
+            return requestHeaders;
+        }
+
+        var merged = new Dictionary<string, string>(requestHeaders, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var header in sessionSnapshot.Headers)
+        {
+            merged[header.Key] = header.Value;
+        }
+
+        return merged;
     }
 }
 

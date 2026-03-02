@@ -1,0 +1,69 @@
+@model LinkedIn.JobScraper.Web.Models.LinkedInSessionPageViewModel
+
+@{
+    ViewData["Title"] = "LinkedIn Session";
+}
+
+<div class="container py-4">
+    <div class="row">
+        <div class="col-lg-9">
+            <h1 class="mb-3">LinkedIn Session</h1>
+            <p class="text-muted">
+                Launch a controlled browser, complete LinkedIn login manually, then capture the authenticated session for API use.
+            </p>
+
+            @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+            {
+                <div class="alert @(Model.StatusSucceeded ? "alert-success" : "alert-danger")" role="alert">
+                    @Model.StatusMessage
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(Model.VerificationMessage))
+            {
+                <div class="alert alert-info" role="alert">
+                    @Model.VerificationMessage
+                </div>
+            }
+
+            <div class="card mb-4">
+                <div class="card-header">Current State</div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Browser Open</dt>
+                        <dd class="col-sm-8">@(Model.BrowserOpen ? "Yes" : "No")</dd>
+
+                        <dt class="col-sm-4">Current Page</dt>
+                        <dd class="col-sm-8">@(Model.CurrentPageUrl ?? "Not available")</dd>
+
+                        <dt class="col-sm-4">Stored Session</dt>
+                        <dd class="col-sm-8">@(Model.StoredSessionAvailable ? "Available" : "Not captured yet")</dd>
+
+                        <dt class="col-sm-4">Captured At</dt>
+                        <dd class="col-sm-8">@(Model.StoredSessionCapturedAtUtc?.ToString("u") ?? "Not available")</dd>
+
+                        <dt class="col-sm-4">Session Source</dt>
+                        <dd class="col-sm-8">@(Model.StoredSessionSource ?? "Not available")</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap">
+                <form asp-action="Launch" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-primary">Launch Login Browser</button>
+                </form>
+
+                <form asp-action="Capture" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-primary">Capture Session</button>
+                </form>
+
+                <form asp-action="Verify" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-secondary">Verify Stored Session</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

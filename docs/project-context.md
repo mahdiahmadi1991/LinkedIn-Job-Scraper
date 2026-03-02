@@ -16,6 +16,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - Browser-session request replay has been proven feasible for LinkedIn job search
 - The MVP will keep ASP.NET Core MVC and add thin service boundaries for LinkedIn, AI, and persistence
 - EF Core with SQL Server is the chosen persistence foundation for the MVP
+- Controlled-browser manual login is the selected MVP approach for acquiring a reusable LinkedIn session
 
 ## Product Intent
 
