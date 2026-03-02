@@ -1,0 +1,209 @@
+@using LinkedIn.JobScraper.Web.Jobs
+@using LinkedIn.JobScraper.Web.Persistence.Entities
+@model JobsDashboardSnapshot
+
+@{
+    ViewData["Title"] = "Jobs";
+    var alertMessage = TempData["JobsAlertMessage"] as string;
+    var alertSeverity = TempData["JobsAlertSeverity"] as string ?? "info";
+}
+
+<div class="d-flex flex-column gap-4">
+    <section class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+        <div>
+            <h1 class="h2 mb-1">Jobs Dashboard</h1>
+            <p class="text-muted mb-0">Review imported jobs, run the end-to-end fetch flow, and keep manual status current.</p>
+        </div>
+        <form asp-action="FetchAndScore" method="post" data-fetch-score-form>
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-primary btn-lg" data-fetch-score-button>
+                <span data-idle-text>Fetch &amp; Score</span>
+                <span class="d-none" data-busy-text>Running fetch, enrich, and scoring...</span>
+            </button>
+        </form>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(alertMessage))
+    {
+        <div class="alert alert-@alertSeverity mb-0" role="alert">
+            @alertMessage
+        </div>
+    }
+
+    <section class="row g-3">
+        <div class="col-6 col-xl-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Total Jobs</div>
+                    <div class="display-6 fw-semibold">@Model.TotalJobs</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Scored</div>
+                    <div class="display-6 fw-semibold">@Model.ScoredJobs</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Strong Matches</div>
+                    <div class="display-6 fw-semibold">@Model.StrongMatches</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Unscored</div>
+                    <div class="display-6 fw-semibold">@Model.UnscoredJobs</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="card-body p-0">
+            @if (Model.Jobs.Count == 0)
+            {
+                <div class="p-4 text-center text-muted">
+                    No jobs are stored yet. Capture a LinkedIn session, then run <strong>Fetch &amp; Score</strong>.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Job</th>
+                                <th>Fit</th>
+                                <th>Status</th>
+                                <th>Dates</th>
+                                <th>Apply</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var job in Model.Jobs)
+                        {
+                            var fitBadgeClass = job.AiLabel switch
+                            {
+                                "StrongMatch" => "bg-success-subtle text-success-emphasis",
+                                "Review" => "bg-warning-subtle text-warning-emphasis",
+                                "Skip" => "bg-secondary-subtle text-secondary-emphasis",
+                                _ => "bg-light text-dark"
+                            };
+
+                            <tr>
+                                <td class="w-50">
+                                    <div class="fw-semibold">@job.Title</div>
+                                    <div class="text-muted small">
+                                        @(job.CompanyName ?? "Unknown company")
+                                        @if (!string.IsNullOrWhiteSpace(job.LocationName))
+                                        {
+                                            <span> | @job.LocationName</span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(job.EmploymentStatus))
+                                        {
+                                            <span> | @job.EmploymentStatus</span>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(job.AiSummary))
+                                    {
+                                        <div class="small mt-2 text-body-secondary">
+                                            @job.AiSummary
+                                        </div>
+                                    }
+                                </td>
+                                <td>
+                                    @if (job.AiScore.HasValue)
+                                    {
+                                        <div class="fw-semibold">@job.AiScore / 100</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="text-muted small">Not scored</div>
+                                    }
+
+                                    <div class="badge rounded-pill @fitBadgeClass mt-1">
+                                        @(job.AiLabel ?? "Pending")
+                                    </div>
+                                </td>
+                                <td>
+                                    <form asp-action="UpdateStatus" method="post" class="d-flex flex-column gap-2">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="jobId" value="@job.Id" />
+                                        <select class="form-select form-select-sm" name="status">
+                                            @foreach (var status in Enum.GetValues<JobWorkflowStatus>())
+                                            {
+                                                <option value="@status" selected="@(status == job.CurrentStatus ? "selected" : null)">
+                                                    @status
+                                                </option>
+                                            }
+                                        </select>
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Save</button>
+                                    </form>
+                                </td>
+                                <td class="small text-muted">
+                                    <div>Seen: @job.LastSeenAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</div>
+                                    <div>
+                                        Listed:
+                                        @(job.ListedAtUtc.HasValue
+                                            ? job.ListedAtUtc.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
+                                            : "Unknown")
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(job.CompanyApplyUrl))
+                                    {
+                                        <a class="btn btn-outline-primary btn-sm" href="@job.CompanyApplyUrl" target="_blank" rel="noreferrer">
+                                            Open Apply
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">No direct apply URL</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </section>
+</div>
+
+@section Scripts
+{
+    <script>
+        (() => {
+            const form = document.querySelector("[data-fetch-score-form]");
+            if (!form) {
+                return;
+            }
+
+            const button = form.querySelector("[data-fetch-score-button]");
+            const idleText = form.querySelector("[data-idle-text]");
+            const busyText = form.querySelector("[data-busy-text]");
+
+            form.addEventListener("submit", () => {
+                if (button) {
+                    button.disabled = true;
+                }
+
+                if (idleText) {
+                    idleText.classList.add("d-none");
+                }
+
+                if (busyText) {
+                    busyText.classList.remove("d-none");
+                }
+            });
+        })();
+    </script>
+}

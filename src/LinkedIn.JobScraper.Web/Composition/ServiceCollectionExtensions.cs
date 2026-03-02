@@ -35,6 +35,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IJobImportService, JobImportService>();
         services.AddTransient<IJobEnrichmentService, JobEnrichmentService>();
         services.AddTransient<IJobBatchScoringService, JobBatchScoringService>();
+        services.AddTransient<IJobsDashboardService, JobsDashboardService>();
         services.AddDbContextFactory<LinkedInJobScraperDbContext>(ConfigureSqlServerDbContext);
 
         services.AddHttpClient<ILinkedInApiClient, LinkedInApiClient>()

@@ -1,11 +1,12 @@
 ﻿@{
-    ViewData["Title"] = "Home Page";
+    ViewData["Title"] = "Home";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Use the local tools to connect your LinkedIn session and start building the job workflow.</p>
-    <p>
-        <a class="btn btn-primary" asp-controller="LinkedInSession" asp-action="Index">Open LinkedIn Session</a>
-    </p>
+<div class="p-4 p-lg-5 bg-light rounded-3 border">
+    <h1 class="display-6 mb-3">LinkedIn Job Scraper MVP</h1>
+    <p class="lead mb-4">Start from the jobs dashboard for the full workflow, or refresh the LinkedIn session if the platform expires your stored cookies.</p>
+    <div class="d-flex flex-column flex-sm-row gap-2">
+        <a class="btn btn-primary" asp-controller="Jobs" asp-action="Index">Open Jobs Dashboard</a>
+        <a class="btn btn-outline-secondary" asp-controller="LinkedInSession" asp-action="Index">Open LinkedIn Session</a>
+    </div>
 </div>
