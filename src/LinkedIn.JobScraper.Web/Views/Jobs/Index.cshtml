@@ -6,6 +6,34 @@
     ViewData["Title"] = "Jobs";
     var alertMessage = TempData["JobsAlertMessage"] as string;
     var alertSeverity = TempData["JobsAlertSeverity"] as string ?? "info";
+    var workflowSummaryAvailable =
+        string.Equals(
+            TempData["JobsWorkflowSummaryAvailable"] as string,
+            bool.TrueString,
+            StringComparison.OrdinalIgnoreCase);
+    var importFetchedCount = TempData["JobsWorkflowImportFetchedCount"] is int fetchedCount ? fetchedCount : 0;
+    var importTotalCount = TempData["JobsWorkflowImportTotalCount"] is int totalCount ? totalCount : 0;
+    var importImportedCount = TempData["JobsWorkflowImportImportedCount"] is int importedCount ? importedCount : 0;
+    var importRefreshedCount = TempData["JobsWorkflowImportRefreshedCount"] is int refreshedCount ? refreshedCount : 0;
+    var importSkippedCount = TempData["JobsWorkflowImportSkippedCount"] is int skippedCount ? skippedCount : 0;
+    var enrichmentRequestedCount =
+        TempData["JobsWorkflowEnrichmentRequestedCount"] is int enrichmentRequested ? enrichmentRequested : 0;
+    var enrichmentProcessedCount =
+        TempData["JobsWorkflowEnrichmentProcessedCount"] is int enrichmentProcessed ? enrichmentProcessed : 0;
+    var enrichmentEnrichedCount =
+        TempData["JobsWorkflowEnrichmentEnrichedCount"] is int enrichmentEnriched ? enrichmentEnriched : 0;
+    var enrichmentWarningCount =
+        TempData["JobsWorkflowEnrichmentWarningCount"] is int enrichmentWarnings ? enrichmentWarnings : 0;
+    var enrichmentFailedCount =
+        TempData["JobsWorkflowEnrichmentFailedCount"] is int enrichmentFailed ? enrichmentFailed : 0;
+    var scoringRequestedCount =
+        TempData["JobsWorkflowScoringRequestedCount"] is int scoringRequested ? scoringRequested : 0;
+    var scoringProcessedCount =
+        TempData["JobsWorkflowScoringProcessedCount"] is int scoringProcessed ? scoringProcessed : 0;
+    var scoringScoredCount =
+        TempData["JobsWorkflowScoringScoredCount"] is int scoringScored ? scoringScored : 0;
+    var scoringFailedCount =
+        TempData["JobsWorkflowScoringFailedCount"] is int scoringFailed ? scoringFailed : 0;
     var query = Model.Query;
 }
 
@@ -73,6 +101,41 @@
         <div class="alert alert-@alertSeverity mb-0" role="alert">
             @alertMessage
         </div>
+    }
+
+    @if (workflowSummaryAvailable)
+    {
+        <section class="card border-0 shadow-sm">
+            <div class="card-body d-flex flex-column gap-3">
+                <div>
+                    <div class="small text-muted text-uppercase">Last Workflow Result</div>
+                    <div class="fw-semibold">Structured summary of the latest fetch, enrichment, and AI scoring run.</div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-12 col-lg-4">
+                        <div class="border rounded p-3 h-100">
+                            <div class="small text-muted text-uppercase">Fetch</div>
+                            <div class="fw-semibold">@importFetchedCount fetched from @importTotalCount available</div>
+                            <div class="small text-body-secondary">@importImportedCount new, @importRefreshedCount refreshed, @importSkippedCount skipped.</div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-lg-4">
+                        <div class="border rounded p-3 h-100">
+                            <div class="small text-muted text-uppercase">Enrichment</div>
+                            <div class="fw-semibold">@enrichmentEnrichedCount enriched out of @enrichmentProcessedCount processed</div>
+                            <div class="small text-body-secondary">@enrichmentRequestedCount requested, @enrichmentWarningCount warnings, @enrichmentFailedCount failed.</div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-lg-4">
+                        <div class="border rounded p-3 h-100">
+                            <div class="small text-muted text-uppercase">AI Scoring</div>
+                            <div class="fw-semibold">@scoringScoredCount scored out of @scoringProcessedCount processed</div>
+                            <div class="small text-body-secondary">@scoringRequestedCount requested, @scoringFailedCount failed.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
     }
 
     <section class="card">

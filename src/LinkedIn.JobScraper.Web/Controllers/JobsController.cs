@@ -44,6 +44,7 @@ public class JobsController : Controller
         var result = await _jobsDashboardService.RunFetchAndScoreAsync(cancellationToken);
         TempData["JobsAlertMessage"] = result.Message;
         TempData["JobsAlertSeverity"] = result.Severity;
+        WriteWorkflowSummary(result);
 
         return RedirectToAction(nameof(Index), BuildRouteValues(query));
     }
@@ -74,5 +75,32 @@ public class JobsController : Controller
             minScore = query.MinScore,
             sortBy = query.GetNormalizedSortBy()
         };
+    }
+
+    private void WriteWorkflowSummary(FetchAndScoreWorkflowResult result)
+    {
+        TempData["JobsWorkflowSummaryAvailable"] = bool.TrueString;
+        TempData["JobsWorkflowImportFetchedCount"] = result.ImportResult.FetchedCount;
+        TempData["JobsWorkflowImportTotalCount"] = result.ImportResult.TotalAvailableCount;
+        TempData["JobsWorkflowImportImportedCount"] = result.ImportResult.ImportedCount;
+        TempData["JobsWorkflowImportRefreshedCount"] = result.ImportResult.UpdatedExistingCount;
+        TempData["JobsWorkflowImportSkippedCount"] = result.ImportResult.SkippedCount;
+
+        if (result.EnrichmentResult is not null)
+        {
+            TempData["JobsWorkflowEnrichmentRequestedCount"] = result.EnrichmentResult.RequestedCount;
+            TempData["JobsWorkflowEnrichmentProcessedCount"] = result.EnrichmentResult.ProcessedCount;
+            TempData["JobsWorkflowEnrichmentEnrichedCount"] = result.EnrichmentResult.EnrichedCount;
+            TempData["JobsWorkflowEnrichmentWarningCount"] = result.EnrichmentResult.WarningCount;
+            TempData["JobsWorkflowEnrichmentFailedCount"] = result.EnrichmentResult.FailedCount;
+        }
+
+        if (result.ScoringResult is not null)
+        {
+            TempData["JobsWorkflowScoringRequestedCount"] = result.ScoringResult.RequestedCount;
+            TempData["JobsWorkflowScoringProcessedCount"] = result.ScoringResult.ProcessedCount;
+            TempData["JobsWorkflowScoringScoredCount"] = result.ScoringResult.ScoredCount;
+            TempData["JobsWorkflowScoringFailedCount"] = result.ScoringResult.FailedCount;
+        }
     }
 }

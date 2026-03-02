@@ -26,6 +26,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The jobs dashboard now exposes AI summary, why-matched, and concern text directly in each job row for faster review
 - A dedicated job details page now shows full description and AI analysis without overloading the dashboard table
 - The `Fetch & Score` action now exposes a clearer client-side staged progress panel while the sequential workflow is running
+- The jobs dashboard now shows a structured post-run summary for fetch, enrichment, and scoring counts after each `Fetch & Score`
 
 ## Product Intent
 
