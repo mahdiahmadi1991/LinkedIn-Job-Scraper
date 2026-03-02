@@ -162,7 +162,11 @@
 
                             <tr>
                                 <td class="w-50">
-                                    <div class="fw-semibold">@job.Title</div>
+                                    <div class="fw-semibold">
+                                        <a asp-action="Details" asp-route-jobId="@job.Id" class="link-body-emphasis text-decoration-none">
+                                            @job.Title
+                                        </a>
+                                    </div>
                                     <div class="text-muted small">
                                         @(job.CompanyName ?? "Unknown company")
                                         @if (!string.IsNullOrWhiteSpace(job.LocationName))
@@ -245,6 +249,10 @@
                                     </div>
                                 </td>
                                 <td>
+                                    <div class="d-flex flex-column gap-2">
+                                    <a asp-action="Details" asp-route-jobId="@job.Id" class="btn btn-outline-secondary btn-sm">
+                                        Open Details
+                                    </a>
                                     @if (!string.IsNullOrWhiteSpace(job.CompanyApplyUrl))
                                     {
                                         <a class="btn btn-outline-primary btn-sm" href="@job.CompanyApplyUrl" target="_blank" rel="noreferrer">
@@ -255,6 +263,7 @@
                                     {
                                         <span class="text-muted small">No direct apply URL</span>
                                     }
+                                    </div>
                                 </td>
                             </tr>
                         }

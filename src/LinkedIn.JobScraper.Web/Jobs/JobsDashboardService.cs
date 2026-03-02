@@ -128,6 +128,40 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 .ToArray());
     }
 
+    public async Task<JobDetailsSnapshot?> GetJobDetailsAsync(
+        Guid jobId,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var job = await dbContext.Jobs
+            .AsNoTracking()
+            .SingleOrDefaultAsync(job => job.Id == jobId, cancellationToken);
+
+        if (job is null)
+        {
+            return null;
+        }
+
+        return new JobDetailsSnapshot(
+            job.Id,
+            job.Title,
+            job.CompanyName,
+            job.LocationName,
+            job.EmploymentStatus,
+            job.ListedAtUtc,
+            job.FirstDiscoveredAtUtc,
+            job.LastSeenAtUtc,
+            job.CurrentStatus,
+            job.Description,
+            job.CompanyApplyUrl,
+            job.AiScore,
+            job.AiLabel,
+            job.AiSummary,
+            job.AiWhyMatched,
+            job.AiConcerns);
+    }
+
     public async Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(CancellationToken cancellationToken)
     {
         var importResult = await _jobImportService.ImportCurrentSearchAsync(cancellationToken);

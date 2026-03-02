@@ -24,6 +24,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The jobs dashboard now supports server-side filtering and sorting based on stored job fields
 - AI behavior settings are now editable in the UI while OpenAI security settings remain in configuration
 - The jobs dashboard now exposes AI summary, why-matched, and concern text directly in each job row for faster review
+- A dedicated job details page now shows full description and AI analysis without overloading the dashboard table
 
 ## Product Intent
 

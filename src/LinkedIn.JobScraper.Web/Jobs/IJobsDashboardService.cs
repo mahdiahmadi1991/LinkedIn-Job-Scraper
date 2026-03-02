@@ -9,6 +9,10 @@ public interface IJobsDashboardService
         JobsDashboardQuery query,
         CancellationToken cancellationToken);
 
+    Task<JobDetailsSnapshot?> GetJobDetailsAsync(
+        Guid jobId,
+        CancellationToken cancellationToken);
+
     Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(CancellationToken cancellationToken);
 
     Task<JobStatusChangeResult> UpdateStatusAsync(
@@ -25,6 +29,24 @@ public sealed record JobsDashboardSnapshot(
     int UnscoredJobs,
     JobsDashboardQuery Query,
     IReadOnlyList<JobDashboardRow> Jobs);
+
+public sealed record JobDetailsSnapshot(
+    Guid Id,
+    string Title,
+    string? CompanyName,
+    string? LocationName,
+    string? EmploymentStatus,
+    DateTimeOffset? ListedAtUtc,
+    DateTimeOffset FirstDiscoveredAtUtc,
+    DateTimeOffset LastSeenAtUtc,
+    JobWorkflowStatus CurrentStatus,
+    string? Description,
+    string? CompanyApplyUrl,
+    int? AiScore,
+    string? AiLabel,
+    string? AiSummary,
+    string? AiWhyMatched,
+    string? AiConcerns);
 
 public sealed class JobsDashboardQuery
 {

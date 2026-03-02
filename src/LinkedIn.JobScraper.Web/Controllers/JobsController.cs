@@ -22,6 +22,19 @@ public class JobsController : Controller
         return View(snapshot);
     }
 
+    [HttpGet]
+    public async Task<IActionResult> Details(Guid jobId, CancellationToken cancellationToken)
+    {
+        var job = await _jobsDashboardService.GetJobDetailsAsync(jobId, cancellationToken);
+
+        if (job is null)
+        {
+            return NotFound();
+        }
+
+        return View(job);
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> FetchAndScore(
