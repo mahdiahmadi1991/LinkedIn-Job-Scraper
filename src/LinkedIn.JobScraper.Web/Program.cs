@@ -1,8 +1,20 @@
+using System.Net;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddHealthChecks();
+builder.Services
+    .AddHttpClient<LinkedIn.JobScraper.Web.Diagnostics.LinkedInFeasibilityProbe>()
+    .ConfigurePrimaryHttpMessageHandler(
+        static () => new HttpClientHandler
+        {
+            UseCookies = false,
+            AutomaticDecompression = DecompressionMethods.GZip |
+                                     DecompressionMethods.Deflate |
+                                     DecompressionMethods.Brotli
+        });
 
 var app = builder.Build();
 
