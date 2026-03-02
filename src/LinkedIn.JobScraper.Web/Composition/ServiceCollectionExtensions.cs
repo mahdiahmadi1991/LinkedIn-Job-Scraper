@@ -4,6 +4,7 @@ using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Diagnostics;
 using LinkedIn.JobScraper.Web.Jobs;
 using LinkedIn.JobScraper.Web.LinkedIn.Api;
+using LinkedIn.JobScraper.Web.LinkedIn.Details;
 using LinkedIn.JobScraper.Web.LinkedIn.Search;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using LinkedIn.JobScraper.Web.Persistence;
@@ -28,8 +29,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ILinkedInSessionStore, DatabaseLinkedInSessionStore>();
         services.AddSingleton<ILinkedInBrowserLoginService, PlaywrightLinkedInBrowserLoginService>();
         services.AddSingleton<IJobScoringGateway, OpenAiJobScoringGateway>();
+        services.AddTransient<ILinkedInJobDetailService, LinkedInJobDetailService>();
         services.AddTransient<ILinkedInJobSearchService, LinkedInJobSearchService>();
         services.AddTransient<IJobImportService, JobImportService>();
+        services.AddTransient<IJobEnrichmentService, JobEnrichmentService>();
         services.AddDbContextFactory<LinkedInJobScraperDbContext>(ConfigureSqlServerDbContext);
 
         services.AddHttpClient<ILinkedInApiClient, LinkedInApiClient>()

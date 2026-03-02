@@ -18,6 +18,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - EF Core with SQL Server is the chosen persistence foundation for the MVP
 - Controlled-browser manual login is the selected MVP approach for acquiring a reusable LinkedIn session
 - The search import pipeline stores search-card fields first and deduplicates by LinkedIn job id while refreshing `LastSeenAtUtc`
+- Job detail enrichment tolerates partial GraphQL errors and only depends on the main job node being present
 
 ## Product Intent
 
@@ -32,6 +33,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - As of March 2, 2026, LinkedIn's public developer documentation emphasizes approved partner access and product-specific programs rather than an openly available personal-use job search API.
 - We should validate the ingestion strategy before building around an API-first assumption.
 - Direct credential-post login should still be treated as unstable; controlled-browser manual login remains the safer MVP path.
+- Stored LinkedIn sessions can expire and return `401`, so the MVP must keep session re-capture available at all times.
 
 ## Reference Notes
 
