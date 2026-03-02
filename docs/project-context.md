@@ -27,6 +27,12 @@ Build a simple local web application for personal use that helps collect LinkedI
 - As of March 2, 2026, LinkedIn's public developer documentation emphasizes approved partner access and product-specific programs rather than an openly available personal-use job search API.
 - We should validate the ingestion strategy before building around an API-first assumption.
 
+## Reference Notes
+
+- LinkedIn API access overview: https://learn.microsoft.com/en-us/linkedin/shared/authentication/getting-access
+- LinkedIn Talent integrations overview: https://learn.microsoft.com/en-us/linkedin/talent/
+- Apply with LinkedIn access note: https://learn.microsoft.com/en-us/linkedin/talent/apply-with-linkedin
+
 ## Open Architecture Questions
 
 - Will LinkedIn ingestion be online interactive only, or should we still preserve a future path for background processing?
