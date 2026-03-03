@@ -12,6 +12,8 @@ public sealed class LinkedInJobScraperDbContext : DbContext
 
     public DbSet<AiBehaviorSettingsRecord> AiBehaviorSettings => Set<AiBehaviorSettingsRecord>();
 
+    public DbSet<AppUserRecord> AppUsers => Set<AppUserRecord>();
+
     public DbSet<JobRecord> Jobs => Set<JobRecord>();
 
     public DbSet<JobStatusHistoryRecord> JobStatusHistory => Set<JobStatusHistoryRecord>();
@@ -50,6 +52,20 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.HasIndex(static job => job.AiScore);
                 entity.HasIndex(static job => job.LastSeenAtUtc);
                 entity.HasIndex(static job => job.ListedAtUtc);
+            });
+
+        modelBuilder.Entity<AppUserRecord>(
+            entity =>
+            {
+                entity.ToTable("AppUsers");
+                entity.HasKey(static user => user.Id);
+
+                entity.Property(static user => user.UserName).HasMaxLength(128).IsRequired();
+                entity.Property(static user => user.DisplayName).HasMaxLength(256).IsRequired();
+                entity.Property(static user => user.PasswordHash).HasMaxLength(1024).IsRequired();
+
+                entity.HasIndex(static user => user.UserName).IsUnique();
+                entity.HasIndex(static user => user.IsActive);
             });
 
         modelBuilder.Entity<JobStatusHistoryRecord>(

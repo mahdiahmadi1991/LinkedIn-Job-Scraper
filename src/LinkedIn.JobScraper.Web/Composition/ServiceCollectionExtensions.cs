@@ -1,4 +1,5 @@
 using System.Net;
+using LinkedIn.JobScraper.Web.Authentication;
 using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Diagnostics;
@@ -20,6 +21,9 @@ public static class ServiceCollectionExtensions
         services.AddOptions<SqlServerOptions>()
             .Bind(configuration.GetSection(SqlServerOptions.SectionName));
 
+        services.AddOptions<AppAuthenticationOptions>()
+            .Bind(configuration.GetSection(AppAuthenticationOptions.SectionName));
+
         services.AddOptions<OpenAiSecurityOptions>()
             .Bind(configuration.GetSection(OpenAiSecurityOptions.SectionName));
 
@@ -27,7 +31,9 @@ public static class ServiceCollectionExtensions
             .Bind(configuration.GetSection(LinkedInBrowserAutomationOptions.SectionName));
 
         services.AddHostedService<ConfigurationReadinessStartupService>();
+        services.AddHostedService<AppUserSeedingStartupService>();
         services.AddSignalR();
+        services.AddSingleton<IAppUserPasswordHasher, AppUserPasswordHasher>();
         services.AddSingleton<ISqlServerConnectionStringProvider, ConfiguredSqlServerConnectionStringProvider>();
         services.AddSingleton<ILinkedInSessionStore, DatabaseLinkedInSessionStore>();
         services.AddSingleton<ILinkedInBrowserLoginService, PlaywrightLinkedInBrowserLoginService>();
