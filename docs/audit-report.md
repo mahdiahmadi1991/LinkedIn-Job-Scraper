@@ -66,7 +66,7 @@
 | Dependency direction respected (Web -> services -> infra; no infra leaking into views/controllers) | **PARTIAL** | Controllers generally depend on service interfaces (`IJobsDashboardService`, `IAiBehaviorSettingsService`, `ILinkedInSearchSettingsService`) rather than EF directly, but `src/LinkedIn.JobScraper.Web/Controllers/JobsController.cs` imports `LinkedIn.JobScraper.Web.Persistence.Entities` for `JobWorkflowStatus`, and views also import persistence entities for enums. This is a mild web-to-persistence leak. |
 | No EF entities leaking to Views; ViewModels/DTO boundaries respected | **PARTIAL** | Views are strongly typed to snapshots/view models such as `JobsDashboardSnapshot` and `JobsRowsChunk` in `src/LinkedIn.JobScraper.Web/Views/Jobs/*.cshtml`; there is no `@model` EF entity. However, `src/LinkedIn.JobScraper.Web/Views/Jobs/Index.cshtml` and `src/LinkedIn.JobScraper.Web/Views/Jobs/_JobRows.cshtml` use `@using LinkedIn.JobScraper.Web.Persistence.Entities` to access `JobWorkflowStatus`, so the boundary is not fully clean. |
 | “Deferred contracts” rule respected (no premature cross-module contract explosion) | **PARTIAL** | Contract extraction exists but is still relatively contained inside `src/LinkedIn.JobScraper.Web/Contracts`. The repo now contains focused DTOs such as `FetchAndScoreAjaxResponse`, `LinkedInSessionActionResponse`, diagnostics response DTOs, and `SettingsSaveResponse`, which are justified by live JSON endpoints. However, the dedicated `Contracts` folder is already becoming a cross-cutting layer before any multi-project split, so the rule is being managed, not fully “tight.” |
-| Any “cleanup-only refactor” signs (large refactors without milestone linkage) | **PARTIAL** | There is no clear evidence of a wasteful structural rewrite from the current snapshot alone. The current structure is still product-aligned and all major folders map to runtime concerns. However, because this audit is static and commit intent is not evaluated, the repository snapshot cannot fully prove every structural change was milestone-driven. `docs/milestone-status.md` and `docs/project-context.md` do show effort was documented, but this remains only partial evidence. |
+| Any “cleanup-only refactor” signs (large refactors without milestone linkage) | **PARTIAL** | There is no clear evidence of a wasteful structural rewrite from the current snapshot alone. The current structure is still product-aligned and all major folders map to runtime concerns. However, because this audit is static and commit intent is not evaluated, the repository snapshot cannot fully prove every structural change was milestone-driven. `docs/PLAN_REVISED.md` and `docs/project-context.md` do show effort was documented, but this remains only partial evidence. |
 
 # 4) Testing & CI Readiness (CI-safe rule)
 
@@ -159,8 +159,8 @@
 - **Current status:** **In progress**
 - **Evidence:**
   - `README.md` is aligned with current product scope.
-  - Documentation set includes `docs/architecture-overview.md`, `docs/architecture-diagram.md`, `docs/data-flow-diagram.md`, `docs/troubleshooting.md`, `docs/documentation-map.md`, and ADRs.
-  - Status tracking exists in `docs/milestone-status.md`.
+  - Documentation set includes `docs/architecture-overview.md`, `docs/architecture-diagram.md`, `docs/data-flow-diagram.md`, `docs/troubleshooting.md`, and ADRs.
+  - Milestone/status tracking now lives in `docs/PLAN_REVISED.md`.
 - **Top 3 blockers to reach “Done”:**
   - Reviewer-facing visual polish is still documentation-heavy; there are no stored screenshots in the repo.
   - ADR coverage is improving but still selective rather than a complete decision log.
@@ -189,8 +189,8 @@
   - `docs/architecture-overview.md`
   - `docs/architecture-diagram.md`
   - `docs/data-flow-diagram.md`
-  - `docs/documentation-map.md`
-  - `docs/milestone-status.md`
+  - `README.md` (documentation guide section)
+  - `docs/PLAN_REVISED.md` (current milestone snapshot section)
   - `docs/adr-001-local-safety-and-session-strategy.md`
   - `docs/adr-002-ci-safe-testing-and-external-boundaries.md`
 

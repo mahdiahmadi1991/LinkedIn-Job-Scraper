@@ -88,10 +88,58 @@ For a deeper technical walkthrough, see:
 - [data-flow-diagram.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/data-flow-diagram.md)
 - [adr-001-local-safety-and-session-strategy.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/adr-001-local-safety-and-session-strategy.md)
 - [adr-002-ci-safe-testing-and-external-boundaries.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/adr-002-ci-safe-testing-and-external-boundaries.md)
-- [documentation-map.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/documentation-map.md)
-- [milestone-status.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/milestone-status.md)
 - [project-context.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/project-context.md)
+- [technical-debt.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/technical-debt.md)
+- [audit-report.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/audit-report.md)
 - [troubleshooting.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/troubleshooting.md)
+
+## Documentation Guide
+
+Use the docs in this order, depending on what you need:
+
+### Start Here
+
+- [PLAN_REVISED.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/PLAN_REVISED.md)
+  - active roadmap
+  - milestone expectations
+  - current architecture and quality guardrails
+- [project-context.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/project-context.md)
+  - latest confirmed implementation decisions
+  - recently completed changes
+  - current operating constraints
+
+### Deep Technical Context
+
+- [ai-onboarding-report.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/ai-onboarding-report.md)
+  - broad AI/engineer onboarding
+  - implemented scope
+  - system behavior and technical choices
+- [architecture-overview.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/architecture-overview.md)
+  - modular monolith structure
+  - where code belongs
+  - layering rules
+- [architecture-diagram.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/architecture-diagram.md)
+  - visual module overview
+- [data-flow-diagram.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/data-flow-diagram.md)
+  - visual runtime flow summary
+
+### Decision Records And Operational Support
+
+- [adr-001-local-safety-and-session-strategy.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/adr-001-local-safety-and-session-strategy.md)
+- [adr-002-ci-safe-testing-and-external-boundaries.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/adr-002-ci-safe-testing-and-external-boundaries.md)
+- [troubleshooting.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/troubleshooting.md)
+- [security-logging.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/security-logging.md)
+
+### Planning And Review Artifacts
+
+- [plan.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/plan.md)
+  - historical delivery log and prior execution queues
+- [next-plan.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/next-plan.md)
+  - the current externally proposed remediation plan under review
+- [audit-report.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/audit-report.md)
+  - point-in-time evidence snapshot
+- [technical-debt.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/technical-debt.md)
+  - intentionally deferred items still considered real debt
 
 ## Technology Stack
 

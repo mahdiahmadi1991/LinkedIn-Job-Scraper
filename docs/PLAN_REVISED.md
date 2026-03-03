@@ -921,3 +921,114 @@ These are the behaviors that must remain intact throughout all future work:
 - **Should**: Add a concise architectural narrative for recruiters/reviewers.
 - **Could**: Add a small “Why this architecture?” section to the README.
 - **Could**: Add a changelog or release-notes pattern once the core quality gate is in place.
+
+## Current Milestone Status Snapshot
+
+Date of this snapshot: March 3, 2026.
+
+### M1 — Test Foundation
+
+- **Status:** Substantially complete
+- **In place:**
+  - CI-safe xUnit test project
+  - controller tests for key AJAX/JSON flows
+  - service-level tests for LinkedIn failure handling
+  - service-level tests for workflow orchestration progress behavior
+  - middleware tests
+  - configuration and health-check tests
+- **Current test posture:**
+  - no SQL Server dependency
+  - no LinkedIn session dependency
+  - no OpenAI credential dependency
+  - no external network calls
+
+### M2 — Security, Secrets, and Configuration Hardening
+
+- **Status:** Substantially complete
+- **In place:**
+  - secret-free tracked development config
+  - `dotnet user-secrets` guidance and enablement
+  - actionable configuration validation
+  - startup configuration readiness warnings
+  - basic security headers
+  - narrow local rate limiting on sensitive POST actions
+  - minimized persisted LinkedIn session headers
+- **Remaining:**
+  - optional encryption-at-rest for stored session data
+  - tighter retention/cleanup around sensitive local state
+
+### M3 — Observability, Diagnostics, and Resilience
+
+- **Status:** Substantially complete
+- **In place:**
+  - structured workflow stage logging
+  - request-level correlation id
+  - liveness and readiness health endpoints
+  - safe diagnostics summary
+  - safe diagnostics posture that avoids secret exposure
+  - `ProblemDetails` for high-value JSON failure paths across jobs, session, AI readiness, and diagnostics
+- **Remaining:**
+  - richer request-wide diagnostics if needed
+  - optional OpenTelemetry/metrics later
+
+### M4 — CI Quality Gate
+
+- **Status:** Substantially complete
+- **In place:**
+  - GitHub Actions workflow
+  - format verification
+  - build with warnings-as-errors
+  - CI-safe test execution
+  - dependency review for pull requests
+  - test result and coverage artifact publishing
+- **Remaining:**
+  - optional badges
+  - optional stricter coverage thresholds later
+
+### M5 — Portfolio Polish & Documentation
+
+- **Status:** Meaningfully in progress
+- **In place:**
+  - refreshed `README.md`
+  - AI onboarding report
+  - architecture overview
+  - architecture and data-flow diagrams
+  - ADR 001 and ADR 002
+  - troubleshooting guide
+- **Remaining:**
+  - optional screenshot set
+  - optional broader ADR set
+
+### Explicitly Deferred
+
+- global shared result contracts
+- full JSON contract normalization
+- global ProblemDetails shaping (the highest-value JSON endpoints are now covered, but not every JSON surface is fully normalized)
+- broader persistence integration tests
+- SQL Server container CI lane
+- OpenTelemetry traces/metrics
+- deployment and hosting beyond local usage
+
+### Deferred Queue Status
+
+- **Status:** Closed for the current phase
+- **Completed from the activated deferred queue:**
+  - high-value JSON success contracts were standardized
+  - remaining diagnostics JSON success contracts were normalized
+  - a limited shared result contract was introduced for the LinkedIn session seam
+  - CI-safe persistence service coverage was added without introducing a SQL Server dependency in CI
+- **Revisited and intentionally deferred again:**
+  - SQL Server container CI coverage
+  - richer telemetry beyond current logging, health checks, diagnostics, and correlation
+
+### Next-Plan Queue Status
+
+- **Status:** Closed for the current phase
+- **Completed:**
+  - Web-to-Persistence leakage was reduced in the jobs UI seam
+  - controllers were further thinned with module-local view-model adapters
+  - correlation IDs were propagated through workflow progress payloads
+  - a concrete logging redaction policy was added with minimal enforcement in sensitive message paths
+- **Revisited and not reopened:**
+  - CI quality gates already covered the intended baseline for this queue
+  - reviewer-facing documentation already had sufficient baseline coverage after the latest ADR and diagram passes

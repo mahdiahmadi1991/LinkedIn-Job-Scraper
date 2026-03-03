@@ -64,7 +64,7 @@ Build a simple local ASP.NET Core MVC application that:
 
 Outputs:
 
-- `docs/feasibility-notes.md`
+- a short feasibility note (now retained in current architecture/context docs rather than a standalone file)
 - one small console or web-internal diagnostic path to replay a stored session against the search endpoint
 
 Acceptance criteria:
@@ -276,6 +276,13 @@ The following `next-plan` suggestions are already materially satisfied enough th
 - Each item must still be delivered in small, reviewable steps.
 - Each implementation step must map back to one of the approved gap-only items above.
 - No cleanup-only refactor should be done unless it directly removes a currently observed architectural leak or reduces an active risk.
+
+### Queue Closure Status
+
+- **Closed for the current phase**
+- Items 1 through 4 were implemented in reviewable steps.
+- Items 5 and 6 were revisited after those changes and did not expose a new CI or documentation gap large enough to justify another code or docs pass.
+- Any future work in these areas should be treated as a new phase, not as a continuation of this queue.
 
 ## Post-MVP Feedback Plan
 
