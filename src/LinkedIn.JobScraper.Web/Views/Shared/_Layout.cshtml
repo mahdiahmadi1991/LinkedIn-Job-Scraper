@@ -75,11 +75,21 @@
                             <span class="app-menu-button-line"></span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end app-menu-dropdown">
+                            <li class="dropdown-item-text app-menu-user-label">
+                                Signed in as <strong>@(User.Identity?.Name ?? "User")</strong>
+                            </li>
+                            <li><hr class="dropdown-divider" /></li>
                             <li>
                                 <a class="dropdown-item app-menu-item" asp-area="" asp-controller="AiSettings" asp-action="Index">AI Settings</a>
                             </li>
                             <li>
                                 <a class="dropdown-item app-menu-item" asp-area="" asp-controller="SearchSettings" asp-action="Index">Search Settings</a>
+                            </li>
+                            <li><hr class="dropdown-divider" /></li>
+                            <li>
+                                <form asp-area="" asp-controller="Account" asp-action="Logout" method="post">
+                                    <button type="submit" class="dropdown-item app-menu-item">Sign out</button>
+                                </form>
                             </li>
                         </ul>
                     </div>

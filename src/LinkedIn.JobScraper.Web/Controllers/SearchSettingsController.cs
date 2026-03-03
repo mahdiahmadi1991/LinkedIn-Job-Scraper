@@ -1,10 +1,13 @@
+using LinkedIn.JobScraper.Web.Authentication;
 using LinkedIn.JobScraper.Web.LinkedIn.Search;
 using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LinkedIn.JobScraper.Web.Controllers;
 
+[Authorize(AuthenticationSchemes = AppAuthenticationDefaults.CookieScheme)]
 public sealed class SearchSettingsController : Controller
 {
     private readonly ILinkedInLocationLookupService _linkedInLocationLookupService;

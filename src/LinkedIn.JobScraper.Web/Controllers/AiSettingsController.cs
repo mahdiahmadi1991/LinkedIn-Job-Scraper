@@ -1,13 +1,16 @@
 using LinkedIn.JobScraper.Web.AI;
+using LinkedIn.JobScraper.Web.Authentication;
 using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.Controllers;
 
+[Authorize(AuthenticationSchemes = AppAuthenticationDefaults.CookieScheme)]
 public sealed class AiSettingsController : Controller
 {
     private readonly IAiBehaviorSettingsService _aiBehaviorSettingsService;

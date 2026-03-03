@@ -74,6 +74,20 @@ public sealed class AccountControllerTests
         Assert.Equal("/Jobs", redirect.Url);
     }
 
+    [Fact]
+    public async Task LogoutPostSignsOutAndRedirectsToLogin()
+    {
+        var httpAuthenticationService = new CapturingHttpAuthenticationService();
+        var controller = CreateController(new FakeAuthenticationService(false), httpAuthenticationService);
+
+        var result = await controller.Logout();
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+
+        Assert.Equal("/Account/Login", redirect.Url);
+        Assert.Equal(AppAuthenticationDefaults.CookieScheme, httpAuthenticationService.LastSignOutScheme);
+    }
+
     private static AccountController CreateController(
         IAppUserAuthenticationService authenticationService,
         IAuthenticationService? httpAuthenticationService = null)
@@ -142,6 +156,8 @@ public sealed class AccountControllerTests
     {
         public string? LastScheme { get; private set; }
 
+        public string? LastSignOutScheme { get; private set; }
+
         public AuthenticationProperties? LastProperties { get; private set; }
 
         public Task<AuthenticateResult> AuthenticateAsync(HttpContext context, string? scheme)
@@ -168,7 +184,8 @@ public sealed class AccountControllerTests
 
         public Task SignOutAsync(HttpContext context, string? scheme, AuthenticationProperties? properties)
         {
-            throw new NotSupportedException();
+            LastSignOutScheme = scheme;
+            return Task.CompletedTask;
         }
     }
 }

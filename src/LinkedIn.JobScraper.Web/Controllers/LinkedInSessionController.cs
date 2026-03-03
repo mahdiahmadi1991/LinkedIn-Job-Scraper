@@ -1,13 +1,16 @@
+using LinkedIn.JobScraper.Web.Authentication;
 using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using LinkedIn.JobScraper.Web.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace LinkedIn.JobScraper.Web.Controllers;
 
+[Authorize(AuthenticationSchemes = AppAuthenticationDefaults.CookieScheme)]
 public class LinkedInSessionController : Controller
 {
     private readonly ILinkedInBrowserLoginService _linkedInBrowserLoginService;

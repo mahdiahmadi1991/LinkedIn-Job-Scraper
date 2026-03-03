@@ -1,14 +1,17 @@
 using LinkedIn.JobScraper.Web.AI;
+using LinkedIn.JobScraper.Web.Authentication;
 using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.Diagnostics;
 using LinkedIn.JobScraper.Web.Jobs;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.Controllers;
 
+[Authorize(AuthenticationSchemes = AppAuthenticationDefaults.CookieScheme)]
 [Route("diagnostics")]
 public class DiagnosticsController : Controller
 {

@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace LinkedIn.JobScraper.Web.Controllers;
 
-[AllowAnonymous]
 public sealed class AccountController : Controller
 {
     private readonly IAppUserAuthenticationService _authenticationService;
@@ -16,6 +15,7 @@ public sealed class AccountController : Controller
         _authenticationService = authenticationService;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public IActionResult Login(string? returnUrl = null)
     {
@@ -31,6 +31,7 @@ public sealed class AccountController : Controller
             });
     }
 
+    [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Login(LoginPageViewModel model, CancellationToken cancellationToken)
@@ -70,6 +71,15 @@ public sealed class AccountController : Controller
             authenticationProperties);
 
         return Redirect(GetSafeReturnUrl(model.ReturnUrl));
+    }
+
+    [Authorize(AuthenticationSchemes = AppAuthenticationDefaults.CookieScheme)]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Logout()
+    {
+        await HttpContext.SignOutAsync(AppAuthenticationDefaults.CookieScheme);
+        return Redirect("/Account/Login");
     }
 
     private static string GetSafeReturnUrl(string? returnUrl)

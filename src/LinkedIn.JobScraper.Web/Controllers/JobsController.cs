@@ -1,12 +1,15 @@
 using LinkedIn.JobScraper.Web.Jobs;
+using LinkedIn.JobScraper.Web.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Contracts;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace LinkedIn.JobScraper.Web.Controllers;
 
+[Authorize(AuthenticationSchemes = AppAuthenticationDefaults.CookieScheme)]
 public class JobsController : Controller
 {
     private readonly IJobsDashboardService _jobsDashboardService;
