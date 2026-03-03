@@ -85,9 +85,19 @@ Open this when you need:
 
 This is the clearest short-form record of the project's core operating constraints.
 
+### 8. `docs/adr-002-ci-safe-testing-and-external-boundaries.md`
+
+Open this when you need:
+
+- the reasoning behind the current CI-safe test posture
+- the boundary between deterministic automated tests and live external validation
+- the rationale for avoiding SQL Server, LinkedIn, and OpenAI dependencies in CI
+
+This is the clearest short-form record of the repository's current automated validation strategy.
+
 ## Operational Support
 
-### 8. `docs/troubleshooting.md`
+### 9. `docs/troubleshooting.md`
 
 Open this when you need:
 
@@ -98,7 +108,7 @@ Open this when you need:
 
 This is the best first stop when something works locally and then suddenly stops working.
 
-### 9. `docs/feasibility-notes.md`
+### 10. `docs/feasibility-notes.md`
 
 Open this when you need:
 
@@ -109,7 +119,7 @@ This is historical context and should not drive current architecture more than t
 
 ## Historical / Supporting Planning Docs
 
-### 10. `docs/plan.md`
+### 11. `docs/plan.md`
 
 Open this when you need:
 
@@ -118,7 +128,7 @@ Open this when you need:
 
 This is useful as history, but `docs/PLAN_REVISED.md` is the more important current planning source.
 
-### 11. `docs/technical-debt.md`
+### 12. `docs/technical-debt.md`
 
 Open this when you need:
 
@@ -139,7 +149,8 @@ This is useful for deciding whether a new change is a true priority or just clea
 5. `docs/architecture-diagram.md`
 6. `docs/data-flow-diagram.md`
 7. `docs/adr-001-local-safety-and-session-strategy.md`
-8. `README.md`
+8. `docs/adr-002-ci-safe-testing-and-external-boundaries.md`
+9. `README.md`
 
 ### For debugging a broken local environment
 

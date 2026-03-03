@@ -87,6 +87,7 @@ For a deeper technical walkthrough, see:
 - [architecture-diagram.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/architecture-diagram.md)
 - [data-flow-diagram.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/data-flow-diagram.md)
 - [adr-001-local-safety-and-session-strategy.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/adr-001-local-safety-and-session-strategy.md)
+- [adr-002-ci-safe-testing-and-external-boundaries.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/adr-002-ci-safe-testing-and-external-boundaries.md)
 - [documentation-map.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/documentation-map.md)
 - [milestone-status.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/milestone-status.md)
 - [project-context.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/project-context.md)
