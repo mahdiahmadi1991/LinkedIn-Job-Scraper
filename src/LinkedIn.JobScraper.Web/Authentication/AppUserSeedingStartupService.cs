@@ -59,17 +59,31 @@ public sealed class AppUserSeedingStartupService : IHostedService
 
             foreach (var seedUser in configuredSeedUsers)
             {
-                if (existingUsers.TryGetValue(seedUser.UserName, out var existingUser))
+                var normalizedUserName = seedUser.UserName.Trim();
+
+                if (existingUsers.TryGetValue(normalizedUserName, out var existingUser))
                 {
                     var normalizedDisplayName = string.IsNullOrWhiteSpace(seedUser.DisplayName)
-                        ? seedUser.UserName.Trim()
+                        ? normalizedUserName
                         : seedUser.DisplayName.Trim();
+                    var hasWritablePassword = !string.IsNullOrWhiteSpace(seedUser.Password);
+                    var passwordNeedsUpdate = hasWritablePassword &&
+                        !_passwordHasher.VerifyPassword(seedUser.Password.Trim(), existingUser.PasswordHash);
 
                     if (!string.Equals(existingUser.DisplayName, normalizedDisplayName, StringComparison.Ordinal) ||
-                        !existingUser.IsSeeded)
+                        !existingUser.IsSeeded ||
+                        !existingUser.IsActive ||
+                        passwordNeedsUpdate)
                     {
                         existingUser.DisplayName = normalizedDisplayName;
                         existingUser.IsSeeded = true;
+                        existingUser.IsActive = true;
+
+                        if (passwordNeedsUpdate)
+                        {
+                            existingUser.PasswordHash = _passwordHasher.HashPassword(seedUser.Password.Trim());
+                        }
+
                         existingUser.UpdatedAtUtc = utcNow;
                         hasChanges = true;
                     }
@@ -87,7 +101,7 @@ public sealed class AppUserSeedingStartupService : IHostedService
                     {
                         UserName = seedUser.UserName.Trim(),
                         DisplayName = string.IsNullOrWhiteSpace(seedUser.DisplayName)
-                            ? seedUser.UserName.Trim()
+                            ? normalizedUserName
                             : seedUser.DisplayName.Trim(),
                         PasswordHash = _passwordHasher.HashPassword(seedUser.Password.Trim()),
                         IsActive = true,

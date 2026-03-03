@@ -68,6 +68,54 @@ public sealed class AppUserSeedingStartupServiceTests
         Assert.Equal(0, await dbContext.AppUsers.CountAsync());
     }
 
+    [Fact]
+    public async Task StartAsyncUpdatesExistingSeedUserPasswordWhenPasswordChanges()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var hasher = new AppUserPasswordHasher();
+
+        await using (var setupContext = CreateDbContext(databaseName))
+        {
+            setupContext.AppUsers.Add(
+                new AppUserRecord
+                {
+                    UserName = "owner",
+                    DisplayName = "Local Owner",
+                    PasswordHash = hasher.HashPassword("OldPassw0rd!"),
+                    IsActive = true,
+                    IsSeeded = true,
+                    CreatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
+                    UpdatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1)
+                });
+
+            await setupContext.SaveChangesAsync();
+        }
+
+        var service = CreateService(
+            databaseName,
+            new AppAuthenticationOptions
+            {
+                SeedUsers =
+                [
+                    new AppAuthenticationSeedUserOptions
+                    {
+                        UserName = "owner",
+                        DisplayName = "Local Owner",
+                        Password = "NewPassw0rd!"
+                    }
+                ]
+            },
+            isSqlConfigured: true);
+
+        await service.StartAsync(CancellationToken.None);
+
+        await using var verificationContext = CreateDbContext(databaseName);
+        var user = await verificationContext.AppUsers.SingleAsync();
+
+        Assert.True(hasher.VerifyPassword("NewPassw0rd!", user.PasswordHash));
+        Assert.False(hasher.VerifyPassword("OldPassw0rd!", user.PasswordHash));
+    }
+
     private static LinkedInJobScraperDbContext CreateDbContext(string databaseName)
     {
         var options = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()

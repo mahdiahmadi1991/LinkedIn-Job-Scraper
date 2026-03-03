@@ -98,6 +98,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - Internal app authentication is now being activated in a staged rollout: the current step adds the persisted `AppUser` model, password hashing, and startup-only seeded user synchronization, while the actual cookie-auth login UI will come in later steps
 - Cookie-based app authentication is now wired at the platform level with a dedicated local scheme and persistent-cookie support, but route protection and the login UI are still deferred to the next steps so current behavior does not break mid-rollout
 - Main app controllers now require the local cookie-auth scheme, while `Account/Login` remains anonymous and the top-right menu exposes a direct `Sign out` action.
+- Seeded local app users now support password rotation during startup synchronization. `OpenAI` placeholder values were removed from tracked `appsettings` files, and local seeded users can be defined in development config when explicitly desired.
 
 ## Product Intent
 
