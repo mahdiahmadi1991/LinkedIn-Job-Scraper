@@ -72,6 +72,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The AI settings page now includes a local readiness check action, and AJAX workflow failures can return `ProblemDetails` for clearer client-side error handling without changing successful response shapes
 - LinkedIn session AJAX failures now also surface as `ProblemDetails`, and the session modal treats those responses as standard error payloads while refreshing state separately
 - Diagnostics JSON endpoints now use `ProblemDetails` for failure responses as well, so the remaining high-value AJAX/JSON surfaces share the same error-reporting pattern
+- CI-safe orchestration coverage now includes `JobsDashboardService.RunFetchAndScoreAsync`, with explicit tests for progress stage ordering and early-stop behavior when import fails
 
 ## Product Intent
 
