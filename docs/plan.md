@@ -238,6 +238,45 @@ This queue records the next approved phase after the deferred activation queue w
 2. Consider additional ADRs only when they capture a real architectural tradeoff that is not already documented
 3. Revisit larger infrastructure additions such as SQL container coverage or richer telemetry only under a newly approved milestone
 
+## Next Plan Validation And Execution Queue
+
+This section records the review of `docs/next-plan.md` against the current repository, `AGENTS.md`, and the active product/business constraints.
+
+### Validation Result
+
+- `docs/next-plan.md` is broadly aligned with the current product direction.
+- It does **not** conflict with the current business scope because it explicitly avoids business-logic changes and focuses on structure, safety, testing, observability, and documentation.
+- It is compatible with the current architecture direction in `docs/PLAN_REVISED.md` because it targets modular-monolith guardrails rather than introducing a new architecture pattern.
+- It requires two repository-specific adaptations:
+  - use the existing `Models` / `Contracts` conventions instead of introducing a new mandatory `Web/ViewModels` folder shape
+  - treat PR5 and PR6 as **gap-only** follow-up work because CI and documentation already have a substantial baseline in place
+
+### Approved Execution Order (Gap-Only)
+
+Only the parts of `docs/next-plan.md` that still unlock an acceptance criterion or reduce an active risk should be implemented.
+
+1. Remove the remaining Web-to-Persistence leakage (`Persistence.Entities` references in controllers/views)
+2. Thin controllers further by moving non-trivial normalization / validation / payload-shaping helpers out of controllers
+3. Propagate correlation identifiers consistently from HTTP request scope into workflow progress payloads
+4. Add a concrete and testable logging redaction policy for sensitive integration data
+5. Revisit CI only for remaining gaps, not for broad rework
+6. Revisit portfolio/docs only for remaining reviewer-clarity gaps, not for redundant polish
+
+### Explicit Non-Execution Items
+
+The following `next-plan` suggestions are already materially satisfied enough that they should not be reopened unless a new gap appears:
+
+- broad CI restoration as a first-class task
+- baseline README refresh
+- baseline ADR introduction
+- baseline diagrams introduction
+
+### Guardrail For This Queue
+
+- Each item must still be delivered in small, reviewable steps.
+- Each implementation step must map back to one of the approved gap-only items above.
+- No cleanup-only refactor should be done unless it directly removes a currently observed architectural leak or reduces an active risk.
+
 ## Post-MVP Feedback Plan
 
 This section captures the first round of manual-test feedback after the MVP baseline was completed.
