@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using LinkedIn.JobScraper.Web.LinkedIn;
 using LinkedIn.JobScraper.Web.LinkedIn.Api;
+using LinkedIn.JobScraper.Web.LinkedIn.Search;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 
 namespace LinkedIn.JobScraper.Web.LinkedIn.Details;
@@ -13,16 +14,19 @@ public sealed class LinkedInJobDetailService : ILinkedInJobDetailService
     private const string GeoType = "com.linkedin.voyager.dash.common.Geo";
 
     private readonly ILinkedInApiClient _linkedInApiClient;
+    private readonly ILinkedInSearchSettingsService _linkedInSearchSettingsService;
     private readonly ILogger<LinkedInJobDetailService> _logger;
     private readonly ILinkedInSessionStore _sessionStore;
 
     public LinkedInJobDetailService(
         ILinkedInApiClient linkedInApiClient,
         ILinkedInSessionStore sessionStore,
+        ILinkedInSearchSettingsService linkedInSearchSettingsService,
         ILogger<LinkedInJobDetailService> logger)
     {
         _linkedInApiClient = linkedInApiClient;
         _sessionStore = sessionStore;
+        _linkedInSearchSettingsService = linkedInSearchSettingsService;
         _logger = logger;
     }
 
@@ -46,9 +50,10 @@ public sealed class LinkedInJobDetailService : ILinkedInJobDetailService
                 StatusCodes.Status502BadGateway);
         }
 
+        var searchSettings = await _linkedInSearchSettingsService.GetActiveAsync(cancellationToken);
         var jobPostingUrn = $"urn:li:fsd_jobPosting:{linkedInJobId}";
         var requestUri = LinkedInRequestDefaults.BuildJobDetailUri(linkedInJobId);
-        var headers = MergeHeaders(sessionSnapshot, linkedInJobId);
+        var headers = MergeHeaders(sessionSnapshot, linkedInJobId, searchSettings);
 
         var response = await _linkedInApiClient.GetAsync(requestUri, headers, cancellationToken);
 
@@ -102,12 +107,16 @@ public sealed class LinkedInJobDetailService : ILinkedInJobDetailService
 
     private static Dictionary<string, string> MergeHeaders(
         LinkedInSessionSnapshot sessionSnapshot,
-        string linkedInJobId)
+        string linkedInJobId,
+        LinkedInSearchSettings searchSettings)
     {
         var merged = new Dictionary<string, string>(sessionSnapshot.Headers, StringComparer.OrdinalIgnoreCase)
         {
             ["Accept"] = "application/vnd.linkedin.normalized+json+2.1",
-            ["Referer"] = LinkedInRequestDefaults.BuildJobDetailReferer(linkedInJobId),
+            ["Referer"] = LinkedInRequestDefaults.BuildJobDetailReferer(
+                linkedInJobId,
+                searchSettings.Keywords,
+                searchSettings.LocationGeoId),
             ["x-li-pem-metadata"] = LinkedInRequestDefaults.JobDetailPemMetadata
         };
 

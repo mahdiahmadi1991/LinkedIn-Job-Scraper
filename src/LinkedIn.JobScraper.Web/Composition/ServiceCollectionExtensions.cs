@@ -29,8 +29,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISqlServerConnectionStringProvider, ConfiguredSqlServerConnectionStringProvider>();
         services.AddSingleton<ILinkedInSessionStore, DatabaseLinkedInSessionStore>();
         services.AddSingleton<ILinkedInBrowserLoginService, PlaywrightLinkedInBrowserLoginService>();
+        services.AddSingleton<ILinkedInSearchSettingsService, LinkedInSearchSettingsService>();
         services.AddTransient<ILinkedInSessionVerificationService, LinkedInSessionVerificationService>();
         services.AddTransient<IAiBehaviorSettingsService, AiBehaviorSettingsService>();
+        services.AddTransient<ILinkedInLocationLookupService, LinkedInLocationLookupService>();
         services.AddTransient<ILinkedInJobDetailService, LinkedInJobDetailService>();
         services.AddTransient<ILinkedInJobSearchService, LinkedInJobSearchService>();
         services.AddTransient<IJobImportService, JobImportService>();

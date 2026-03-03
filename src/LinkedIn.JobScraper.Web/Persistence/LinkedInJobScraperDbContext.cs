@@ -16,6 +16,8 @@ public sealed class LinkedInJobScraperDbContext : DbContext
 
     public DbSet<JobStatusHistoryRecord> JobStatusHistory => Set<JobStatusHistoryRecord>();
 
+    public DbSet<LinkedInSearchSettingsRecord> LinkedInSearchSettings => Set<LinkedInSearchSettingsRecord>();
+
     public DbSet<LinkedInSessionRecord> LinkedInSessions => Set<LinkedInSessionRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -84,6 +86,21 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.HasKey(static settings => settings.Id);
 
                 entity.Property(static settings => settings.ProfileName).HasMaxLength(128).IsRequired();
+            });
+
+        modelBuilder.Entity<LinkedInSearchSettingsRecord>(
+            entity =>
+            {
+                entity.ToTable("LinkedInSearchSettings");
+                entity.HasKey(static settings => settings.Id);
+
+                entity.Property(static settings => settings.ProfileName).HasMaxLength(128).IsRequired();
+                entity.Property(static settings => settings.Keywords).HasMaxLength(512).IsRequired();
+                entity.Property(static settings => settings.LocationInput).HasMaxLength(256);
+                entity.Property(static settings => settings.LocationDisplayName).HasMaxLength(256);
+                entity.Property(static settings => settings.LocationGeoId).HasMaxLength(32);
+                entity.Property(static settings => settings.WorkplaceTypeCodesCsv).HasMaxLength(128).IsRequired();
+                entity.Property(static settings => settings.JobTypeCodesCsv).HasMaxLength(128).IsRequired();
             });
     }
 }

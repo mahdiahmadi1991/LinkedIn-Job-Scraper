@@ -30,6 +30,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - Stored session verification now uses a lightweight read-only LinkedIn geo typeahead check instead of replaying job search
 - The LinkedIn session flow now starts an automatic background capture watcher after browser launch so the user usually does not need a separate capture click
 - The main search and job-detail runtime flows now use in-code request builders instead of reading onboarding samples from `docs/api-sample`
+- LinkedIn fetch settings are now persisted in SQL Server, editable in the UI, and include real LinkedIn location lookup that resolves free-text input to a stored geoId
 
 ## Product Intent
 

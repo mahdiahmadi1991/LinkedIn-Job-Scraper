@@ -1,0 +1,222 @@
+@model LinkedInSearchSettingsPageViewModel
+
+@{
+    ViewData["Title"] = "Search Settings";
+    var alertSeverity = Model.StatusSucceeded ? "success" : "warning";
+}
+
+<div class="d-flex flex-column gap-4">
+    <section class="d-flex flex-column gap-2">
+        <div>
+            <h1 class="h2 mb-1">LinkedIn Search Settings</h1>
+            <p class="text-muted mb-0">
+                Configure the exact LinkedIn search that powers <strong>Fetch &amp; Score</strong>. These settings define which jobs get pulled into the dashboard.
+            </p>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-@alertSeverity mb-0" role="alert">
+            @Model.StatusMessage
+        </div>
+    }
+
+    <section class="row g-4">
+        <div class="col-12 col-xl-8">
+            <div class="card">
+                <div class="card-body">
+                    <form asp-action="Save" method="post" class="d-flex flex-column gap-4" id="search-settings-form">
+                        @Html.AntiForgeryToken()
+
+                        <input asp-for="LocationDisplayName" type="hidden" />
+                        <input asp-for="LocationGeoId" type="hidden" />
+
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label asp-for="ProfileName" class="form-label"></label>
+                                <input asp-for="ProfileName" class="form-control" />
+                                <span asp-validation-for="ProfileName" class="text-danger small"></span>
+                            </div>
+                            <div class="col-12">
+                                <label asp-for="Keywords" class="form-label"></label>
+                                <input asp-for="Keywords" class="form-control" placeholder="C#, .NET, backend, company, title" />
+                                <span asp-validation-for="Keywords" class="text-danger small"></span>
+                            </div>
+                            <div class="col-12">
+                                <label asp-for="LocationInput" class="form-label"></label>
+                                <div class="d-flex flex-column flex-md-row gap-2">
+                                    <input asp-for="LocationInput" class="form-control" placeholder="Limassol, Cyprus" />
+                                    <button type="submit"
+                                            class="btn btn-outline-primary"
+                                            formaction="@Url.Action("SearchLocation")"
+                                            formmethod="post">
+                                        Find Locations
+                                    </button>
+                                </div>
+                                <span asp-validation-for="LocationInput" class="text-danger small"></span>
+                                @if (!string.IsNullOrWhiteSpace(Model.LocationDisplayName))
+                                {
+                                    <div class="small text-muted mt-2">
+                                        Selected LinkedIn location: <strong>@Model.LocationDisplayName</strong>
+                                        <span class="ms-1">(@Model.LocationGeoId)</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        @if (Model.LocationSuggestions.Count > 0)
+                        {
+                            <div class="border rounded p-3">
+                                <div class="small text-muted text-uppercase mb-2">LinkedIn Location Suggestions</div>
+                                <div class="d-flex flex-column gap-2">
+                                    @foreach (var suggestion in Model.LocationSuggestions)
+                                    {
+                                        var isSelected = string.Equals(Model.LocationGeoId, suggestion.GeoId, StringComparison.Ordinal);
+                                        <button type="button"
+                                                class="btn @(isSelected ? "btn-primary" : "btn-outline-secondary") text-start"
+                                                data-location-select
+                                                data-geo-id="@suggestion.GeoId"
+                                                data-display-name="@suggestion.DisplayName">
+                                            <span class="fw-semibold">@suggestion.DisplayName</span>
+                                            <span class="small ms-2">@suggestion.GeoId</span>
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        <div class="form-check form-switch">
+                            <input asp-for="EasyApply" class="form-check-input" />
+                            <label asp-for="EasyApply" class="form-check-label"></label>
+                        </div>
+
+                        <div class="row g-4">
+                            <div class="col-12 col-lg-6">
+                                <div class="border rounded p-3 h-100">
+                                    <div class="small text-muted text-uppercase mb-2">Remote</div>
+                                    <div class="d-flex flex-column gap-2">
+                                        @foreach (var option in LinkedInSearchSettingsPageViewModel.WorkplaceTypeOptions)
+                                        {
+                                            var isChecked = Model.WorkplaceTypeCodes.Contains(option.Code, StringComparer.OrdinalIgnoreCase);
+                                            <label class="form-check">
+                                                <input class="form-check-input"
+                                                       type="checkbox"
+                                                       name="WorkplaceTypeCodes"
+                                                       value="@option.Code"
+                                                       checked="@isChecked" />
+                                                <span class="form-check-label">@option.Label</span>
+                                            </label>
+                                        }
+                                    </div>
+                                    <span asp-validation-for="WorkplaceTypeCodes" class="text-danger small"></span>
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-lg-6">
+                                <div class="border rounded p-3 h-100">
+                                    <div class="small text-muted text-uppercase mb-2">Job Type</div>
+                                    <div class="d-flex flex-column gap-2">
+                                        @foreach (var option in LinkedInSearchSettingsPageViewModel.JobTypeOptions)
+                                        {
+                                            var isChecked = Model.JobTypeCodes.Contains(option.Code, StringComparer.OrdinalIgnoreCase);
+                                            <label class="form-check">
+                                                <input class="form-check-input"
+                                                       type="checkbox"
+                                                       name="JobTypeCodes"
+                                                       value="@option.Code"
+                                                       checked="@isChecked" />
+                                                <span class="form-check-label">@option.Label</span>
+                                            </label>
+                                        }
+                                    </div>
+                                    <span asp-validation-for="JobTypeCodes" class="text-danger small"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Save Search Settings</button>
+                            <a asp-action="Index" class="btn btn-outline-secondary">Reset</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-4">
+            <div class="card h-100">
+                <div class="card-body d-flex flex-column gap-3">
+                    <div>
+                        <h2 class="h5">What this controls</h2>
+                        <p class="small text-muted mb-0">
+                            These filters determine the exact LinkedIn search request used by the next <strong>Fetch &amp; Score</strong> run.
+                        </p>
+                    </div>
+                    <div class="small">
+                        <div><strong>Keywords:</strong> title, skill, or company text search</div>
+                        <div><strong>Location:</strong> resolved to a LinkedIn geoId through typeahead</div>
+                        <div><strong>Remote:</strong> multi-select workplace type filter</div>
+                        <div><strong>Job Type:</strong> multi-select employment filter</div>
+                        <div><strong>Easy Apply:</strong> limits fetches to LinkedIn easy apply listings</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+@section Scripts
+{
+    <script>
+        (() => {
+            const form = document.getElementById("search-settings-form");
+            if (!form) {
+                return;
+            }
+
+            const geoIdInput = form.querySelector('input[name="LocationGeoId"]');
+            const displayNameInput = form.querySelector('input[name="LocationDisplayName"]');
+            const locationInput = form.querySelector('input[name="LocationInput"]');
+            const suggestionButtons = form.querySelectorAll("[data-location-select]");
+
+            locationInput?.addEventListener("input", () => {
+                if (geoIdInput) {
+                    geoIdInput.value = "";
+                }
+
+                if (displayNameInput) {
+                    displayNameInput.value = "";
+                }
+            });
+
+            suggestionButtons.forEach((button) => {
+                button.addEventListener("click", () => {
+                    const geoId = button.getAttribute("data-geo-id");
+                    const displayName = button.getAttribute("data-display-name");
+
+                    if (geoIdInput) {
+                        geoIdInput.value = geoId ?? "";
+                    }
+
+                    if (displayNameInput) {
+                        displayNameInput.value = displayName ?? "";
+                    }
+
+                    if (locationInput && displayName) {
+                        locationInput.value = displayName;
+                    }
+
+                    suggestionButtons.forEach((currentButton) => {
+                        currentButton.classList.remove("btn-primary");
+                        currentButton.classList.remove("btn-outline-primary");
+                        currentButton.classList.add("btn-outline-secondary");
+                    });
+
+                    button.classList.remove("btn-outline-secondary");
+                    button.classList.add("btn-primary");
+                });
+            });
+        })();
+    </script>
+}
