@@ -1,0 +1,65 @@
+@model LinkedIn.JobScraper.Web.Models.LoginPageViewModel
+@{
+    ViewData["Title"] = "Sign in";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - LinkedIn Job Scraper</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/LinkedIn.JobScraper.Web.styles.css" asp-append-version="true" />
+</head>
+<body>
+    <main class="container app-shell">
+        <div class="auth-shell">
+            <section class="auth-panel">
+                <div class="auth-brand">
+                    <span class="brand-mark">in</span>
+                    <div>
+                        <h1 class="auth-title">Sign in to continue</h1>
+                        <p class="auth-subtitle">Use one of the seeded local accounts to access your private LinkedIn job workspace.</p>
+                    </div>
+                </div>
+
+                <form asp-action="Login" method="post" class="auth-form" novalidate>
+                    @Html.AntiForgeryToken()
+                    <input asp-for="ReturnUrl" type="hidden" />
+
+                    @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
+                    {
+                        <div class="auth-error-note" role="alert">
+                            @ViewData.ModelState[string.Empty]!.Errors[0].ErrorMessage
+                        </div>
+                    }
+
+                    <div class="mb-3">
+                        <label asp-for="UserName" class="form-label"></label>
+                        <input asp-for="UserName" class="form-control form-control-lg" autocomplete="username" />
+                        <span asp-validation-for="UserName" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Password" class="form-label"></label>
+                        <input asp-for="Password" class="form-control form-control-lg" autocomplete="current-password" />
+                        <span asp-validation-for="Password" class="text-danger small"></span>
+                    </div>
+
+                    <div class="auth-remember-row">
+                        <div class="form-check">
+                            <input asp-for="RememberMe" class="form-check-input" />
+                            <label asp-for="RememberMe" class="form-check-label"></label>
+                        </div>
+                        <span class="auth-remember-copy">Keeps your local session active across browser restarts on this machine.</span>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-lg w-100 mt-3">Sign in</button>
+                </form>
+            </section>
+        </div>
+    </main>
+</body>
+</html>
