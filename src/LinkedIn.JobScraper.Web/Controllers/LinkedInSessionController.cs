@@ -1,4 +1,3 @@
-using LinkedIn.JobScraper.Web.Diagnostics;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using LinkedIn.JobScraper.Web.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -8,14 +7,14 @@ namespace LinkedIn.JobScraper.Web.Controllers;
 public class LinkedInSessionController : Controller
 {
     private readonly ILinkedInBrowserLoginService _linkedInBrowserLoginService;
-    private readonly LinkedInFeasibilityProbe _linkedInFeasibilityProbe;
+    private readonly ILinkedInSessionVerificationService _linkedInSessionVerificationService;
 
     public LinkedInSessionController(
         ILinkedInBrowserLoginService linkedInBrowserLoginService,
-        LinkedInFeasibilityProbe linkedInFeasibilityProbe)
+        ILinkedInSessionVerificationService linkedInSessionVerificationService)
     {
         _linkedInBrowserLoginService = linkedInBrowserLoginService;
-        _linkedInFeasibilityProbe = linkedInFeasibilityProbe;
+        _linkedInSessionVerificationService = linkedInSessionVerificationService;
     }
 
     [HttpGet]
@@ -27,8 +26,7 @@ public class LinkedInSessionController : Controller
             StatusSucceeded = string.Equals(
                 TempData["LinkedInSessionStatusSucceeded"] as string,
                 bool.TrueString,
-                StringComparison.OrdinalIgnoreCase),
-            VerificationMessage = TempData["LinkedInSessionVerificationMessage"] as string
+                StringComparison.OrdinalIgnoreCase)
         };
 
         try
@@ -80,14 +78,8 @@ public class LinkedInSessionController : Controller
     {
         try
         {
-            var result = await _linkedInFeasibilityProbe.RunUsingStoredSessionAsync(cancellationToken);
-
-            var message = result.Success
-                ? $"Stored session verification succeeded. Returned {result.ReturnedCount} jobs from {result.TotalCount} total."
-                : $"Stored session verification failed. {result.Message}";
-
-            TempData["LinkedInSessionVerificationMessage"] = message;
-            WriteStatusMessage(result.Success, message);
+            var result = await _linkedInSessionVerificationService.VerifyCurrentAsync(cancellationToken);
+            WriteStatusMessage(result.Success, result.Message);
         }
         catch (Exception exception)
         {

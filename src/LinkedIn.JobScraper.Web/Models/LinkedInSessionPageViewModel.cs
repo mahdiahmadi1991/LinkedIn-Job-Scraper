@@ -15,6 +15,4 @@ public sealed class LinkedInSessionPageViewModel
     public string? StatusMessage { get; set; }
 
     public bool StatusSucceeded { get; set; }
-
-    public string? VerificationMessage { get; set; }
 }
