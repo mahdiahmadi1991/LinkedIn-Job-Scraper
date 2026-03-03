@@ -53,4 +53,28 @@ public sealed class AiBehaviorSettingsServiceTests
         Assert.Equal("Portfolio Profile", record.ProfileName);
         Assert.Equal("fa", record.OutputLanguageCode);
     }
+
+    [Fact]
+    public async Task SaveAsyncThrowsFriendlyExceptionForMalformedConcurrencyToken()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var options = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+
+        var service = new AiBehaviorSettingsService(new TestDbContextFactory(options));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.SaveAsync(
+                new AiBehaviorProfile(
+                    "Default",
+                    "Behavior",
+                    "Priority",
+                    "Exclusion",
+                    "en",
+                    "not-base64"),
+                CancellationToken.None));
+
+        Assert.Contains("submitted settings state is invalid", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }

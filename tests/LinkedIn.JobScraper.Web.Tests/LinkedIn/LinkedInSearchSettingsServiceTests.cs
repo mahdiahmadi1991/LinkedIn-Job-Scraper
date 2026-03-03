@@ -65,4 +65,31 @@ public sealed class LinkedInSearchSettingsServiceTests
         Assert.Equal("2,1", record.WorkplaceTypeCodesCsv);
         Assert.Equal("F,P,C,T,I,O", record.JobTypeCodesCsv);
     }
+
+    [Fact]
+    public async Task SaveAsyncThrowsFriendlyExceptionForMalformedConcurrencyToken()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var options = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+
+        using var service = new LinkedInSearchSettingsService(new TestDbContextFactory(options));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.SaveAsync(
+                new LinkedInSearchSettings(
+                    "Default",
+                    "C# Backend",
+                    null,
+                    null,
+                    null,
+                    true,
+                    ["1"],
+                    ["F"],
+                    "not-base64"),
+                CancellationToken.None));
+
+        Assert.Contains("submitted settings state is invalid", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }
