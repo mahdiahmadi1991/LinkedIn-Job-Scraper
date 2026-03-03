@@ -19,6 +19,7 @@ public interface IJobsDashboardService
 
     Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(
         string? progressConnectionId,
+        string? correlationId,
         CancellationToken cancellationToken);
 
     Task<JobStatusChangeResult> UpdateStatusAsync(

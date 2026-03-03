@@ -168,14 +168,18 @@ public sealed class JobsDashboardService : IJobsDashboardService
 
     public async Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(
         string? progressConnectionId,
+        string? correlationId,
         CancellationToken cancellationToken)
     {
-        var workflowId = Guid.NewGuid().ToString("N");
-        LogWorkflowStarted(_logger, workflowId, progressConnectionId, null);
+        var effectiveCorrelationId = string.IsNullOrWhiteSpace(correlationId)
+            ? Guid.NewGuid().ToString("N")
+            : correlationId;
+        LogWorkflowStarted(_logger, effectiveCorrelationId, progressConnectionId, null);
 
         await PublishProgressAsync(
             progressConnectionId,
             new JobsWorkflowProgressUpdate(
+                effectiveCorrelationId,
                 "running",
                 "fetch",
                 10,
@@ -186,11 +190,12 @@ public sealed class JobsDashboardService : IJobsDashboardService
 
         if (!importResult.Success)
         {
-            LogWorkflowFailed(_logger, workflowId, importResult.Message, null);
+            LogWorkflowFailed(_logger, effectiveCorrelationId, importResult.Message, null);
 
             await PublishProgressAsync(
                 progressConnectionId,
                 new JobsWorkflowProgressUpdate(
+                    effectiveCorrelationId,
                     "failed",
                     "fetch",
                     100,
@@ -212,7 +217,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
 
         LogImportCompleted(
             _logger,
-            workflowId,
+            effectiveCorrelationId,
             importResult.PagesFetched,
             importResult.FetchedCount,
             importResult.ImportedCount,
@@ -222,6 +227,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
         await PublishProgressAsync(
             progressConnectionId,
             new JobsWorkflowProgressUpdate(
+                effectiveCorrelationId,
                 "running",
                 "fetch",
                 38,
@@ -240,6 +246,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
         await PublishProgressAsync(
             progressConnectionId,
             new JobsWorkflowProgressUpdate(
+                effectiveCorrelationId,
                 "running",
                 "enrichment",
                 52,
@@ -256,7 +263,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
 
         LogEnrichmentCompleted(
             _logger,
-            workflowId,
+            effectiveCorrelationId,
             enrichmentResult.RequestedCount,
             enrichmentResult.ProcessedCount,
             enrichmentResult.EnrichedCount,
@@ -266,6 +273,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
         await PublishProgressAsync(
             progressConnectionId,
             new JobsWorkflowProgressUpdate(
+                effectiveCorrelationId,
                 enrichmentResult.Success ? "running" : "warning",
                 "enrichment",
                 72,
@@ -288,6 +296,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
         await PublishProgressAsync(
             progressConnectionId,
             new JobsWorkflowProgressUpdate(
+                effectiveCorrelationId,
                 "running",
                 "scoring",
                 84,
@@ -304,7 +313,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
 
         LogScoringCompleted(
             _logger,
-            workflowId,
+            effectiveCorrelationId,
             scoringResult.RequestedCount,
             scoringResult.ProcessedCount,
             scoringResult.ScoredCount,
@@ -348,6 +357,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
         await PublishProgressAsync(
             progressConnectionId,
             new JobsWorkflowProgressUpdate(
+                effectiveCorrelationId,
                 severity == "danger" ? "failed" : severity == "warning" ? "warning" : "completed",
                 "completed",
                 100,
@@ -358,7 +368,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 scoringResult.FailedCount),
             cancellationToken);
 
-        LogWorkflowCompleted(_logger, workflowId, workflowResult.Success, workflowResult.Severity, null);
+        LogWorkflowCompleted(_logger, effectiveCorrelationId, workflowResult.Success, workflowResult.Severity, null);
 
         return workflowResult;
     }

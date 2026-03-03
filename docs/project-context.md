@@ -90,6 +90,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The Web layer no longer references the persistence `JobWorkflowStatus` enum directly in jobs controllers and views; a web-facing `JobWorkflowState` now carries that concern while mapping stays inside the `Jobs` module
 - `SearchSettingsController` is now thinner: its non-trivial normalization, validation, and read-model-to-view-model mapping for LinkedIn search settings have moved into a dedicated `LinkedIn.Search` adapter helper without changing behavior
 - `AiSettingsController` is now thinner as well: profile-to-view-model mapping and OpenAI connection-state shaping now live in a dedicated `AI` adapter helper, while controller actions remain orchestration-only
+- `Fetch & Score` workflow progress now carries the active HTTP correlation id in each SignalR progress payload, so request-scoped logs and live progress events can be tied together without changing workflow behavior
 
 ## Product Intent
 

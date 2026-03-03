@@ -21,7 +21,7 @@ public sealed class JobsDashboardServiceTests
             notifier,
             NullLogger<JobsDashboardService>.Instance);
 
-        var result = await service.RunFetchAndScoreAsync("connection-1", CancellationToken.None);
+        var result = await service.RunFetchAndScoreAsync("connection-1", "corr-1", CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.Equal("success", result.Severity);
@@ -32,6 +32,7 @@ public sealed class JobsDashboardServiceTests
             ["running", "running", "running", "running", "running", "completed"],
             notifier.Updates.Select(static update => update.State).ToArray());
         Assert.All(notifier.ConnectionIds, static connectionId => Assert.Equal("connection-1", connectionId));
+        Assert.All(notifier.Updates, static update => Assert.Equal("corr-1", update.CorrelationId));
     }
 
     [Fact]
@@ -46,7 +47,7 @@ public sealed class JobsDashboardServiceTests
             notifier,
             NullLogger<JobsDashboardService>.Instance);
 
-        var result = await service.RunFetchAndScoreAsync("connection-2", CancellationToken.None);
+        var result = await service.RunFetchAndScoreAsync("connection-2", "corr-2", CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.Equal("danger", result.Severity);
@@ -56,6 +57,7 @@ public sealed class JobsDashboardServiceTests
         Assert.Equal("fetch", notifier.Updates[0].Stage);
         Assert.Equal("fetch", notifier.Updates[1].Stage);
         Assert.Equal("failed", notifier.Updates[1].State);
+        Assert.All(notifier.Updates, static update => Assert.Equal("corr-2", update.CorrelationId));
         Assert.Contains("Stored session expired.", notifier.Updates[1].Message, StringComparison.Ordinal);
     }
 

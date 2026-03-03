@@ -39,6 +39,7 @@ public sealed class SignalRJobsWorkflowProgressNotifier : IJobsWorkflowProgressN
 }
 
 public sealed record JobsWorkflowProgressUpdate(
+    string CorrelationId,
     string State,
     string Stage,
     int Percent,

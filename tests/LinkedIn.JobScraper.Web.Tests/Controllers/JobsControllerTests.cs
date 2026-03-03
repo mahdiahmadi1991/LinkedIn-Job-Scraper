@@ -43,6 +43,7 @@ public sealed class JobsControllerTests
         Assert.Equal(3, controller.TempData["JobsWorkflowEnrichmentEnrichedCount"]);
         Assert.Equal(3, controller.TempData["JobsWorkflowScoringScoredCount"]);
         Assert.Equal("connection-1", service.LastConnectionId);
+        Assert.False(string.IsNullOrWhiteSpace(service.LastCorrelationId));
     }
 
     [Fact]
@@ -76,6 +77,8 @@ public sealed class JobsControllerTests
     {
         public string? LastConnectionId { get; private set; }
 
+        public string? LastCorrelationId { get; private set; }
+
         public Task<JobsDashboardSnapshot> GetSnapshotAsync(JobsDashboardQuery query, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
@@ -91,9 +94,13 @@ public sealed class JobsControllerTests
             throw new NotSupportedException();
         }
 
-        public Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(string? progressConnectionId, CancellationToken cancellationToken)
+        public Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(
+            string? progressConnectionId,
+            string? correlationId,
+            CancellationToken cancellationToken)
         {
             LastConnectionId = progressConnectionId;
+            LastCorrelationId = correlationId;
 
             var import = JobImportResult.Succeeded(
                 pagesFetched: 1,
@@ -150,7 +157,10 @@ public sealed class JobsControllerTests
             throw new NotSupportedException();
         }
 
-        public Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(string? progressConnectionId, CancellationToken cancellationToken)
+        public Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(
+            string? progressConnectionId,
+            string? correlationId,
+            CancellationToken cancellationToken)
         {
             var import = JobImportResult.Failed("Import failed.", StatusCodes.Status503ServiceUnavailable);
 

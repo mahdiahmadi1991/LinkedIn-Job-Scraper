@@ -56,7 +56,10 @@ public class JobsController : Controller
         [FromHeader(Name = "X-Progress-ConnectionId")] string? progressConnectionId,
         CancellationToken cancellationToken)
     {
-        var result = await _jobsDashboardService.RunFetchAndScoreAsync(progressConnectionId, cancellationToken);
+        var result = await _jobsDashboardService.RunFetchAndScoreAsync(
+            progressConnectionId,
+            HttpContext.TraceIdentifier,
+            cancellationToken);
         TempData["JobsAlertMessage"] = result.Message;
         TempData["JobsAlertSeverity"] = result.Severity;
         WriteWorkflowSummary(result);
