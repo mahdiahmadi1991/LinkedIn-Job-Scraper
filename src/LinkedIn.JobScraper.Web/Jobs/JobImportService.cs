@@ -18,7 +18,9 @@ public sealed class JobImportService : IJobImportService
         _linkedInJobSearchService = linkedInJobSearchService;
     }
 
-    public async Task<JobImportResult> ImportCurrentSearchAsync(CancellationToken cancellationToken)
+    public async Task<JobImportResult> ImportCurrentSearchAsync(
+        CancellationToken cancellationToken,
+        JobStageProgressCallback? progressCallback = null)
     {
         var searchResult = await _linkedInJobSearchService.FetchCurrentSearchAsync(cancellationToken);
 
@@ -59,13 +61,28 @@ public sealed class JobImportService : IJobImportService
         var importedCount = 0;
         var updatedExistingCount = 0;
         var skippedCount = 0;
+        var processedCount = 0;
         var originalAutoDetectChanges = dbContext.ChangeTracker.AutoDetectChangesEnabled;
         dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
+
+        if (progressCallback is not null)
+        {
+            await progressCallback(
+                new JobStageProgress(
+                    $"LinkedIn returned {searchResult.Jobs.Count} jobs. Reconciling them with the local store...",
+                    searchResult.Jobs.Count,
+                    0,
+                    0,
+                    0),
+                cancellationToken);
+        }
 
         try
         {
             foreach (var job in searchResult.Jobs)
             {
+                string progressMessage;
+
                 if (existingById.TryGetValue(job.LinkedInJobId, out var existing))
                 {
                     existing.LastSeenAtUtc = seenAtUtc;
@@ -84,31 +101,60 @@ public sealed class JobImportService : IJobImportService
 
                     updatedExistingCount++;
                     skippedCount++;
-                    continue;
+                    progressMessage = $"Reconciled {processedCount + 1} of {searchResult.Jobs.Count}: refreshed '{job.Title}'.";
+                }
+                else
+                {
+                    var record = new JobRecord
+                    {
+                        LinkedInJobId = job.LinkedInJobId,
+                        LinkedInJobPostingUrn = job.LinkedInJobPostingUrn,
+                        LinkedInJobCardUrn = job.LinkedInJobCardUrn,
+                        Title = job.Title,
+                        CompanyName = job.CompanyName,
+                        LocationName = job.LocationName,
+                        ListedAtUtc = job.ListedAtUtc,
+                        FirstDiscoveredAtUtc = seenAtUtc,
+                        LastSeenAtUtc = seenAtUtc,
+                        CurrentStatus = JobWorkflowStatus.New
+                    };
+
+                    insertedRecords.Add(record);
+                    existingById[job.LinkedInJobId] = record;
+                    importedCount++;
+                    progressMessage = $"Reconciled {processedCount + 1} of {searchResult.Jobs.Count}: added '{job.Title}'.";
                 }
 
-                var record = new JobRecord
-                {
-                    LinkedInJobId = job.LinkedInJobId,
-                    LinkedInJobPostingUrn = job.LinkedInJobPostingUrn,
-                    LinkedInJobCardUrn = job.LinkedInJobCardUrn,
-                    Title = job.Title,
-                    CompanyName = job.CompanyName,
-                    LocationName = job.LocationName,
-                    ListedAtUtc = job.ListedAtUtc,
-                    FirstDiscoveredAtUtc = seenAtUtc,
-                    LastSeenAtUtc = seenAtUtc,
-                    CurrentStatus = JobWorkflowStatus.New
-                };
+                processedCount++;
 
-                insertedRecords.Add(record);
-                existingById[job.LinkedInJobId] = record;
-                importedCount++;
+                if (progressCallback is not null)
+                {
+                    await progressCallback(
+                        new JobStageProgress(
+                            progressMessage,
+                            searchResult.Jobs.Count,
+                            processedCount,
+                            importedCount + updatedExistingCount,
+                            0),
+                        cancellationToken);
+                }
             }
 
             if (insertedRecords.Count > 0)
             {
                 dbContext.Jobs.AddRange(insertedRecords);
+            }
+
+            if (progressCallback is not null)
+            {
+                await progressCallback(
+                    new JobStageProgress(
+                        $"Persisting {importedCount + updatedExistingCount} reconciled records to the local database...",
+                        searchResult.Jobs.Count,
+                        processedCount,
+                        importedCount + updatedExistingCount,
+                        0),
+                    cancellationToken);
             }
 
             dbContext.ChangeTracker.DetectChanges();

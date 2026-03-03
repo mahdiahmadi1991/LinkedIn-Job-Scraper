@@ -1,8 +1,13 @@
+using LinkedIn.JobScraper.Web.Jobs;
+
 namespace LinkedIn.JobScraper.Web.AI;
 
 public interface IJobBatchScoringService
 {
-    Task<JobBatchScoringResult> ScoreReadyJobsAsync(int maxCount, CancellationToken cancellationToken);
+    Task<JobBatchScoringResult> ScoreReadyJobsAsync(
+        int maxCount,
+        CancellationToken cancellationToken,
+        JobStageProgressCallback? progressCallback = null);
 }
 
 public sealed record JobBatchScoringResult(

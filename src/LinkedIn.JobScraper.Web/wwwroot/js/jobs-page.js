@@ -25,6 +25,7 @@
     const setButtonLoading = window.appButtons?.setLoading ?? (() => {});
     const busySpinner = form.querySelector("[data-busy-spinner]");
     const workflowStorageKey = "jobs.activeWorkflowId";
+    const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
     let signalRConnection = null;
     let isSubmitting = false;
     let lastLoggedMessage = null;
@@ -117,6 +118,25 @@
         }
     };
 
+    const scrollProgressLogToLatest = (behavior = "smooth") => {
+        if (!progressLog) {
+            return;
+        }
+
+        const top = progressLog.scrollHeight;
+        const effectiveBehavior = prefersReducedMotion ? "auto" : behavior;
+
+        if (typeof progressLog.scrollTo === "function") {
+            progressLog.scrollTo({
+                top,
+                behavior: effectiveBehavior
+            });
+            return;
+        }
+
+        progressLog.scrollTop = top;
+    };
+
     const appendProgressLog = (update, occurredAtUtc) => {
         if (!progressLog || !update || !update.message) {
             return;
@@ -181,7 +201,12 @@
             ${detailsMarkup}
         `;
 
-        progressLog.prepend(item);
+        progressLog.append(item);
+
+        window.requestAnimationFrame(() => {
+            item.classList.add("is-visible");
+            scrollProgressLogToLatest();
+        });
     };
 
     const applyProgressUpdate = (update, occurredAtUtc) => {
@@ -318,7 +343,7 @@
 
         if (progressLogEmpty) {
             progressLogEmpty.classList.remove("d-none");
-            progressLogEmpty.textContent = "Waiting for the first workflow event...";
+            progressLogEmpty.textContent = "Waiting for the first workflow event to appear...";
         }
 
         void pollWorkflowProgress();

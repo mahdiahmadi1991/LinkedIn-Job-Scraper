@@ -4,7 +4,8 @@ public interface IJobEnrichmentService
 {
     Task<JobEnrichmentResult> EnrichIncompleteJobsAsync(
         int maxCount,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        JobStageProgressCallback? progressCallback = null);
 }
 
 public sealed record JobEnrichmentResult(

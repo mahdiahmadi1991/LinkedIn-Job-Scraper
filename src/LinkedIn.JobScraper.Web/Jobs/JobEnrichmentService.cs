@@ -19,7 +19,8 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
 
     public async Task<JobEnrichmentResult> EnrichIncompleteJobsAsync(
         int maxCount,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        JobStageProgressCallback? progressCallback = null)
     {
         if (maxCount <= 0)
         {
@@ -43,6 +44,18 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
             return JobEnrichmentResult.Succeeded(maxCount, 0, 0, 0, 0);
         }
 
+        if (progressCallback is not null)
+        {
+            await progressCallback(
+                new JobStageProgress(
+                    $"Queued {jobsToEnrich.Count} jobs for LinkedIn detail enrichment.",
+                    jobsToEnrich.Count,
+                    0,
+                    0,
+                    0),
+                cancellationToken);
+        }
+
         var enrichedCount = 0;
         var failedCount = 0;
         var warningCount = 0;
@@ -59,12 +72,26 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
                 processedCount++;
 
                 var detailResult = await _linkedInJobDetailService.FetchAsync(job.LinkedInJobId, cancellationToken);
+                var displayTitle = string.IsNullOrWhiteSpace(job.Title) ? job.LinkedInJobId : job.Title;
 
                 if (!detailResult.Success || detailResult.Job is null)
                 {
                     failedCount++;
                     firstFailureMessage ??= detailResult.Message;
                     firstFailureStatusCode ??= detailResult.StatusCode;
+
+                    if (progressCallback is not null)
+                    {
+                        await progressCallback(
+                            new JobStageProgress(
+                                $"Enrichment {processedCount}/{jobsToEnrich.Count} failed for '{displayTitle}': {detailResult.Message}",
+                                jobsToEnrich.Count,
+                                processedCount,
+                                enrichedCount,
+                                failedCount),
+                            cancellationToken);
+                    }
+
                     continue;
                 }
 
@@ -104,6 +131,22 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
                 }
 
                 enrichedCount++;
+
+                if (progressCallback is not null)
+                {
+                    var warningsSuffix = detailResult.Warnings.Count > 0
+                        ? $" ({detailResult.Warnings.Count} warning(s))"
+                        : string.Empty;
+
+                    await progressCallback(
+                        new JobStageProgress(
+                            $"Enrichment {processedCount}/{jobsToEnrich.Count} updated '{displayTitle}'{warningsSuffix}.",
+                            jobsToEnrich.Count,
+                            processedCount,
+                            enrichedCount,
+                            failedCount),
+                        cancellationToken);
+                }
             }
 
             if (enrichedCount == 0 && failedCount > 0)
@@ -116,6 +159,18 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
                     0,
                     failedCount,
                     warningCount);
+            }
+
+            if (progressCallback is not null)
+            {
+                await progressCallback(
+                    new JobStageProgress(
+                        $"Saving enrichment results for {enrichedCount} updated job(s).",
+                        jobsToEnrich.Count,
+                        processedCount,
+                        enrichedCount,
+                        failedCount),
+                    cancellationToken);
             }
 
             dbContext.ChangeTracker.DetectChanges();

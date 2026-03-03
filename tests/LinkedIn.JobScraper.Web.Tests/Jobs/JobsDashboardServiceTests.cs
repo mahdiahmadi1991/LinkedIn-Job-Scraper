@@ -27,11 +27,12 @@ public sealed class JobsDashboardServiceTests
         Assert.True(result.Success);
         Assert.Equal("success", result.Severity);
         Assert.Equal(
-            ["fetch", "fetch", "fetch", "enrichment", "enrichment", "enrichment", "scoring", "scoring", "completed"],
+            ["fetch", "fetch", "fetch", "fetch", "fetch", "enrichment", "enrichment", "enrichment", "enrichment", "enrichment", "scoring", "scoring", "scoring", "scoring", "completed"],
             notifier.Updates.Select(static update => update.Stage).ToArray());
         Assert.Equal(
-            ["running", "running", "running", "running", "running", "running", "running", "running", "completed"],
+            ["running", "running", "running", "running", "running", "running", "running", "running", "running", "running", "running", "running", "running", "running", "completed"],
             notifier.Updates.Select(static update => update.State).ToArray());
+        Assert.Contains(notifier.Updates, static update => update.Percent % 1 != 0);
         Assert.All(notifier.ConnectionIds, static connectionId => Assert.Equal("connection-1", connectionId));
         Assert.All(notifier.Updates, static update => Assert.Equal("corr-1", update.CorrelationId));
         Assert.All(notifier.Updates, static update => Assert.Equal("workflow-1", update.WorkflowId));
@@ -98,9 +99,17 @@ public sealed class JobsDashboardServiceTests
 
     private sealed class SuccessfulJobImportService : IJobImportService
     {
-        public Task<JobImportResult> ImportCurrentSearchAsync(CancellationToken cancellationToken)
+        public async Task<JobImportResult> ImportCurrentSearchAsync(
+            CancellationToken cancellationToken,
+            JobStageProgressCallback? progressCallback = null)
         {
-            return Task.FromResult(
+            if (progressCallback is not null)
+            {
+                await progressCallback(new JobStageProgress("Fetch queued.", 6, 0, 0, 0), cancellationToken);
+                await progressCallback(new JobStageProgress("Fetch 1/6.", 6, 1, 1, 0), cancellationToken);
+            }
+
+            return
                 JobImportResult.Succeeded(
                     pagesFetched: 2,
                     fetchedCount: 50,
@@ -108,13 +117,15 @@ public sealed class JobsDashboardServiceTests
                     importedCount: 6,
                     updatedExistingCount: 44,
                     skippedCount: 44,
-                    message: "Import completed."));
+                    message: "Import completed.");
         }
     }
 
     private sealed class FailedJobImportService : IJobImportService
     {
-        public Task<JobImportResult> ImportCurrentSearchAsync(CancellationToken cancellationToken)
+        public Task<JobImportResult> ImportCurrentSearchAsync(
+            CancellationToken cancellationToken,
+            JobStageProgressCallback? progressCallback = null)
         {
             return Task.FromResult(
                 JobImportResult.Failed(
@@ -125,21 +136,33 @@ public sealed class JobsDashboardServiceTests
 
     private sealed class SuccessfulJobEnrichmentService : IJobEnrichmentService
     {
-        public Task<JobEnrichmentResult> EnrichIncompleteJobsAsync(int maxCount, CancellationToken cancellationToken)
+        public async Task<JobEnrichmentResult> EnrichIncompleteJobsAsync(
+            int maxCount,
+            CancellationToken cancellationToken,
+            JobStageProgressCallback? progressCallback = null)
         {
-            return Task.FromResult(
+            if (progressCallback is not null)
+            {
+                await progressCallback(new JobStageProgress("Enrichment queued.", 6, 0, 0, 0), cancellationToken);
+                await progressCallback(new JobStageProgress("Enrichment 1/6.", 6, 1, 1, 0), cancellationToken);
+            }
+
+            return
                 JobEnrichmentResult.Succeeded(
                     requestedCount: 6,
                     processedCount: 6,
                     enrichedCount: 6,
                     failedCount: 0,
-                    warningCount: 0));
+                    warningCount: 0);
         }
     }
 
     private sealed class GuardJobEnrichmentService : IJobEnrichmentService
     {
-        public Task<JobEnrichmentResult> EnrichIncompleteJobsAsync(int maxCount, CancellationToken cancellationToken)
+        public Task<JobEnrichmentResult> EnrichIncompleteJobsAsync(
+            int maxCount,
+            CancellationToken cancellationToken,
+            JobStageProgressCallback? progressCallback = null)
         {
             throw new InvalidOperationException("Enrichment should not run after import failure.");
         }
@@ -147,20 +170,32 @@ public sealed class JobsDashboardServiceTests
 
     private sealed class SuccessfulJobBatchScoringService : IJobBatchScoringService
     {
-        public Task<JobBatchScoringResult> ScoreReadyJobsAsync(int maxCount, CancellationToken cancellationToken)
+        public async Task<JobBatchScoringResult> ScoreReadyJobsAsync(
+            int maxCount,
+            CancellationToken cancellationToken,
+            JobStageProgressCallback? progressCallback = null)
         {
-            return Task.FromResult(
+            if (progressCallback is not null)
+            {
+                await progressCallback(new JobStageProgress("Scoring queued.", 6, 0, 0, 0), cancellationToken);
+                await progressCallback(new JobStageProgress("Scoring 1/6.", 6, 1, 1, 0), cancellationToken);
+            }
+
+            return
                 JobBatchScoringResult.Succeeded(
                     requestedCount: 6,
                     processedCount: 6,
                     scoredCount: 6,
-                    failedCount: 0));
+                    failedCount: 0);
         }
     }
 
     private sealed class GuardJobBatchScoringService : IJobBatchScoringService
     {
-        public Task<JobBatchScoringResult> ScoreReadyJobsAsync(int maxCount, CancellationToken cancellationToken)
+        public Task<JobBatchScoringResult> ScoreReadyJobsAsync(
+            int maxCount,
+            CancellationToken cancellationToken,
+            JobStageProgressCallback? progressCallback = null)
         {
             throw new InvalidOperationException("Scoring should not run after import failure.");
         }

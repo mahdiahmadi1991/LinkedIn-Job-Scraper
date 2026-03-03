@@ -192,7 +192,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 effectiveCorrelationId,
                 "running",
                 "fetch",
-                10,
+                4,
                 "Workflow accepted. Starting LinkedIn fetch using the current stored session and search settings."),
             CancellationToken.None);
 
@@ -205,11 +205,21 @@ public sealed class JobsDashboardService : IJobsDashboardService
                     effectiveCorrelationId,
                     "running",
                     "fetch",
-                    16,
-                    "Calling LinkedIn search endpoints and reconciling results with the local database..."),
+                    12,
+                    "Calling LinkedIn search endpoints and preparing item-by-item reconciliation..."),
                 CancellationToken.None);
 
-            importResult = await _jobImportService.ImportCurrentSearchAsync(workflowCancellationToken);
+            var importProgressCallback = CreateStageProgressCallback(
+                progressConnectionId,
+                workflowId,
+                effectiveCorrelationId,
+                "fetch",
+                14,
+                42);
+
+            importResult = await _jobImportService.ImportCurrentSearchAsync(
+                workflowCancellationToken,
+                importProgressCallback);
 
             if (!importResult.Success)
             {
@@ -255,7 +265,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                     effectiveCorrelationId,
                     "running",
                     "fetch",
-                    32,
+                    44,
                     $"Fetch completed. {importResult.FetchedCount} jobs collected across {importResult.PagesFetched} page(s): {importResult.ImportedCount} new, {importResult.UpdatedExistingCount} refreshed, {importResult.SkippedCount} skipped.",
                     importResult.TotalAvailableCount,
                     importResult.FetchedCount,
@@ -275,7 +285,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                     effectiveCorrelationId,
                     "running",
                     "enrichment",
-                    46,
+                    48,
                     $"Preparing enrichment batch. Up to {enrichmentBatchSize} jobs will request LinkedIn detail payloads.",
                     enrichmentBatchSize,
                     0,
@@ -290,13 +300,22 @@ public sealed class JobsDashboardService : IJobsDashboardService
                     effectiveCorrelationId,
                     "running",
                     "enrichment",
-                    54,
-                    "Calling LinkedIn job detail endpoints for incomplete records..."),
+                    52,
+                    "Calling LinkedIn job detail endpoints and streaming per-job results..."),
                 CancellationToken.None);
+
+            var enrichmentProgressCallback = CreateStageProgressCallback(
+                progressConnectionId,
+                workflowId,
+                effectiveCorrelationId,
+                "enrichment",
+                54,
+                74);
 
             enrichmentResult = await _jobEnrichmentService.EnrichIncompleteJobsAsync(
                 enrichmentBatchSize,
-                workflowCancellationToken);
+                workflowCancellationToken,
+                enrichmentProgressCallback);
 
             LogEnrichmentCompleted(
                 _logger,
@@ -314,7 +333,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                     effectiveCorrelationId,
                     enrichmentResult.Success ? "running" : "warning",
                     "enrichment",
-                    68,
+                    76,
                     enrichmentResult.Success
                         ? $"Enrichment completed. {enrichmentResult.EnrichedCount} of {enrichmentResult.ProcessedCount} processed jobs were updated. Warnings: {enrichmentResult.WarningCount}. Failed: {enrichmentResult.FailedCount}."
                         : $"Enrichment issue: {enrichmentResult.Message}",
@@ -338,7 +357,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                     effectiveCorrelationId,
                     "running",
                     "scoring",
-                    78,
+                    80,
                     $"Preparing AI scoring batch. Up to {scoringBatchSize} jobs will be sent to OpenAI for evaluation.",
                     scoringBatchSize,
                     0,
@@ -353,13 +372,22 @@ public sealed class JobsDashboardService : IJobsDashboardService
                     effectiveCorrelationId,
                     "running",
                     "scoring",
-                    86,
-                    "Submitting the scoring batch to OpenAI and waiting for parsed results..."),
+                    84,
+                    "Submitting the scoring batch to OpenAI and streaming per-job results..."),
                 CancellationToken.None);
+
+            var scoringProgressCallback = CreateStageProgressCallback(
+                progressConnectionId,
+                workflowId,
+                effectiveCorrelationId,
+                "scoring",
+                86,
+                98);
 
             scoringResult = await _jobBatchScoringService.ScoreReadyJobsAsync(
                 scoringBatchSize,
-                workflowCancellationToken);
+                workflowCancellationToken,
+                scoringProgressCallback);
 
             LogScoringCompleted(
                 _logger,
@@ -506,6 +534,47 @@ public sealed class JobsDashboardService : IJobsDashboardService
         CancellationToken cancellationToken)
     {
         return _jobsWorkflowProgressNotifier.PublishAsync(progressConnectionId, update, cancellationToken);
+    }
+
+    private JobStageProgressCallback CreateStageProgressCallback(
+        string? progressConnectionId,
+        string workflowId,
+        string correlationId,
+        string stage,
+        double startPercent,
+        double endPercent)
+    {
+        return (progress, _) =>
+            PublishProgressAsync(
+                progressConnectionId,
+                new JobsWorkflowProgressUpdate(
+                    workflowId,
+                    correlationId,
+                    "running",
+                    stage,
+                    CalculateProgressPercent(startPercent, endPercent, progress.ProcessedCount, progress.RequestedCount),
+                    progress.Message,
+                    progress.RequestedCount,
+                    progress.ProcessedCount,
+                    progress.SucceededCount,
+                    progress.FailedCount),
+                CancellationToken.None);
+    }
+
+    private static double CalculateProgressPercent(
+        double startPercent,
+        double endPercent,
+        int processedCount,
+        int requestedCount)
+    {
+        if (requestedCount <= 0)
+        {
+            return endPercent;
+        }
+
+        var boundedProcessedCount = Math.Clamp(processedCount, 0, requestedCount);
+        var ratio = (double)boundedProcessedCount / requestedCount;
+        return Math.Round(startPercent + ((endPercent - startPercent) * ratio), 1);
     }
 
     private static IQueryable<JobRecord> ApplyFilters(

@@ -61,7 +61,7 @@ public sealed record JobsWorkflowProgressUpdate(
     string CorrelationId,
     string State,
     string Stage,
-    int Percent,
+    double Percent,
     string Message,
     int? RequestedCount = null,
     int? ProcessedCount = null,

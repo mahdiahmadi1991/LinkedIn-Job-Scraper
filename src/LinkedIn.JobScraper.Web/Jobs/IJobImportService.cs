@@ -2,7 +2,9 @@ namespace LinkedIn.JobScraper.Web.Jobs;
 
 public interface IJobImportService
 {
-    Task<JobImportResult> ImportCurrentSearchAsync(CancellationToken cancellationToken);
+    Task<JobImportResult> ImportCurrentSearchAsync(
+        CancellationToken cancellationToken,
+        JobStageProgressCallback? progressCallback = null);
 }
 
 public sealed record JobImportResult(

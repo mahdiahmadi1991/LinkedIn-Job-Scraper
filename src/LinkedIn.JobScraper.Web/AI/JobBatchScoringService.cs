@@ -1,3 +1,4 @@
+using LinkedIn.JobScraper.Web.Jobs;
 using LinkedIn.JobScraper.Web.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,7 +20,10 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
         _behaviorSettingsService = behaviorSettingsService;
     }
 
-    public async Task<JobBatchScoringResult> ScoreReadyJobsAsync(int maxCount, CancellationToken cancellationToken)
+    public async Task<JobBatchScoringResult> ScoreReadyJobsAsync(
+        int maxCount,
+        CancellationToken cancellationToken,
+        JobStageProgressCallback? progressCallback = null)
     {
         if (maxCount <= 0)
         {
@@ -43,6 +47,18 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
             return JobBatchScoringResult.Succeeded(maxCount, 0, 0, 0);
         }
 
+        if (progressCallback is not null)
+        {
+            await progressCallback(
+                new JobStageProgress(
+                    $"Queued {jobsToScore.Count} jobs for AI scoring.",
+                    jobsToScore.Count,
+                    0,
+                    0,
+                    0),
+                cancellationToken);
+        }
+
         var processedCount = 0;
         var scoredCount = 0;
         var failedCount = 0;
@@ -56,6 +72,7 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
             foreach (var job in jobsToScore)
             {
                 processedCount++;
+                var displayTitle = string.IsNullOrWhiteSpace(job.Title) ? job.Id.ToString("N") : job.Title;
 
                 var result = await _jobScoringGateway.ScoreAsync(
                     new JobScoringGatewayRequest(
@@ -77,6 +94,19 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
                     failedCount++;
                     firstFailureMessage ??= result.Message;
                     firstFailureStatusCode ??= result.StatusCode ?? StatusCodes.Status502BadGateway;
+
+                    if (progressCallback is not null)
+                    {
+                        await progressCallback(
+                            new JobStageProgress(
+                                $"Scoring {processedCount}/{jobsToScore.Count} failed for '{displayTitle}': {result.Message}",
+                                jobsToScore.Count,
+                                processedCount,
+                                scoredCount,
+                                failedCount),
+                            cancellationToken);
+                    }
+
                     continue;
                 }
 
@@ -87,6 +117,18 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
                 job.AiConcerns = result.Concerns;
                 job.LastScoredAtUtc = DateTimeOffset.UtcNow;
                 scoredCount++;
+
+                if (progressCallback is not null)
+                {
+                    await progressCallback(
+                        new JobStageProgress(
+                            $"Scoring {processedCount}/{jobsToScore.Count} saved a score for '{displayTitle}'.",
+                            jobsToScore.Count,
+                            processedCount,
+                            scoredCount,
+                            failedCount),
+                        cancellationToken);
+                }
             }
 
             if (scoredCount == 0 && failedCount > 0)
@@ -98,6 +140,18 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
                     processedCount,
                     0,
                     failedCount);
+            }
+
+            if (progressCallback is not null)
+            {
+                await progressCallback(
+                    new JobStageProgress(
+                        $"Saving AI scoring results for {scoredCount} job(s).",
+                        jobsToScore.Count,
+                        processedCount,
+                        scoredCount,
+                        failedCount),
+                    cancellationToken);
             }
 
             dbContext.ChangeTracker.DetectChanges();

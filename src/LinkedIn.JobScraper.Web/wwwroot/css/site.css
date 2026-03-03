@@ -705,6 +705,18 @@ a:hover {
   transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
 }
 
+.jobs-page .workflow-panel .progress {
+  overflow: hidden;
+  background: rgba(221, 232, 244, 0.72);
+}
+
+.jobs-page .workflow-panel .progress-bar {
+  transition:
+    width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
 .progress-activity-panel {
   display: grid;
   gap: 0.85rem;
@@ -724,6 +736,8 @@ a:hover {
   max-height: 13.5rem;
   overflow-y: auto;
   padding-right: 0.25rem;
+  scroll-behavior: smooth;
+  align-content: start;
 }
 
 .progress-activity-item {
@@ -733,6 +747,18 @@ a:hover {
   border: 1px solid rgba(220, 230, 241, 0.85);
   border-radius: 0.9rem;
   background: rgba(255, 255, 255, 0.94);
+  opacity: 0;
+  transform: translateY(0.65rem);
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease,
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.progress-activity-item.is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .progress-activity-item.completed {
@@ -770,6 +796,17 @@ a:hover {
   color: var(--app-ink-500);
   font-size: 0.8rem;
   line-height: 1.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jobs-page .workflow-panel .progress-bar,
+  .progress-activity-item {
+    transition: none;
+  }
+
+  .progress-activity-list {
+    scroll-behavior: auto;
+  }
 }
 
 .jobs-page .jobs-list-panel .card-body {
