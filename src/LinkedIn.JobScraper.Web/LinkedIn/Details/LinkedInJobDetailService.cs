@@ -1,9 +1,8 @@
 using System.Net;
 using System.Text.Json;
+using LinkedIn.JobScraper.Web.LinkedIn;
 using LinkedIn.JobScraper.Web.LinkedIn.Api;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
-using Microsoft.AspNetCore.Http.Extensions;
-using Microsoft.AspNetCore.WebUtilities;
 
 namespace LinkedIn.JobScraper.Web.LinkedIn.Details;
 
@@ -13,7 +12,6 @@ public sealed class LinkedInJobDetailService : ILinkedInJobDetailService
     private const string EmploymentStatusType = "com.linkedin.voyager.dash.hiring.EmploymentStatus";
     private const string GeoType = "com.linkedin.voyager.dash.common.Geo";
 
-    private readonly IWebHostEnvironment _environment;
     private readonly ILinkedInApiClient _linkedInApiClient;
     private readonly ILogger<LinkedInJobDetailService> _logger;
     private readonly ILinkedInSessionStore _sessionStore;
@@ -21,12 +19,10 @@ public sealed class LinkedInJobDetailService : ILinkedInJobDetailService
     public LinkedInJobDetailService(
         ILinkedInApiClient linkedInApiClient,
         ILinkedInSessionStore sessionStore,
-        IWebHostEnvironment environment,
         ILogger<LinkedInJobDetailService> logger)
     {
         _linkedInApiClient = linkedInApiClient;
         _sessionStore = sessionStore;
-        _environment = environment;
         _logger = logger;
     }
 
@@ -50,29 +46,9 @@ public sealed class LinkedInJobDetailService : ILinkedInJobDetailService
                 StatusCodes.Status502BadGateway);
         }
 
-        var requestFilePath = Path.GetFullPath(
-            Path.Combine(_environment.ContentRootPath, "..", "..", "docs", "api-sample", "job-detail-request.txt"));
-
-        if (!File.Exists(requestFilePath))
-        {
-            return LinkedInJobDetailFetchResult.Failed(
-                $"Sample request file was not found at '{requestFilePath}'.",
-                StatusCodes.Status500InternalServerError);
-        }
-
-        var fileContent = await File.ReadAllTextAsync(requestFilePath, cancellationToken);
-        var parsedRequest = LinkedInCapturedRequestParser.Parse(fileContent);
-
-        if (!parsedRequest.IsValid)
-        {
-            return LinkedInJobDetailFetchResult.Failed(
-                parsedRequest.ErrorMessage!,
-                StatusCodes.Status500InternalServerError);
-        }
-
         var jobPostingUrn = $"urn:li:fsd_jobPosting:{linkedInJobId}";
-        var requestUri = BuildRequestUri(parsedRequest.Url!, jobPostingUrn);
-        var headers = MergeHeaders(parsedRequest.Headers, sessionSnapshot, linkedInJobId);
+        var requestUri = LinkedInRequestDefaults.BuildJobDetailUri(linkedInJobId);
+        var headers = MergeHeaders(sessionSnapshot, linkedInJobId);
 
         var response = await _linkedInApiClient.GetAsync(requestUri, headers, cancellationToken);
 
@@ -124,75 +100,18 @@ public sealed class LinkedInJobDetailService : ILinkedInJobDetailService
         }
     }
 
-    private static Uri BuildRequestUri(Uri sampleUri, string jobPostingUrn)
-    {
-        var query = QueryHelpers.ParseQuery(sampleUri.Query);
-        var queryId = query.TryGetValue("queryId", out var queryIdValues)
-            ? queryIdValues.ToString()
-            : string.Empty;
-
-        var encodedJobPostingUrn = Uri.EscapeDataString(jobPostingUrn);
-        var variablesValue = $"(jobPostingUrn:{encodedJobPostingUrn})";
-        var queryText = $"variables={variablesValue}";
-
-        if (!string.IsNullOrWhiteSpace(queryId))
-        {
-            queryText = $"{queryText}&queryId={Uri.EscapeDataString(queryId)}";
-        }
-
-        var builder = new UriBuilder(sampleUri)
-        {
-            Query = queryText
-        };
-
-        return builder.Uri;
-    }
-
     private static Dictionary<string, string> MergeHeaders(
-        IReadOnlyDictionary<string, string> requestHeaders,
         LinkedInSessionSnapshot sessionSnapshot,
         string linkedInJobId)
     {
-        var merged = new Dictionary<string, string>(requestHeaders, StringComparer.OrdinalIgnoreCase);
-
-        foreach (var header in sessionSnapshot.Headers)
+        var merged = new Dictionary<string, string>(sessionSnapshot.Headers, StringComparer.OrdinalIgnoreCase)
         {
-            merged[header.Key] = header.Value;
-        }
-
-        if (merged.TryGetValue("Referer", out var referer))
-        {
-            merged["Referer"] = ReplaceCurrentJobIdInReferer(referer, linkedInJobId);
-        }
-
-        return merged;
-    }
-
-    private static string ReplaceCurrentJobIdInReferer(string referer, string linkedInJobId)
-    {
-        if (!Uri.TryCreate(referer, UriKind.Absolute, out var refererUri))
-        {
-            return referer;
-        }
-
-        var query = QueryHelpers.ParseQuery(refererUri.Query);
-        var queryBuilder = new QueryBuilder();
-
-        foreach (var pair in query)
-        {
-            var value = string.Equals(pair.Key, "currentJobId", StringComparison.OrdinalIgnoreCase)
-                ? linkedInJobId
-                : pair.Value.ToString();
-
-            queryBuilder.Add(pair.Key, value);
-        }
-
-        var builder = new UriBuilder(refererUri)
-        {
-            Query = queryBuilder.ToQueryString().Value?.TrimStart('?')
+            ["Accept"] = "application/vnd.linkedin.normalized+json+2.1",
+            ["Referer"] = LinkedInRequestDefaults.BuildJobDetailReferer(linkedInJobId),
+            ["x-li-pem-metadata"] = LinkedInRequestDefaults.JobDetailPemMetadata
         };
 
-        return builder.Uri.AbsoluteUri;
+        return merged;
     }
 
     private static List<string> ReadWarnings(JsonElement envelopeNode)

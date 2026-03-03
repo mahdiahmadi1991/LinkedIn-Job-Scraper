@@ -8,9 +8,7 @@ namespace LinkedIn.JobScraper.Web.LinkedIn.Search;
 public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
 {
     private const string JobPostingCardType = "com.linkedin.voyager.dash.jobs.JobPostingCard";
-    private const string SearchRequestRelativePath = "../../docs/api-sample/job-seaarch-request.txt";
 
-    private readonly IWebHostEnvironment _environment;
     private readonly ILinkedInApiClient _linkedInApiClient;
     private readonly ILogger<LinkedInJobSearchService> _logger;
     private readonly ILinkedInSessionStore _sessionStore;
@@ -18,12 +16,10 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
     public LinkedInJobSearchService(
         ILinkedInApiClient linkedInApiClient,
         ILinkedInSessionStore sessionStore,
-        IWebHostEnvironment environment,
         ILogger<LinkedInJobSearchService> logger)
     {
         _linkedInApiClient = linkedInApiClient;
         _sessionStore = sessionStore;
-        _environment = environment;
         _logger = logger;
     }
 
@@ -38,28 +34,11 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
                 StatusCodes.Status502BadGateway);
         }
 
-        var requestFilePath = Path.GetFullPath(
-            Path.Combine(_environment.ContentRootPath, "..", "..", "docs", "api-sample", "job-seaarch-request.txt"));
-
-        if (!File.Exists(requestFilePath))
-        {
-            return LinkedInJobSearchFetchResult.Failed(
-                $"Sample request file was not found at '{requestFilePath}'.",
-                StatusCodes.Status500InternalServerError);
-        }
-
-        var fileContent = await File.ReadAllTextAsync(requestFilePath, cancellationToken);
-        var parsedRequest = LinkedInCapturedRequestParser.Parse(fileContent);
-
-        if (!parsedRequest.IsValid)
-        {
-            return LinkedInJobSearchFetchResult.Failed(
-                parsedRequest.ErrorMessage!,
-                StatusCodes.Status500InternalServerError);
-        }
-
-        var headers = MergeHeaders(parsedRequest.Headers, sessionSnapshot);
-        var response = await _linkedInApiClient.GetAsync(parsedRequest.Url!, headers, cancellationToken);
+        var headers = MergeHeaders(sessionSnapshot);
+        var response = await _linkedInApiClient.GetAsync(
+            LinkedInRequestDefaults.BuildSearchUri(),
+            headers,
+            cancellationToken);
 
         if (response.StatusCode != (int)HttpStatusCode.OK)
         {
@@ -271,16 +250,14 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
         return postingUrn[(colonIndex + 1)..];
     }
 
-    private static Dictionary<string, string> MergeHeaders(
-        IReadOnlyDictionary<string, string> requestHeaders,
-        LinkedInSessionSnapshot sessionSnapshot)
+    private static Dictionary<string, string> MergeHeaders(LinkedInSessionSnapshot sessionSnapshot)
     {
-        var merged = new Dictionary<string, string>(requestHeaders, StringComparer.OrdinalIgnoreCase);
-
-        foreach (var header in sessionSnapshot.Headers)
+        var merged = new Dictionary<string, string>(sessionSnapshot.Headers, StringComparer.OrdinalIgnoreCase)
         {
-            merged[header.Key] = header.Value;
-        }
+            ["Accept"] = "application/vnd.linkedin.normalized+json+2.1",
+            ["Referer"] = LinkedInRequestDefaults.BuildSearchReferer(),
+            ["x-li-pem-metadata"] = LinkedInRequestDefaults.SearchPemMetadata
+        };
 
         return merged;
     }
