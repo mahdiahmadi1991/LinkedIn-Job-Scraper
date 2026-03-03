@@ -536,6 +536,38 @@
             let observer = null;
             let loadInFlight = false;
 
+            rowsBody.addEventListener("click", (event) => {
+                const toggle = event.target instanceof Element
+                    ? event.target.closest("[data-job-row-toggle]")
+                    : null;
+
+                if (!toggle) {
+                    return;
+                }
+
+                const targetId = toggle.getAttribute("data-target-id");
+                if (!targetId) {
+                    return;
+                }
+
+                const detailRow = rowsBody.querySelector(`#${targetId}`);
+                if (!detailRow) {
+                    return;
+                }
+
+                const isExpanded = toggle.getAttribute("aria-expanded") === "true";
+                const nextExpanded = !isExpanded;
+
+                toggle.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
+                toggle.classList.toggle("is-open", nextExpanded);
+                detailRow.classList.toggle("d-none", !nextExpanded);
+
+                const label = toggle.querySelector(".job-expand-label");
+                if (label) {
+                    label.textContent = nextExpanded ? "Less" : "More";
+                }
+            });
+
             const loadNextRows = async (sentinelRow) => {
                 if (!sentinelRow || loadInFlight) {
                     return;

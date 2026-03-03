@@ -4,6 +4,7 @@
 
 @foreach (var job in Model.Jobs)
 {
+    var detailRowId = $"job-detail-{job.Id:N}";
     var fitBadgeClass = job.AiLabel switch
     {
         "StrongMatch" => "bg-success-subtle text-success-emphasis",
@@ -12,11 +13,20 @@
         _ => "bg-light text-dark"
     };
 
-    <tr>
+    <tr class="job-primary-row" data-job-primary-row>
         <td class="w-50">
             <div class="job-opportunity-cell">
                 <div class="job-title-row">
                     <span class="job-kicker">Opportunity</span>
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary btn-sm job-expand-toggle"
+                        data-job-row-toggle
+                        data-target-id="@detailRowId"
+                        aria-expanded="false"
+                        aria-controls="@detailRowId">
+                        <span class="job-expand-label">More</span>
+                    </button>
                 </div>
                 <a asp-action="Details" asp-route-jobId="@job.Id" class="job-title-link">
                     @job.Title
@@ -32,31 +42,6 @@
                         <span class="job-meta-pill">@job.EmploymentStatus</span>
                     }
                 </div>
-                @if (!string.IsNullOrWhiteSpace(job.AiSummary))
-                {
-                    <div class="job-summary line-clamp-2" dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">
-                        @job.AiSummary
-                    </div>
-                }
-                @if (!string.IsNullOrWhiteSpace(job.AiWhyMatched) || !string.IsNullOrWhiteSpace(job.AiConcerns))
-                {
-                    <div class="job-signal-stack">
-                        @if (!string.IsNullOrWhiteSpace(job.AiWhyMatched))
-                        {
-                            <div class="job-signal-item">
-                                <span class="job-signal-label match">Match</span>
-                                <span class="text-body-secondary line-clamp-1" dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@job.AiWhyMatched</span>
-                            </div>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(job.AiConcerns))
-                        {
-                            <div class="job-signal-item">
-                                <span class="job-signal-label concern">Concern</span>
-                                <span class="text-body-secondary line-clamp-1" dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@job.AiConcerns</span>
-                            </div>
-                        }
-                    </div>
-                }
             </div>
         </td>
         <td>
@@ -113,20 +98,81 @@
                         </span>
                     </div>
                 </div>
-                <div class="apply-actions pt-1">
+                <div class="activity-actions">
                     <a asp-action="Details" asp-route-jobId="@job.Id" class="btn btn-outline-secondary btn-sm">
                         Open Details
                     </a>
                     @if (!string.IsNullOrWhiteSpace(job.CompanyApplyUrl))
                     {
                         <a class="btn btn-outline-primary btn-sm" href="@job.CompanyApplyUrl" target="_blank" rel="noreferrer">
-                            Open Apply
+                            Apply
                         </a>
                     }
-                    else
-                    {
-                        <span class="text-muted small">No direct apply</span>
-                    }
+                </div>
+            </div>
+        </td>
+    </tr>
+    <tr class="job-detail-row d-none" id="@detailRowId" data-job-detail-row>
+        <td colspan="4">
+            <div class="job-detail-panel">
+                <div class="job-detail-grid">
+                    <div class="job-detail-block">
+                        <div class="job-detail-label">AI Summary</div>
+                        @if (!string.IsNullOrWhiteSpace(job.AiSummary))
+                        {
+                            <div class="job-summary line-clamp-3" dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">
+                                @job.AiSummary
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-muted small">No AI summary yet.</div>
+                        }
+                    </div>
+                    <div class="job-detail-block">
+                        <div class="job-detail-label">Signals</div>
+                        @if (!string.IsNullOrWhiteSpace(job.AiWhyMatched) || !string.IsNullOrWhiteSpace(job.AiConcerns))
+                        {
+                            <div class="job-signal-stack compact">
+                                @if (!string.IsNullOrWhiteSpace(job.AiWhyMatched))
+                                {
+                                    <div class="job-signal-item">
+                                        <span class="job-signal-label match">Match</span>
+                                        <span class="text-body-secondary" dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@job.AiWhyMatched</span>
+                                    </div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(job.AiConcerns))
+                                {
+                                    <div class="job-signal-item">
+                                        <span class="job-signal-label concern">Concern</span>
+                                        <span class="text-body-secondary" dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@job.AiConcerns</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-muted small">No AI rationale is stored yet.</div>
+                        }
+                    </div>
+                    <div class="job-detail-block">
+                        <div class="job-detail-label">Quick Actions</div>
+                        <div class="apply-actions inline">
+                            <a asp-action="Details" asp-route-jobId="@job.Id" class="btn btn-outline-secondary btn-sm">
+                                Full Details
+                            </a>
+                            @if (!string.IsNullOrWhiteSpace(job.CompanyApplyUrl))
+                            {
+                                <a class="btn btn-primary btn-sm" href="@job.CompanyApplyUrl" target="_blank" rel="noreferrer">
+                                    Open Apply
+                                </a>
+                            }
+                            else
+                            {
+                                <span class="text-muted small">No direct apply link captured.</span>
+                            }
+                        </div>
+                    </div>
                 </div>
             </div>
         </td>

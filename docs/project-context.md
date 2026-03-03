@@ -42,6 +42,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The jobs dashboard now lazy-loads additional job rows in client-side batches so the first render stays lighter while deeper browsing continues on demand
 - The jobs workflow panel now includes a live activity log under the progress bar so backend stage messages and counters are visible while the workflow is running
 - AI behavior settings now include an output-language choice (`English` or `فارسی`), and AI-generated summary fields render with the matching text direction in the dashboard and job details views
+- The jobs table now keeps primary rows compact and moves AI rationale plus secondary actions into a per-job expandable child row so scanning large result sets stays cleaner
 
 ## Product Intent
 

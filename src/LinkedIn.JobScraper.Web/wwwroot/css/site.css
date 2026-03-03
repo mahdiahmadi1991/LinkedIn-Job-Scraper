@@ -560,6 +560,10 @@ a:hover {
   background: rgba(10, 102, 194, 0.03);
 }
 
+.jobs-page .jobs-table tbody tr.job-detail-row:hover {
+  background: transparent;
+}
+
 .job-opportunity-cell {
   display: grid;
   gap: 0.45rem;
@@ -569,6 +573,8 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  justify-content: space-between;
+  flex-wrap: wrap;
 }
 
 .job-kicker {
@@ -577,6 +583,20 @@ a:hover {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.job-expand-toggle {
+  margin-left: auto;
+  min-width: 4.75rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.job-expand-toggle.is-open {
+  border-color: rgba(10, 102, 194, 0.18);
+  background: rgba(10, 102, 194, 0.08);
+  color: var(--app-blue-800);
 }
 
 .job-title-link {
@@ -636,6 +656,10 @@ a:hover {
   display: grid;
   gap: 0.4rem;
   margin-top: 0.4rem;
+}
+
+.job-signal-stack.compact {
+  margin-top: 0;
 }
 
 .job-signal-item {
@@ -722,13 +746,59 @@ a:hover {
   min-width: 9.25rem;
 }
 
+.apply-actions.inline {
+  min-width: 0;
+}
+
 .apply-actions .btn {
   width: 100%;
 }
 
+.apply-actions.inline .btn {
+  width: auto;
+}
+
 .activity-cell {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.6rem;
+}
+
+.activity-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.job-detail-row > td {
+  padding-top: 0;
+  background: rgba(245, 249, 253, 0.88);
+}
+
+.job-detail-panel {
+  padding: 1rem 0;
+}
+
+.job-detail-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.job-detail-block {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(10, 102, 194, 0.08);
+  border-radius: 0.95rem;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.job-detail-label {
+  color: var(--app-ink-500);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .jobs-load-more-row td {
@@ -769,6 +839,10 @@ a:hover {
   .app-topbar .navbar-nav {
     gap: 0.35rem;
     padding-top: 0.75rem;
+  }
+
+  .job-detail-grid {
+    grid-template-columns: 1fr;
   }
 
   .jobs-page .jobs-table thead th {
