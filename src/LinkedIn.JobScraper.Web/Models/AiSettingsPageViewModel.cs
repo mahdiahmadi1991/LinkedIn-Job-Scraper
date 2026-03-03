@@ -20,6 +20,10 @@ public sealed class AiSettingsPageViewModel
     [Display(Name = "Exclusion Signals")]
     public string ExclusionSignals { get; set; } = string.Empty;
 
+    [Required]
+    [Display(Name = "AI Output Language")]
+    public string OutputLanguageCode { get; set; } = "en";
+
     public string? StatusMessage { get; set; }
 
     public bool StatusSucceeded { get; set; }

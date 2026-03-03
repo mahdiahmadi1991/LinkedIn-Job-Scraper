@@ -11,4 +11,8 @@ public sealed record AiBehaviorProfile(
     string ProfileName,
     string BehavioralInstructions,
     string PrioritySignals,
-    string ExclusionSignals);
+    string ExclusionSignals,
+    string OutputLanguageCode)
+{
+    public string OutputDirection => AiOutputLanguage.GetDirection(OutputLanguageCode);
+}

@@ -13,6 +13,7 @@ public sealed record JobScoringGatewayRequest(
     string BehavioralInstructions,
     string PrioritySignals,
     string ExclusionSignals,
+    string OutputLanguageCode,
     string? CompanyName,
     string? LocationName,
     string? EmploymentStatus);

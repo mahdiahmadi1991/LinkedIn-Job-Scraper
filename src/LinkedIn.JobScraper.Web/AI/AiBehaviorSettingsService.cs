@@ -33,6 +33,7 @@ public sealed class AiBehaviorSettingsService : IAiBehaviorSettingsService
         record.BehavioralInstructions = profile.BehavioralInstructions.Trim();
         record.PrioritySignals = profile.PrioritySignals.Trim();
         record.ExclusionSignals = profile.ExclusionSignals.Trim();
+        record.OutputLanguageCode = AiOutputLanguage.Normalize(profile.OutputLanguageCode);
         record.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -59,6 +60,7 @@ public sealed class AiBehaviorSettingsService : IAiBehaviorSettingsService
                     "C#, .NET, ASP.NET Core, backend engineering, clear scope, remote-friendly roles, direct apply path, concrete requirements.",
                 ExclusionSignals =
                     "Strong stack mismatch, unclear responsibilities, vague descriptions, low evidence of fit, or roles far outside established experience.",
+                OutputLanguageCode = AiOutputLanguage.English,
                 UpdatedAtUtc = DateTimeOffset.UtcNow
             };
 
@@ -75,6 +77,7 @@ public sealed class AiBehaviorSettingsService : IAiBehaviorSettingsService
             record.ProfileName,
             record.BehavioralInstructions,
             record.PrioritySignals,
-            record.ExclusionSignals);
+            record.ExclusionSignals,
+            AiOutputLanguage.Normalize(record.OutputLanguageCode));
     }
 }

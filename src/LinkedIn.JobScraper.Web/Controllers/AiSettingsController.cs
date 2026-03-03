@@ -24,6 +24,7 @@ public sealed class AiSettingsController : Controller
             BehavioralInstructions = profile.BehavioralInstructions,
             PrioritySignals = profile.PrioritySignals,
             ExclusionSignals = profile.ExclusionSignals,
+            OutputLanguageCode = profile.OutputLanguageCode,
             StatusMessage = TempData["AiSettingsStatusMessage"] as string,
             StatusSucceeded = string.Equals(
                 TempData["AiSettingsStatusSucceeded"] as string,
@@ -50,10 +51,12 @@ public sealed class AiSettingsController : Controller
                 viewModel.ProfileName,
                 viewModel.BehavioralInstructions,
                 viewModel.PrioritySignals,
-                viewModel.ExclusionSignals),
+                viewModel.ExclusionSignals,
+                viewModel.OutputLanguageCode),
             cancellationToken);
 
-        TempData["AiSettingsStatusMessage"] = $"Saved AI behavior profile '{savedProfile.ProfileName}'.";
+        TempData["AiSettingsStatusMessage"] =
+            $"Saved AI behavior profile '{savedProfile.ProfileName}' with {AiOutputLanguage.GetDisplayName(savedProfile.OutputLanguageCode)} output.";
         TempData["AiSettingsStatusSucceeded"] = bool.TrueString;
 
         return RedirectToAction(nameof(Index));

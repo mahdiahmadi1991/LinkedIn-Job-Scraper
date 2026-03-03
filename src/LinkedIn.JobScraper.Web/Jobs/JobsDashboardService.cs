@@ -40,9 +40,11 @@ public sealed class JobsDashboardService : IJobsDashboardService
         var filteredQuery = ApplyFilters(dbContext.Jobs.AsNoTracking(), query);
 
         var filteredJobs = await filteredQuery.CountAsync(cancellationToken);
+        var aiOutputLanguageCode = await GetAiOutputLanguageCodeAsync(dbContext, cancellationToken);
         var rowsChunk = await GetRowsChunkAsync(
             ApplySorting(filteredQuery, query),
             query,
+            aiOutputLanguageCode,
             0,
             cancellationToken);
 
@@ -86,6 +88,8 @@ public sealed class JobsDashboardService : IJobsDashboardService
             return null;
         }
 
+        var aiOutputLanguageCode = await GetAiOutputLanguageCodeAsync(dbContext, cancellationToken);
+
         return new JobDetailsSnapshot(
             job.Id,
             job.Title,
@@ -102,7 +106,9 @@ public sealed class JobsDashboardService : IJobsDashboardService
             job.AiLabel,
             job.AiSummary,
             job.AiWhyMatched,
-            job.AiConcerns);
+            job.AiConcerns,
+            aiOutputLanguageCode,
+            AiOutputLanguage.GetDirection(aiOutputLanguageCode));
     }
 
     public async Task<JobsRowsChunk> GetRowsAsync(
@@ -117,8 +123,14 @@ public sealed class JobsDashboardService : IJobsDashboardService
 
         var filteredQuery = ApplyFilters(dbContext.Jobs.AsNoTracking(), query);
         var sortedQuery = ApplySorting(filteredQuery, query);
+        var aiOutputLanguageCode = await GetAiOutputLanguageCodeAsync(dbContext, cancellationToken);
 
-        return await GetRowsChunkAsync(sortedQuery, query, offset, cancellationToken);
+        return await GetRowsChunkAsync(
+            sortedQuery,
+            query,
+            aiOutputLanguageCode,
+            offset,
+            cancellationToken);
     }
 
     public async Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(
@@ -395,6 +407,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
     private static async Task<JobsRowsChunk> GetRowsChunkAsync(
         IQueryable<JobRecord> sortedQuery,
         JobsDashboardQuery query,
+        string aiOutputLanguageCode,
         int offset,
         CancellationToken cancellationToken)
     {
@@ -428,6 +441,22 @@ public sealed class JobsDashboardService : IJobsDashboardService
             query,
             materializedRows,
             offset + materializedRows.Length,
-            hasMoreJobs);
+            hasMoreJobs,
+            aiOutputLanguageCode,
+            AiOutputLanguage.GetDirection(aiOutputLanguageCode));
+    }
+
+    private static async Task<string> GetAiOutputLanguageCodeAsync(
+        LinkedInJobScraperDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var outputLanguageCode = await dbContext.AiBehaviorSettings
+            .AsNoTracking()
+            .OrderByDescending(settings => settings.UpdatedAtUtc)
+            .ThenByDescending(settings => settings.Id)
+            .Select(settings => settings.OutputLanguageCode)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return AiOutputLanguage.Normalize(outputLanguageCode);
     }
 }

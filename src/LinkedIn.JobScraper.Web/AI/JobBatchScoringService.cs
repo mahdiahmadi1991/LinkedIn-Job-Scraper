@@ -64,6 +64,7 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
                         behaviorProfile.BehavioralInstructions,
                         behaviorProfile.PrioritySignals,
                         behaviorProfile.ExclusionSignals,
+                        behaviorProfile.OutputLanguageCode,
                         job.CompanyName,
                         job.LocationName,
                         job.EmploymentStatus),

@@ -12,5 +12,7 @@ public sealed class AiBehaviorSettingsRecord
 
     public string ExclusionSignals { get; set; } = string.Empty;
 
+    public string OutputLanguageCode { get; set; } = "en";
+
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }

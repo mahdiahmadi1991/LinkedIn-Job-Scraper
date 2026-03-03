@@ -48,7 +48,9 @@ public sealed record JobsRowsChunk(
     JobsDashboardQuery Query,
     IReadOnlyList<JobDashboardRow> Jobs,
     int NextOffset,
-    bool HasMoreJobs);
+    bool HasMoreJobs,
+    string AiOutputLanguageCode,
+    string AiOutputDirection);
 
 public sealed record JobDetailsSnapshot(
     Guid Id,
@@ -66,7 +68,9 @@ public sealed record JobDetailsSnapshot(
     string? AiLabel,
     string? AiSummary,
     string? AiWhyMatched,
-    string? AiConcerns);
+    string? AiConcerns,
+    string AiOutputLanguageCode,
+    string AiOutputDirection);
 
 public sealed class JobsDashboardQuery
 {

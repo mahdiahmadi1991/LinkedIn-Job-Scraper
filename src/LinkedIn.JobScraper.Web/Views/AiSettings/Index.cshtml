@@ -45,6 +45,14 @@
                             <textarea asp-for="ExclusionSignals" class="form-control" rows="5"></textarea>
                             <span asp-validation-for="ExclusionSignals" class="text-danger small"></span>
                         </div>
+                        <div>
+                            <label asp-for="OutputLanguageCode" class="form-label"></label>
+                            <select asp-for="OutputLanguageCode" class="form-select">
+                                <option value="en">English</option>
+                                <option value="fa">فارسی</option>
+                            </select>
+                            <span asp-validation-for="OutputLanguageCode" class="text-danger small"></span>
+                        </div>
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">Save Behavior Settings</button>
                             <a asp-action="Index" class="btn btn-outline-secondary">Reset</a>
@@ -62,6 +70,7 @@
                         <li>The tone and priorities used in AI scoring</li>
                         <li>The positive signals that should increase the fit score</li>
                         <li>The mismatch signals that should push jobs toward review or skip</li>
+                        <li>The language and reading direction used for AI-generated summaries and rationale</li>
                     </ul>
                     <hr />
                     <p class="small text-muted mb-0">

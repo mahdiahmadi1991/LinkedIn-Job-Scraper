@@ -128,7 +128,7 @@ public sealed class OpenAiJobScoringGateway : IJobScoringGateway
                         {
                             type = "input_text",
                             text =
-                                "Score the job for fit. Return concise structured JSON only. Penalize mismatches and missing evidence. Use the provided behavioral profile."
+                                "Score the job for fit. Return concise structured JSON only. Penalize mismatches and missing evidence. Use the provided behavioral profile and honor the requested output language for all natural-language fields."
                         }
                     }
                 },
@@ -191,6 +191,10 @@ public sealed class OpenAiJobScoringGateway : IJobScoringGateway
         builder.AppendLine();
         builder.AppendLine("Exclusion signals:");
         builder.AppendLine(request.ExclusionSignals);
+        builder.AppendLine();
+        builder.Append("Output language for summary fields: ");
+        builder.AppendLine(AiOutputLanguage.GetPromptLabel(request.OutputLanguageCode));
+        builder.AppendLine("Write summary, whyMatched, and concerns in that language.");
         builder.AppendLine();
         builder.AppendLine("Job data:");
         builder.Append("Title: ");

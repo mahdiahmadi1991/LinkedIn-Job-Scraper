@@ -118,7 +118,7 @@
                         <h2 class="h5">AI Review</h2>
                         @if (!string.IsNullOrWhiteSpace(Model.AiSummary))
                         {
-                            <p class="mb-2 job-summary">@Model.AiSummary</p>
+                            <p class="mb-2 job-summary" dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@Model.AiSummary</p>
                         }
                         else
                         {
@@ -130,7 +130,7 @@
                     {
                         <div class="details-review-block match">
                             <div class="small text-success fw-semibold text-uppercase mb-1">Why Matched</div>
-                            <div>@Model.AiWhyMatched</div>
+                            <div dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@Model.AiWhyMatched</div>
                         </div>
                     }
 
@@ -138,7 +138,7 @@
                     {
                         <div class="details-review-block concern">
                             <div class="small text-warning-emphasis fw-semibold text-uppercase mb-1">Concerns</div>
-                            <div>@Model.AiConcerns</div>
+                            <div dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@Model.AiConcerns</div>
                         </div>
                     }
                 </div>

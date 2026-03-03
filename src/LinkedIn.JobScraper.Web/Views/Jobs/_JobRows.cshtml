@@ -34,7 +34,7 @@
                 </div>
                 @if (!string.IsNullOrWhiteSpace(job.AiSummary))
                 {
-                    <div class="job-summary line-clamp-2">
+                    <div class="job-summary line-clamp-2" dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">
                         @job.AiSummary
                     </div>
                 }
@@ -45,14 +45,14 @@
                         {
                             <div class="job-signal-item">
                                 <span class="job-signal-label match">Match</span>
-                                <span class="text-body-secondary line-clamp-1">@job.AiWhyMatched</span>
+                                <span class="text-body-secondary line-clamp-1" dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@job.AiWhyMatched</span>
                             </div>
                         }
                         @if (!string.IsNullOrWhiteSpace(job.AiConcerns))
                         {
                             <div class="job-signal-item">
                                 <span class="job-signal-label concern">Concern</span>
-                                <span class="text-body-secondary line-clamp-1">@job.AiConcerns</span>
+                                <span class="text-body-secondary line-clamp-1" dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@job.AiConcerns</span>
                             </div>
                         }
                     </div>

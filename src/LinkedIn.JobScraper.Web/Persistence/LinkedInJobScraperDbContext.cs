@@ -86,6 +86,7 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.HasKey(static settings => settings.Id);
 
                 entity.Property(static settings => settings.ProfileName).HasMaxLength(128).IsRequired();
+                entity.Property(static settings => settings.OutputLanguageCode).HasMaxLength(8).IsRequired();
             });
 
         modelBuilder.Entity<LinkedInSearchSettingsRecord>(
