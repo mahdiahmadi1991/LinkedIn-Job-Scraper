@@ -10,10 +10,14 @@ namespace LinkedIn.JobScraper.Web.Controllers;
 public class JobsController : Controller
 {
     private readonly IJobsDashboardService _jobsDashboardService;
+    private readonly IJobsWorkflowStateStore _jobsWorkflowStateStore;
 
-    public JobsController(IJobsDashboardService jobsDashboardService)
+    public JobsController(
+        IJobsDashboardService jobsDashboardService,
+        IJobsWorkflowStateStore jobsWorkflowStateStore)
     {
         _jobsDashboardService = jobsDashboardService;
+        _jobsWorkflowStateStore = jobsWorkflowStateStore;
     }
 
     [HttpGet]
@@ -54,10 +58,16 @@ public class JobsController : Controller
     public async Task<IActionResult> FetchAndScore(
         [FromForm] JobsDashboardQuery query,
         [FromHeader(Name = "X-Progress-ConnectionId")] string? progressConnectionId,
+        [FromHeader(Name = "X-Workflow-Id")] string? workflowId,
         CancellationToken cancellationToken)
     {
+        var effectiveWorkflowId = string.IsNullOrWhiteSpace(workflowId)
+            ? Guid.NewGuid().ToString("N")
+            : workflowId.Trim();
+
         var result = await _jobsDashboardService.RunFetchAndScoreAsync(
             progressConnectionId,
+            effectiveWorkflowId,
             HttpContext.TraceIdentifier,
             cancellationToken);
         TempData["JobsAlertMessage"] = result.Message;
@@ -71,11 +81,15 @@ public class JobsController : Controller
             if (!result.Success)
             {
                 return Problem(
-                    title: "Fetch & Score failed",
+                    title: string.Equals(result.Severity, "warning", StringComparison.OrdinalIgnoreCase)
+                        ? "Fetch & Score cancelled"
+                        : "Fetch & Score failed",
                     detail: result.Message,
-                    statusCode: result.ImportResult.StatusCode > 0
-                        ? result.ImportResult.StatusCode
-                        : StatusCodes.Status409Conflict);
+                    statusCode: string.Equals(result.Severity, "warning", StringComparison.OrdinalIgnoreCase)
+                        ? StatusCodes.Status409Conflict
+                        : result.ImportResult.StatusCode > 0
+                            ? result.ImportResult.StatusCode
+                            : StatusCodes.Status409Conflict);
             }
 
             return Json(
@@ -87,6 +101,49 @@ public class JobsController : Controller
         }
 
         return Redirect(redirectUrl);
+    }
+
+    [HttpGet]
+    public IActionResult WorkflowProgress(
+        [FromQuery] string workflowId,
+        [FromQuery] long afterSequence = 0)
+    {
+        if (string.IsNullOrWhiteSpace(workflowId))
+        {
+            return Problem(
+                title: "Workflow id is required",
+                detail: "Provide a workflow id before polling workflow progress.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return Json(_jobsWorkflowStateStore.GetBatch(workflowId.Trim(), afterSequence));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting(SecurityRateLimitPolicies.SensitiveLocalActions)]
+    public IActionResult CancelWorkflow([FromForm] string workflowId)
+    {
+        if (string.IsNullOrWhiteSpace(workflowId))
+        {
+            return Problem(
+                title: "Workflow id is required",
+                detail: "Provide a workflow id before requesting cancellation.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (!_jobsWorkflowStateStore.RequestCancellation(workflowId.Trim()))
+        {
+            return Problem(
+                title: "Workflow not found",
+                detail: "No running workflow was found for the provided id.",
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return Json(
+            new WorkflowCancellationResponse(
+                true,
+                "Cancellation requested. The current Fetch & Score run will stop as soon as the active background step yields."));
     }
 
     [HttpPost]

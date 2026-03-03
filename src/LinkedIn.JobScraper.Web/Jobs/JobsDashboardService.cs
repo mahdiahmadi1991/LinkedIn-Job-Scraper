@@ -43,6 +43,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
     private readonly IJobEnrichmentService _jobEnrichmentService;
     private readonly IJobImportService _jobImportService;
     private readonly IJobsWorkflowProgressNotifier _jobsWorkflowProgressNotifier;
+    private readonly IJobsWorkflowStateStore _jobsWorkflowStateStore;
     private readonly IJobBatchScoringService _jobBatchScoringService;
     private readonly ILogger<JobsDashboardService> _logger;
 
@@ -51,6 +52,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
         IJobImportService jobImportService,
         IJobEnrichmentService jobEnrichmentService,
         IJobBatchScoringService jobBatchScoringService,
+        IJobsWorkflowStateStore jobsWorkflowStateStore,
         IJobsWorkflowProgressNotifier jobsWorkflowProgressNotifier,
         ILogger<JobsDashboardService> logger)
     {
@@ -58,6 +60,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
         _jobImportService = jobImportService;
         _jobEnrichmentService = jobEnrichmentService;
         _jobBatchScoringService = jobBatchScoringService;
+        _jobsWorkflowStateStore = jobsWorkflowStateStore;
         _jobsWorkflowProgressNotifier = jobsWorkflowProgressNotifier;
         _logger = logger;
     }
@@ -168,209 +171,287 @@ public sealed class JobsDashboardService : IJobsDashboardService
 
     public async Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(
         string? progressConnectionId,
+        string workflowId,
         string? correlationId,
         CancellationToken cancellationToken)
     {
+        var workflowCancellationToken = _jobsWorkflowStateStore.RegisterWorkflow(workflowId, cancellationToken);
         var effectiveCorrelationId = string.IsNullOrWhiteSpace(correlationId)
             ? Guid.NewGuid().ToString("N")
             : correlationId;
         LogWorkflowStarted(_logger, effectiveCorrelationId, progressConnectionId, null);
 
+        JobImportResult? importResult = null;
+        JobEnrichmentResult? enrichmentResult = null;
+        JobBatchScoringResult? scoringResult = null;
+
         await PublishProgressAsync(
             progressConnectionId,
             new JobsWorkflowProgressUpdate(
+                workflowId,
                 effectiveCorrelationId,
                 "running",
                 "fetch",
                 10,
-                "Starting LinkedIn fetch with the stored session..."),
-            cancellationToken);
+                "Workflow accepted. Starting LinkedIn fetch using the current stored session and search settings."),
+            CancellationToken.None);
 
-        var importResult = await _jobImportService.ImportCurrentSearchAsync(cancellationToken);
-
-        if (!importResult.Success)
+        try
         {
-            LogWorkflowFailed(_logger, effectiveCorrelationId, importResult.Message, null);
+            await PublishProgressAsync(
+                progressConnectionId,
+                new JobsWorkflowProgressUpdate(
+                    workflowId,
+                    effectiveCorrelationId,
+                    "running",
+                    "fetch",
+                    16,
+                    "Calling LinkedIn search endpoints and reconciling results with the local database..."),
+                CancellationToken.None);
+
+            importResult = await _jobImportService.ImportCurrentSearchAsync(workflowCancellationToken);
+
+            if (!importResult.Success)
+            {
+                LogWorkflowFailed(_logger, effectiveCorrelationId, importResult.Message, null);
+
+                await PublishProgressAsync(
+                    progressConnectionId,
+                    new JobsWorkflowProgressUpdate(
+                        workflowId,
+                        effectiveCorrelationId,
+                        "failed",
+                        "fetch",
+                        100,
+                        importResult.Message,
+                        importResult.FetchedCount,
+                        importResult.FetchedCount,
+                        importResult.ImportedCount + importResult.UpdatedExistingCount,
+                        1),
+                    CancellationToken.None);
+
+                return new FetchAndScoreWorkflowResult(
+                    false,
+                    $"Fetch failed. {importResult.Message}",
+                    "danger",
+                    importResult,
+                    null,
+                    null);
+            }
+
+            LogImportCompleted(
+                _logger,
+                effectiveCorrelationId,
+                importResult.PagesFetched,
+                importResult.FetchedCount,
+                importResult.ImportedCount,
+                importResult.UpdatedExistingCount,
+                null);
 
             await PublishProgressAsync(
                 progressConnectionId,
                 new JobsWorkflowProgressUpdate(
+                    workflowId,
                     effectiveCorrelationId,
-                    "failed",
+                    "running",
                     "fetch",
-                    100,
-                    importResult.Message,
-                    importResult.FetchedCount,
+                    32,
+                    $"Fetch completed. {importResult.FetchedCount} jobs collected across {importResult.PagesFetched} page(s): {importResult.ImportedCount} new, {importResult.UpdatedExistingCount} refreshed, {importResult.SkippedCount} skipped.",
+                    importResult.TotalAvailableCount,
                     importResult.FetchedCount,
                     importResult.ImportedCount + importResult.UpdatedExistingCount,
-                    1),
-                cancellationToken);
+                    0),
+                CancellationToken.None);
 
-            return new FetchAndScoreWorkflowResult(
-                false,
-                $"Fetch failed. {importResult.Message}",
-                "danger",
-                importResult,
-                null,
-                null);
-        }
+            var enrichmentBatchSize = Math.Clamp(
+                importResult.ImportedCount > 0 ? importResult.ImportedCount : Math.Min(importResult.FetchedCount, 5),
+                1,
+                25);
 
-        LogImportCompleted(
-            _logger,
-            effectiveCorrelationId,
-            importResult.PagesFetched,
-            importResult.FetchedCount,
-            importResult.ImportedCount,
-            importResult.UpdatedExistingCount,
-            null);
+            await PublishProgressAsync(
+                progressConnectionId,
+                new JobsWorkflowProgressUpdate(
+                    workflowId,
+                    effectiveCorrelationId,
+                    "running",
+                    "enrichment",
+                    46,
+                    $"Preparing enrichment batch. Up to {enrichmentBatchSize} jobs will request LinkedIn detail payloads.",
+                    enrichmentBatchSize,
+                    0,
+                    0,
+                    0),
+                CancellationToken.None);
 
-        await PublishProgressAsync(
-            progressConnectionId,
-            new JobsWorkflowProgressUpdate(
-                effectiveCorrelationId,
-                "running",
-                "fetch",
-                38,
-                $"Fetch completed. {importResult.FetchedCount} jobs collected across {importResult.PagesFetched} page(s): {importResult.ImportedCount} new, {importResult.UpdatedExistingCount} refreshed, {importResult.SkippedCount} already known.",
-                importResult.TotalAvailableCount,
-                importResult.FetchedCount,
-                importResult.ImportedCount + importResult.UpdatedExistingCount,
-                0),
-            cancellationToken);
+            await PublishProgressAsync(
+                progressConnectionId,
+                new JobsWorkflowProgressUpdate(
+                    workflowId,
+                    effectiveCorrelationId,
+                    "running",
+                    "enrichment",
+                    54,
+                    "Calling LinkedIn job detail endpoints for incomplete records..."),
+                CancellationToken.None);
 
-        var enrichmentBatchSize = Math.Clamp(
-            importResult.ImportedCount > 0 ? importResult.ImportedCount : Math.Min(importResult.FetchedCount, 5),
-            1,
-            25);
-
-        await PublishProgressAsync(
-            progressConnectionId,
-            new JobsWorkflowProgressUpdate(
-                effectiveCorrelationId,
-                "running",
-                "enrichment",
-                52,
-                $"Preparing enrichment batch. Up to {enrichmentBatchSize} jobs will request LinkedIn detail payloads.",
+            enrichmentResult = await _jobEnrichmentService.EnrichIncompleteJobsAsync(
                 enrichmentBatchSize,
-                0,
-                0,
-                0),
-            cancellationToken);
+                workflowCancellationToken);
 
-        var enrichmentResult = await _jobEnrichmentService.EnrichIncompleteJobsAsync(
-            enrichmentBatchSize,
-            cancellationToken);
-
-        LogEnrichmentCompleted(
-            _logger,
-            effectiveCorrelationId,
-            enrichmentResult.RequestedCount,
-            enrichmentResult.ProcessedCount,
-            enrichmentResult.EnrichedCount,
-            enrichmentResult.FailedCount,
-            null);
-
-        await PublishProgressAsync(
-            progressConnectionId,
-            new JobsWorkflowProgressUpdate(
+            LogEnrichmentCompleted(
+                _logger,
                 effectiveCorrelationId,
-                enrichmentResult.Success ? "running" : "warning",
-                "enrichment",
-                72,
-                enrichmentResult.Success
-                    ? $"Enrichment completed. {enrichmentResult.EnrichedCount} of {enrichmentResult.ProcessedCount} processed jobs were updated. Warnings: {enrichmentResult.WarningCount}. Failed: {enrichmentResult.FailedCount}."
-                    : $"Enrichment issue: {enrichmentResult.Message}",
                 enrichmentResult.RequestedCount,
                 enrichmentResult.ProcessedCount,
                 enrichmentResult.EnrichedCount,
-                enrichmentResult.FailedCount),
-            cancellationToken);
+                enrichmentResult.FailedCount,
+                null);
 
-        var scoringBatchSize = Math.Clamp(
-            enrichmentResult.Success
-                ? Math.Max(enrichmentResult.EnrichedCount, Math.Min(importResult.ImportedCount, 5))
-                : Math.Max(Math.Min(importResult.ImportedCount, 5), 1),
-            1,
-            10);
+            await PublishProgressAsync(
+                progressConnectionId,
+                new JobsWorkflowProgressUpdate(
+                    workflowId,
+                    effectiveCorrelationId,
+                    enrichmentResult.Success ? "running" : "warning",
+                    "enrichment",
+                    68,
+                    enrichmentResult.Success
+                        ? $"Enrichment completed. {enrichmentResult.EnrichedCount} of {enrichmentResult.ProcessedCount} processed jobs were updated. Warnings: {enrichmentResult.WarningCount}. Failed: {enrichmentResult.FailedCount}."
+                        : $"Enrichment issue: {enrichmentResult.Message}",
+                    enrichmentResult.RequestedCount,
+                    enrichmentResult.ProcessedCount,
+                    enrichmentResult.EnrichedCount,
+                    enrichmentResult.FailedCount),
+                CancellationToken.None);
 
-        await PublishProgressAsync(
-            progressConnectionId,
-            new JobsWorkflowProgressUpdate(
-                effectiveCorrelationId,
-                "running",
-                "scoring",
-                84,
-                $"Preparing AI scoring batch. Up to {scoringBatchSize} jobs will be sent to OpenAI for evaluation.",
+            var scoringBatchSize = Math.Clamp(
+                enrichmentResult.Success
+                    ? Math.Max(enrichmentResult.EnrichedCount, Math.Min(importResult.ImportedCount, 5))
+                    : Math.Max(Math.Min(importResult.ImportedCount, 5), 1),
+                1,
+                10);
+
+            await PublishProgressAsync(
+                progressConnectionId,
+                new JobsWorkflowProgressUpdate(
+                    workflowId,
+                    effectiveCorrelationId,
+                    "running",
+                    "scoring",
+                    78,
+                    $"Preparing AI scoring batch. Up to {scoringBatchSize} jobs will be sent to OpenAI for evaluation.",
+                    scoringBatchSize,
+                    0,
+                    0,
+                    0),
+                CancellationToken.None);
+
+            await PublishProgressAsync(
+                progressConnectionId,
+                new JobsWorkflowProgressUpdate(
+                    workflowId,
+                    effectiveCorrelationId,
+                    "running",
+                    "scoring",
+                    86,
+                    "Submitting the scoring batch to OpenAI and waiting for parsed results..."),
+                CancellationToken.None);
+
+            scoringResult = await _jobBatchScoringService.ScoreReadyJobsAsync(
                 scoringBatchSize,
-                0,
-                0,
-                0),
-            cancellationToken);
+                workflowCancellationToken);
 
-        var scoringResult = await _jobBatchScoringService.ScoreReadyJobsAsync(
-            scoringBatchSize,
-            cancellationToken);
-
-        LogScoringCompleted(
-            _logger,
-            effectiveCorrelationId,
-            scoringResult.RequestedCount,
-            scoringResult.ProcessedCount,
-            scoringResult.ScoredCount,
-            scoringResult.FailedCount,
-            null);
-
-        var severity = "success";
-        var messageParts = new List<string>
-        {
-            $"Import: +{importResult.ImportedCount} new, {importResult.UpdatedExistingCount} refreshed."
-        };
-
-        if (enrichmentResult.Success)
-        {
-            messageParts.Add($"Enrichment: {enrichmentResult.EnrichedCount} updated.");
-        }
-        else
-        {
-            severity = "warning";
-            messageParts.Add($"Enrichment issue: {enrichmentResult.Message}");
-        }
-
-        if (scoringResult.Success)
-        {
-            messageParts.Add($"AI scoring: {scoringResult.ScoredCount} scored.");
-        }
-        else
-        {
-            severity = severity == "danger" ? "danger" : "warning";
-            messageParts.Add($"AI scoring issue: {scoringResult.Message}");
-        }
-
-        var workflowResult = new FetchAndScoreWorkflowResult(
-            true,
-            string.Join(' ', messageParts),
-            severity,
-            importResult,
-            enrichmentResult,
-            scoringResult);
-
-        await PublishProgressAsync(
-            progressConnectionId,
-            new JobsWorkflowProgressUpdate(
+            LogScoringCompleted(
+                _logger,
                 effectiveCorrelationId,
-                severity == "danger" ? "failed" : severity == "warning" ? "warning" : "completed",
-                "completed",
-                100,
-                workflowResult.Message,
                 scoringResult.RequestedCount,
                 scoringResult.ProcessedCount,
                 scoringResult.ScoredCount,
-                scoringResult.FailedCount),
-            cancellationToken);
+                scoringResult.FailedCount,
+                null);
 
-        LogWorkflowCompleted(_logger, effectiveCorrelationId, workflowResult.Success, workflowResult.Severity, null);
+            var severity = "success";
+            var messageParts = new List<string>
+            {
+                $"Import: +{importResult.ImportedCount} new, {importResult.UpdatedExistingCount} refreshed."
+            };
 
-        return workflowResult;
+            if (enrichmentResult.Success)
+            {
+                messageParts.Add($"Enrichment: {enrichmentResult.EnrichedCount} updated.");
+            }
+            else
+            {
+                severity = "warning";
+                messageParts.Add($"Enrichment issue: {enrichmentResult.Message}");
+            }
+
+            if (scoringResult.Success)
+            {
+                messageParts.Add($"AI scoring: {scoringResult.ScoredCount} scored.");
+            }
+            else
+            {
+                severity = severity == "danger" ? "danger" : "warning";
+                messageParts.Add($"AI scoring issue: {scoringResult.Message}");
+            }
+
+            var workflowResult = new FetchAndScoreWorkflowResult(
+                true,
+                string.Join(' ', messageParts),
+                severity,
+                importResult,
+                enrichmentResult,
+                scoringResult);
+
+            await PublishProgressAsync(
+                progressConnectionId,
+                new JobsWorkflowProgressUpdate(
+                    workflowId,
+                    effectiveCorrelationId,
+                    severity == "danger" ? "failed" : severity == "warning" ? "warning" : "completed",
+                    "completed",
+                    100,
+                    workflowResult.Message,
+                    scoringResult.RequestedCount,
+                    scoringResult.ProcessedCount,
+                    scoringResult.ScoredCount,
+                    scoringResult.FailedCount),
+                CancellationToken.None);
+
+            LogWorkflowCompleted(_logger, effectiveCorrelationId, workflowResult.Success, workflowResult.Severity, null);
+
+            return workflowResult;
+        }
+        catch (OperationCanceledException) when (workflowCancellationToken.IsCancellationRequested)
+        {
+            var cancelledImport = importResult ?? JobImportResult.Failed("Workflow was cancelled before fetch completed.", StatusCodes.Status409Conflict);
+            var cancelledResult = new FetchAndScoreWorkflowResult(
+                false,
+                "Fetch & Score was cancelled.",
+                "warning",
+                cancelledImport,
+                enrichmentResult,
+                scoringResult);
+
+            await PublishProgressAsync(
+                progressConnectionId,
+                new JobsWorkflowProgressUpdate(
+                    workflowId,
+                    effectiveCorrelationId,
+                    "cancelled",
+                    "completed",
+                    100,
+                    "Cancellation requested. The workflow stopped before completing all remaining background work.",
+                    scoringResult?.RequestedCount ?? enrichmentResult?.RequestedCount ?? importResult?.TotalAvailableCount,
+                    scoringResult?.ProcessedCount ?? enrichmentResult?.ProcessedCount ?? importResult?.FetchedCount,
+                    scoringResult?.ScoredCount ?? enrichmentResult?.EnrichedCount ?? (importResult?.ImportedCount ?? 0) + (importResult?.UpdatedExistingCount ?? 0),
+                    (scoringResult?.FailedCount ?? 0) + (enrichmentResult?.FailedCount ?? 0)),
+                CancellationToken.None);
+
+            LogWorkflowCompleted(_logger, effectiveCorrelationId, cancelledResult.Success, cancelledResult.Severity, null);
+            return cancelledResult;
+        }
     }
 
     public async Task<JobStatusChangeResult> UpdateStatusAsync(

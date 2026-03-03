@@ -32,6 +32,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ILinkedInSessionStore, DatabaseLinkedInSessionStore>();
         services.AddSingleton<ILinkedInBrowserLoginService, PlaywrightLinkedInBrowserLoginService>();
         services.AddSingleton<ILinkedInSearchSettingsService, LinkedInSearchSettingsService>();
+        services.AddSingleton<IJobsWorkflowStateStore, InMemoryJobsWorkflowStateStore>();
         services.AddSingleton<IJobsWorkflowProgressNotifier, SignalRJobsWorkflowProgressNotifier>();
         services.AddTransient<ILinkedInSessionVerificationService, LinkedInSessionVerificationService>();
         services.AddTransient<IAiBehaviorSettingsService, AiBehaviorSettingsService>();

@@ -18,21 +18,23 @@ public sealed class JobsDashboardServiceTests
             new SuccessfulJobImportService(),
             new SuccessfulJobEnrichmentService(),
             new SuccessfulJobBatchScoringService(),
+            new InMemoryJobsWorkflowStateStore(),
             notifier,
             NullLogger<JobsDashboardService>.Instance);
 
-        var result = await service.RunFetchAndScoreAsync("connection-1", "corr-1", CancellationToken.None);
+        var result = await service.RunFetchAndScoreAsync("connection-1", "workflow-1", "corr-1", CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.Equal("success", result.Severity);
         Assert.Equal(
-            ["fetch", "fetch", "enrichment", "enrichment", "scoring", "completed"],
+            ["fetch", "fetch", "fetch", "enrichment", "enrichment", "enrichment", "scoring", "scoring", "completed"],
             notifier.Updates.Select(static update => update.Stage).ToArray());
         Assert.Equal(
-            ["running", "running", "running", "running", "running", "completed"],
+            ["running", "running", "running", "running", "running", "running", "running", "running", "completed"],
             notifier.Updates.Select(static update => update.State).ToArray());
         Assert.All(notifier.ConnectionIds, static connectionId => Assert.Equal("connection-1", connectionId));
         Assert.All(notifier.Updates, static update => Assert.Equal("corr-1", update.CorrelationId));
+        Assert.All(notifier.Updates, static update => Assert.Equal("workflow-1", update.WorkflowId));
     }
 
     [Fact]
@@ -44,21 +46,24 @@ public sealed class JobsDashboardServiceTests
             new FailedJobImportService(),
             new GuardJobEnrichmentService(),
             new GuardJobBatchScoringService(),
+            new InMemoryJobsWorkflowStateStore(),
             notifier,
             NullLogger<JobsDashboardService>.Instance);
 
-        var result = await service.RunFetchAndScoreAsync("connection-2", "corr-2", CancellationToken.None);
+        var result = await service.RunFetchAndScoreAsync("connection-2", "workflow-2", "corr-2", CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.Equal("danger", result.Severity);
         Assert.Null(result.EnrichmentResult);
         Assert.Null(result.ScoringResult);
-        Assert.Equal(2, notifier.Updates.Count);
+        Assert.Equal(3, notifier.Updates.Count);
         Assert.Equal("fetch", notifier.Updates[0].Stage);
         Assert.Equal("fetch", notifier.Updates[1].Stage);
-        Assert.Equal("failed", notifier.Updates[1].State);
+        Assert.Equal("fetch", notifier.Updates[2].Stage);
+        Assert.Equal("failed", notifier.Updates[2].State);
         Assert.All(notifier.Updates, static update => Assert.Equal("corr-2", update.CorrelationId));
-        Assert.Contains("Stored session expired.", notifier.Updates[1].Message, StringComparison.Ordinal);
+        Assert.All(notifier.Updates, static update => Assert.Equal("workflow-2", update.WorkflowId));
+        Assert.Contains("Stored session expired.", notifier.Updates[2].Message, StringComparison.Ordinal);
     }
 
     private sealed class UnusedDbContextFactory : IDbContextFactory<LinkedInJobScraperDbContext>

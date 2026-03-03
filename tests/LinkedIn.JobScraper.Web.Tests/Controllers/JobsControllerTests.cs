@@ -15,7 +15,8 @@ public sealed class JobsControllerTests
     public async Task FetchAndScoreReturnsJsonPayloadForAjaxRequests()
     {
         var service = new FakeJobsDashboardService();
-        var controller = new JobsController(service)
+        var workflowStateStore = new FakeJobsWorkflowStateStore();
+        var controller = new JobsController(service, workflowStateStore)
         {
             ControllerContext = new ControllerContext
             {
@@ -27,7 +28,7 @@ public sealed class JobsControllerTests
 
         controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
 
-        var result = await controller.FetchAndScore(new JobsDashboardQuery(), "connection-1", CancellationToken.None);
+        var result = await controller.FetchAndScore(new JobsDashboardQuery(), "connection-1", "workflow-1", CancellationToken.None);
 
         var json = Assert.IsType<JsonResult>(result);
         var payload = Assert.IsType<FetchAndScoreAjaxResponse>(json.Value);
@@ -43,13 +44,14 @@ public sealed class JobsControllerTests
         Assert.Equal(3, controller.TempData["JobsWorkflowEnrichmentEnrichedCount"]);
         Assert.Equal(3, controller.TempData["JobsWorkflowScoringScoredCount"]);
         Assert.Equal("connection-1", service.LastConnectionId);
+        Assert.Equal("workflow-1", service.LastWorkflowId);
         Assert.False(string.IsNullOrWhiteSpace(service.LastCorrelationId));
     }
 
     [Fact]
     public async Task FetchAndScoreReturnsProblemDetailsForAjaxFailures()
     {
-        var controller = new JobsController(new FailedJobsDashboardService())
+        var controller = new JobsController(new FailedJobsDashboardService(), new FakeJobsWorkflowStateStore())
         {
             ControllerContext = new ControllerContext
             {
@@ -61,7 +63,7 @@ public sealed class JobsControllerTests
 
         controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
 
-        var result = await controller.FetchAndScore(new JobsDashboardQuery(), "connection-1", CancellationToken.None);
+        var result = await controller.FetchAndScore(new JobsDashboardQuery(), "connection-1", "workflow-1", CancellationToken.None);
 
         var problem = Assert.IsType<ObjectResult>(result);
         var details = Assert.IsType<ProblemDetails>(problem.Value);
@@ -76,6 +78,8 @@ public sealed class JobsControllerTests
     private sealed class FakeJobsDashboardService : IJobsDashboardService
     {
         public string? LastConnectionId { get; private set; }
+
+        public string? LastWorkflowId { get; private set; }
 
         public string? LastCorrelationId { get; private set; }
 
@@ -96,10 +100,12 @@ public sealed class JobsControllerTests
 
         public Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(
             string? progressConnectionId,
+            string workflowId,
             string? correlationId,
             CancellationToken cancellationToken)
         {
             LastConnectionId = progressConnectionId;
+            LastWorkflowId = workflowId;
             LastCorrelationId = correlationId;
 
             var import = JobImportResult.Succeeded(
@@ -159,6 +165,7 @@ public sealed class JobsControllerTests
 
         public Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(
             string? progressConnectionId,
+            string workflowId,
             string? correlationId,
             CancellationToken cancellationToken)
         {
@@ -177,6 +184,28 @@ public sealed class JobsControllerTests
         public Task<JobStatusChangeResult> UpdateStatusAsync(Guid jobId, JobWorkflowState status, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
+        }
+    }
+
+    private sealed class FakeJobsWorkflowStateStore : IJobsWorkflowStateStore
+    {
+        public void Append(JobsWorkflowProgressUpdate update)
+        {
+        }
+
+        public JobsWorkflowProgressBatch GetBatch(string workflowId, long afterSequence)
+        {
+            return new JobsWorkflowProgressBatch([], 1, false);
+        }
+
+        public CancellationToken RegisterWorkflow(string workflowId, CancellationToken outerCancellationToken)
+        {
+            return outerCancellationToken;
+        }
+
+        public bool RequestCancellation(string workflowId)
+        {
+            return false;
         }
     }
 }

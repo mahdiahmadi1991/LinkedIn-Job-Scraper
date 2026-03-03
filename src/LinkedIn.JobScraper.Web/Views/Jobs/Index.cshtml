@@ -47,7 +47,11 @@
             <h1 class="h2 mb-1">Jobs Dashboard</h1>
             <p class="dashboard-lead mb-0">Review imported jobs, run the end-to-end fetch flow, and keep manual status current.</p>
         </div>
-        <form asp-action="FetchAndScore" method="post" data-fetch-score-form>
+        <form asp-action="FetchAndScore"
+              method="post"
+              data-fetch-score-form
+              data-progress-poll-url="@Url.Action("WorkflowProgress", "Jobs")"
+              data-cancel-url="@Url.Action("CancelWorkflow", "Jobs")">
             @Html.AntiForgeryToken()
             <input type="hidden" name="Search" value="@query.Search" />
             <input type="hidden" name="FilterStatus" value="@query.FilterStatus" />
@@ -74,6 +78,25 @@
             <div class="progress" role="progressbar" aria-label="Fetch and score progress" aria-valuemin="0" aria-valuemax="100">
                 <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 8%;" data-progress-bar></div>
             </div>
+            <div class="progress-activity-panel" data-progress-log-panel>
+                <div class="d-flex justify-content-between align-items-center gap-3">
+                    <div>
+                        <div class="small text-muted text-uppercase">Live Activity</div>
+                        <div class="fw-semibold">Background workflow report</div>
+                    </div>
+                    <span class="small text-muted">Newest events appear first</span>
+                </div>
+                <div class="progress-activity-empty small text-muted" data-progress-log-empty>
+                    Waiting for the first workflow event...
+                </div>
+                <div class="progress-activity-list d-none" data-progress-log></div>
+            </div>
+            <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                <div class="small text-muted">Stage progress updates are shown live below.</div>
+                <button type="button" class="btn btn-outline-danger btn-sm d-none" data-fetch-cancel-button>
+                    Cancel current run
+                </button>
+            </div>
             <div class="row g-2" data-progress-stages>
                 <div class="col-12 col-md-4">
                     <div class="progress-stage p-3" data-progress-stage="0">
@@ -96,19 +119,6 @@
                         <div class="small text-body-secondary">Scores ready jobs using the current OpenAI behavior profile.</div>
                     </div>
                 </div>
-            </div>
-            <div class="progress-activity-panel" data-progress-log-panel>
-                <div class="d-flex justify-content-between align-items-center gap-3">
-                    <div>
-                        <div class="small text-muted text-uppercase">Live Activity</div>
-                        <div class="fw-semibold">Background workflow report</div>
-                    </div>
-                    <span class="small text-muted">Newest events appear first</span>
-                </div>
-                <div class="progress-activity-empty small text-muted" data-progress-log-empty>
-                    Waiting for the first workflow event...
-                </div>
-                <div class="progress-activity-list d-none" data-progress-log></div>
             </div>
         </div>
     </section>
@@ -298,11 +308,20 @@
             const progressStatus = document.querySelector("[data-progress-status]");
             const progressLog = document.querySelector("[data-progress-log]");
             const progressLogEmpty = document.querySelector("[data-progress-log-empty]");
+            const cancelButton = document.querySelector("[data-fetch-cancel-button]");
             const stageNodes = Array.from(document.querySelectorAll("[data-progress-stage]"));
             const stageOrder = ["fetch", "enrichment", "scoring"];
+            const pollUrl = form.dataset.progressPollUrl;
+            const cancelUrl = form.dataset.cancelUrl;
+            const antiForgeryToken = form.querySelector('input[name="__RequestVerificationToken"]')?.value ?? "";
             let signalRConnection = null;
             let isSubmitting = false;
             let lastLoggedMessage = null;
+            let activeWorkflowId = null;
+            let lastSequence = 0;
+            let workflowTerminalState = null;
+            let workflowPollingTimer = null;
+            let activeFetchPromise = null;
 
             const setBusyState = () => {
                 if (button) {
@@ -320,6 +339,11 @@
                 if (progressPanel) {
                     progressPanel.classList.remove("d-none");
                 }
+
+                if (cancelButton) {
+                    cancelButton.classList.remove("d-none");
+                    cancelButton.disabled = false;
+                }
             };
 
             const setIdleState = () => {
@@ -334,18 +358,33 @@
                 if (busyText) {
                     busyText.classList.add("d-none");
                 }
+
+                if (cancelButton) {
+                    cancelButton.classList.add("d-none");
+                    cancelButton.disabled = false;
+                }
             };
 
-            const appendProgressLog = (update) => {
+            const stopPolling = () => {
+                if (!workflowPollingTimer) {
+                    return;
+                }
+
+                window.clearTimeout(workflowPollingTimer);
+                workflowPollingTimer = null;
+            };
+
+            const appendProgressLog = (update, occurredAtUtc) => {
                 if (!progressLog || !update || !update.message) {
                     return;
                 }
 
-                if (lastLoggedMessage === update.message) {
+                const dedupeKey = `${update.state}|${update.stage}|${update.message}|${update.requestedCount}|${update.processedCount}|${update.succeededCount}|${update.failedCount}`;
+                if (lastLoggedMessage === dedupeKey) {
                     return;
                 }
 
-                lastLoggedMessage = update.message;
+                lastLoggedMessage = dedupeKey;
 
                 if (progressLogEmpty) {
                     progressLogEmpty.classList.add("d-none");
@@ -359,17 +398,18 @@
                 const state = String(update.state || "running");
                 if (state === "completed") {
                     item.classList.add("completed");
-                } else if (state === "warning") {
+                } else if (state === "warning" || state === "cancelled") {
                     item.classList.add("warning");
                 } else if (state === "failed") {
                     item.classList.add("failed");
                 }
 
+                const timestamp = occurredAtUtc ? new Date(occurredAtUtc) : new Date();
                 const timeLabel = new Intl.DateTimeFormat([], {
                     hour: "2-digit",
                     minute: "2-digit",
                     second: "2-digit"
-                }).format(new Date());
+                }).format(timestamp);
 
                 const detailParts = [];
                 if (Number.isFinite(Number(update.requestedCount)) && Number(update.requestedCount) > 0) {
@@ -401,7 +441,7 @@
                 progressLog.prepend(item);
             };
 
-            const applyProgressUpdate = (update) => {
+            const applyProgressUpdate = (update, occurredAtUtc) => {
                 if (!update) {
                     return;
                 }
@@ -414,7 +454,7 @@
                     progressStatus.textContent = update.message;
                 }
 
-                appendProgressLog(update);
+                appendProgressLog(update, occurredAtUtc);
 
                 if (progressBar) {
                     const percent = Math.max(0, Math.min(100, Number(update.percent) || 0));
@@ -422,7 +462,7 @@
                     progressBar.setAttribute("aria-valuenow", String(percent));
                     progressBar.classList.toggle("progress-bar-animated", update.state === "running");
                     progressBar.classList.toggle("progress-bar-striped", update.state === "running");
-                    progressBar.classList.toggle("bg-warning", update.state === "warning");
+                    progressBar.classList.toggle("bg-warning", update.state === "warning" || update.state === "cancelled");
                     progressBar.classList.toggle("bg-danger", update.state === "failed");
                     progressBar.classList.toggle("bg-success", update.state === "completed");
                 }
@@ -440,6 +480,14 @@
                     node.classList.toggle("bg-success-subtle", !isActive && isCompleted);
                     node.classList.toggle("text-success-emphasis", !isActive && isCompleted);
                 });
+
+                if (["completed", "failed", "cancelled"].includes(update.state)) {
+                    workflowTerminalState = update.state;
+                    stopPolling();
+                    isSubmitting = false;
+                    activeFetchPromise = null;
+                    setIdleState();
+                }
             };
 
             const ensureConnection = async () => {
@@ -457,11 +505,78 @@
                     .build();
 
                 signalRConnection.on("WorkflowProgress", (update) => {
-                    applyProgressUpdate(update);
+                    applyProgressUpdate(update, null);
                 });
 
                 await signalRConnection.start();
                 return signalRConnection;
+            };
+
+            const pollWorkflowProgress = async () => {
+                if (!activeWorkflowId || !pollUrl) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${pollUrl}?workflowId=${encodeURIComponent(activeWorkflowId)}&afterSequence=${lastSequence}`, {
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest"
+                        },
+                        credentials: "same-origin"
+                    });
+
+                    if (!response.ok) {
+                        throw new Error("Could not read workflow progress.");
+                    }
+
+                    const payload = await response.json();
+                    const events = Array.isArray(payload?.events) ? payload.events : [];
+
+                    for (const item of events) {
+                        const sequence = Number(item?.sequence);
+                        if (Number.isFinite(sequence) && sequence > lastSequence) {
+                            lastSequence = sequence;
+                        }
+
+                        if (item?.update) {
+                            applyProgressUpdate(item.update, item.occurredAtUtc);
+                        }
+                    }
+                } catch {
+                    if (!workflowTerminalState) {
+                        appendProgressLog({
+                            state: "warning",
+                            stage: "fetch",
+                            message: "Progress polling missed one server update. Retrying automatically..."
+                        });
+                    }
+                } finally {
+                    if (!workflowTerminalState) {
+                        workflowPollingTimer = window.setTimeout(() => {
+                            void pollWorkflowProgress();
+                        }, 900);
+                    }
+                }
+            };
+
+            const beginWorkflowTracking = (workflowId) => {
+                activeWorkflowId = workflowId;
+                lastSequence = 0;
+                lastLoggedMessage = null;
+                workflowTerminalState = null;
+                stopPolling();
+
+                if (progressLog) {
+                    progressLog.innerHTML = "";
+                    progressLog.classList.add("d-none");
+                }
+
+                if (progressLogEmpty) {
+                    progressLogEmpty.classList.remove("d-none");
+                    progressLogEmpty.textContent = "Waiting for the first workflow event...";
+                }
+
+                void pollWorkflowProgress();
             };
 
             form.addEventListener("submit", async (event) => {
@@ -469,6 +584,9 @@
                     event.preventDefault();
                     return;
                 }
+
+                event.preventDefault();
+                isSubmitting = true;
 
                 let connection = null;
 
@@ -478,29 +596,86 @@
                     connection = null;
                 }
 
-                if (!connection || !connection.connectionId) {
-                    setBusyState();
-                    return;
-                }
-
-                event.preventDefault();
-                isSubmitting = true;
+                const workflowId = window.crypto?.randomUUID?.() ?? `workflow-${Date.now()}`;
+                beginWorkflowTracking(workflowId);
                 setBusyState();
                 applyProgressUpdate({
+                    workflowId,
                     state: "running",
                     stage: "fetch",
                     percent: 6,
-                    message: "Starting Fetch & Score workflow..."
+                    message: "Starting Fetch & Score workflow and waiting for the first server event..."
                 });
 
                 try {
-                    const response = await fetch(form.action, {
+                    activeFetchPromise = fetch(form.action, {
                         method: "POST",
                         headers: {
                             "X-Requested-With": "XMLHttpRequest",
-                            "X-Progress-ConnectionId": connection.connectionId
+                            "X-Workflow-Id": workflowId,
+                            ...(connection?.connectionId ? { "X-Progress-ConnectionId": connection.connectionId } : {})
                         },
                         body: new FormData(form),
+                        credentials: "same-origin"
+                    });
+
+                    const response = await activeFetchPromise;
+                    const contentType = response.headers.get("Content-Type") || "";
+                    const canReadJson = contentType.includes("application/json") || contentType.includes("application/problem+json");
+                    const payload = canReadJson ? await response.json() : null;
+
+                    if (!response.ok || !payload || !payload.redirectUrl) {
+                        const error = new Error(payload?.detail || payload?.message || payload?.title || "Fetch & Score request failed.");
+                        error.name = response.status === 409 && workflowTerminalState === "cancelled"
+                            ? "WorkflowCancelled"
+                            : "WorkflowFailed";
+                        throw error;
+                    }
+
+                    window.setTimeout(() => {
+                        window.location.assign(payload.redirectUrl);
+                    }, 250);
+                } catch (error) {
+                    if (!(error instanceof Error && error.name === "WorkflowCancelled" && workflowTerminalState === "cancelled")) {
+                        applyProgressUpdate({
+                            workflowId,
+                            state: "failed",
+                            stage: "completed",
+                            percent: 100,
+                            message: error instanceof Error ? error.message : "Fetch & Score request failed."
+                        });
+                    }
+                    else {
+                        isSubmitting = false;
+                        activeFetchPromise = null;
+                        setIdleState();
+                    }
+                }
+            });
+
+            cancelButton?.addEventListener("click", async () => {
+                if (!activeWorkflowId || !cancelUrl || !antiForgeryToken) {
+                    return;
+                }
+
+                cancelButton.disabled = true;
+                appendProgressLog({
+                    state: "warning",
+                    stage: "completed",
+                    message: "Cancellation requested. Waiting for the current background step to stop..."
+                });
+
+                try {
+                    const formData = new FormData();
+                    formData.append("__RequestVerificationToken", antiForgeryToken);
+                    formData.append("workflowId", activeWorkflowId);
+
+                    const response = await fetch(cancelUrl, {
+                        method: "POST",
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest"
+                        },
+                        body: formData,
                         credentials: "same-origin"
                     });
 
@@ -508,22 +683,22 @@
                     const canReadJson = contentType.includes("application/json") || contentType.includes("application/problem+json");
                     const payload = canReadJson ? await response.json() : null;
 
-                    if (!response.ok || !payload || !payload.redirectUrl) {
-                        throw new Error(payload?.detail || payload?.message || payload?.title || "Fetch & Score request failed.");
+                    if (!response.ok) {
+                        throw new Error(payload?.detail || payload?.message || payload?.title || "Could not cancel the current workflow.");
                     }
 
-                    window.setTimeout(() => {
-                        window.location.assign(payload.redirectUrl);
-                    }, 250);
+                    appendProgressLog({
+                        state: "warning",
+                        stage: "completed",
+                        message: payload?.message || "Cancellation request accepted."
+                    });
                 } catch (error) {
-                    applyProgressUpdate({
+                    cancelButton.disabled = false;
+                    appendProgressLog({
                         state: "failed",
                         stage: "completed",
-                        percent: 100,
-                        message: error instanceof Error ? error.message : "Fetch & Score request failed."
+                        message: error instanceof Error ? error.message : "Could not cancel the current workflow."
                     });
-                    isSubmitting = false;
-                    setIdleState();
                 }
             });
         })();
