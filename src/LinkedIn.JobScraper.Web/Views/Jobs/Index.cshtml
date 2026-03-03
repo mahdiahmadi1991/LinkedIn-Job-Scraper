@@ -560,7 +560,9 @@
 
                 toggle.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
                 toggle.classList.toggle("is-open", nextExpanded);
-                detailRow.classList.toggle("d-none", !nextExpanded);
+                detailRow.classList.toggle("is-expanded", nextExpanded);
+                detailRow.classList.toggle("is-collapsed", !nextExpanded);
+                detailRow.setAttribute("aria-hidden", nextExpanded ? "false" : "true");
 
                 const label = toggle.querySelector(".job-expand-label");
                 if (label) {
@@ -583,9 +585,11 @@
 
                 const button = sentinelRow.querySelector("[data-jobs-load-more-button]");
                 const status = sentinelRow.querySelector("[data-jobs-load-more-status]");
+                const idleButtonText = button ? button.textContent : null;
 
                 if (button) {
                     button.disabled = true;
+                    button.textContent = "Loading...";
                 }
 
                 if (status) {
@@ -613,6 +617,9 @@
 
                     if (button) {
                         button.disabled = false;
+                        if (idleButtonText) {
+                            button.textContent = idleButtonText;
+                        }
                     }
 
                     if (status) {

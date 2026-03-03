@@ -112,7 +112,7 @@
             </div>
         </td>
     </tr>
-    <tr class="job-detail-row d-none" id="@detailRowId" data-job-detail-row>
+    <tr class="job-detail-row is-collapsed" id="@detailRowId" data-job-detail-row aria-hidden="true">
         <td colspan="4">
             <div class="job-detail-panel">
                 <div class="job-detail-grid">
@@ -198,6 +198,10 @@
     <tr class="jobs-load-more-row" data-jobs-lazy-sentinel data-jobs-load-more-url="@nextRowsUrl">
         <td colspan="4">
             <div class="jobs-load-more-shell">
+                <div class="jobs-load-more-indicator" aria-hidden="true">
+                    <span class="jobs-load-spinner" data-jobs-load-spinner></span>
+                    <span class="small text-muted">Background fetch</span>
+                </div>
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-jobs-load-more-button>Load more jobs</button>
                 <span class="small text-muted" data-jobs-load-more-status>Loading continues as you scroll.</span>
             </div>
