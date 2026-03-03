@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text.Json;
 using LinkedIn.JobScraper.Web.LinkedIn.Api;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 
@@ -7,150 +6,57 @@ namespace LinkedIn.JobScraper.Web.Diagnostics;
 
 public sealed class LinkedInFeasibilityProbe
 {
-    private readonly IWebHostEnvironment _environment;
     private readonly ILinkedInApiClient _linkedInApiClient;
+    private readonly ILinkedInSessionVerificationService _linkedInSessionVerificationService;
     private readonly ILogger<LinkedInFeasibilityProbe> _logger;
-    private readonly ILinkedInSessionStore _sessionStore;
 
     public LinkedInFeasibilityProbe(
         ILinkedInApiClient linkedInApiClient,
-        ILinkedInSessionStore sessionStore,
-        IWebHostEnvironment environment,
+        ILinkedInSessionVerificationService linkedInSessionVerificationService,
         ILogger<LinkedInFeasibilityProbe> logger)
     {
         _linkedInApiClient = linkedInApiClient;
-        _sessionStore = sessionStore;
-        _environment = environment;
+        _linkedInSessionVerificationService = linkedInSessionVerificationService;
         _logger = logger;
     }
 
     public async Task<LinkedInFeasibilityResult> RunAsync(CancellationToken cancellationToken)
     {
-        return await RunCoreAsync(null, cancellationToken);
-    }
-
-    public async Task<LinkedInFeasibilityResult> RunUsingStoredSessionAsync(CancellationToken cancellationToken)
-    {
-        var sessionSnapshot = await _sessionStore.GetCurrentAsync(cancellationToken);
-
-        if (sessionSnapshot is null)
-        {
-            return LinkedInFeasibilityResult.Failed("No stored LinkedIn session is available yet.");
-        }
-
-        return await RunCoreAsync(sessionSnapshot, cancellationToken);
-    }
-
-    private async Task<LinkedInFeasibilityResult> RunCoreAsync(
-        LinkedInSessionSnapshot? sessionSnapshot,
-        CancellationToken cancellationToken)
-    {
-        var requestFilePath = Path.GetFullPath(
-            Path.Combine(
-                _environment.ContentRootPath,
-                "..",
-                "..",
-                "docs",
-                "api-sample",
-                "job-seaarch-request.txt"));
-
-        if (!File.Exists(requestFilePath))
-        {
-            return LinkedInFeasibilityResult.Failed(
-                $"Sample request file was not found at '{requestFilePath}'.");
-        }
-
-        var fileContent = await File.ReadAllTextAsync(requestFilePath, cancellationToken);
-        var parsedRequest = LinkedInCapturedRequestParser.Parse(fileContent);
-
-        if (!parsedRequest.IsValid)
-        {
-            return LinkedInFeasibilityResult.Failed(parsedRequest.ErrorMessage!);
-        }
-
-        var requestHeaders = MergeHeaders(parsedRequest.Headers, sessionSnapshot);
-
         var response = await _linkedInApiClient.GetAsync(
-            parsedRequest.Url!,
-            requestHeaders,
+            new Uri("https://www.linkedin.com/robots.txt", UriKind.Absolute),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Accept"] = "text/plain"
+            },
             cancellationToken);
-
-        var body = response.Body;
 
         if (response.StatusCode != (int)HttpStatusCode.OK)
         {
             Log.LinkedInProbeReturnedNonSuccessStatusCode(_logger, response.StatusCode);
 
             return LinkedInFeasibilityResult.Failed(
-                $"LinkedIn request failed with HTTP {response.StatusCode}.",
+                $"LinkedIn public reachability check failed with HTTP {response.StatusCode}.",
                 response.StatusCode,
-                Truncate(body, 600));
+                Truncate(response.Body, 600));
         }
 
-        try
+        return LinkedInFeasibilityResult.Succeeded(
+            response.StatusCode,
+            "LinkedIn public reachability check succeeded. Stored session was not evaluated.");
+    }
+
+    public async Task<LinkedInFeasibilityResult> RunUsingStoredSessionAsync(CancellationToken cancellationToken)
+    {
+        var verificationResult = await _linkedInSessionVerificationService.VerifyCurrentAsync(cancellationToken);
+
+        if (!verificationResult.Success)
         {
-            using var document = JsonDocument.Parse(body);
-
-            if (!document.RootElement.TryGetProperty("data", out var dataNode))
-            {
-                return LinkedInFeasibilityResult.Failed(
-                    "Response JSON did not contain a top-level 'data' node.",
-                    response.StatusCode,
-                    Truncate(body, 600));
-            }
-
-            var returnedCount = 0;
-            var totalCount = 0;
-            var jobCardUrns = new List<string>();
-
-            if (dataNode.TryGetProperty("elements", out var elementsNode) &&
-                elementsNode.ValueKind == JsonValueKind.Array)
-            {
-                returnedCount = elementsNode.GetArrayLength();
-
-                foreach (var element in elementsNode.EnumerateArray())
-                {
-                    if (!element.TryGetProperty("jobCardUnion", out var jobCardUnionNode))
-                    {
-                        continue;
-                    }
-
-                    if (!jobCardUnionNode.TryGetProperty("*jobPostingCard", out var urnNode))
-                    {
-                        continue;
-                    }
-
-                    var urnValue = urnNode.GetString();
-
-                    if (!string.IsNullOrWhiteSpace(urnValue))
-                    {
-                        jobCardUrns.Add(urnValue);
-                    }
-                }
-            }
-
-            if (dataNode.TryGetProperty("paging", out var pagingNode) &&
-                pagingNode.TryGetProperty("total", out var totalNode) &&
-                totalNode.TryGetInt32(out var parsedTotal))
-            {
-                totalCount = parsedTotal;
-            }
-
-            return LinkedInFeasibilityResult.Succeeded(
-                (int)response.StatusCode,
-                returnedCount,
-                totalCount,
-                jobCardUrns);
+            return LinkedInFeasibilityResult.Failed(verificationResult.Message, verificationResult.StatusCode);
         }
-        catch (JsonException exception)
-        {
-            Log.LinkedInProbeFailedToParseJson(_logger, exception);
 
-            return LinkedInFeasibilityResult.Failed(
-                    "LinkedIn response was not valid JSON.",
-                response.StatusCode,
-                Truncate(body, 600));
-        }
+        return LinkedInFeasibilityResult.Succeeded(
+            verificationResult.StatusCode ?? StatusCodes.Status200OK,
+            verificationResult.Message);
     }
 
     private static string Truncate(string value, int maxLength)
@@ -163,24 +69,6 @@ public sealed class LinkedInFeasibilityProbe
         return $"{value[..maxLength]}...";
     }
 
-    private static IReadOnlyDictionary<string, string> MergeHeaders(
-        IReadOnlyDictionary<string, string> requestHeaders,
-        LinkedInSessionSnapshot? sessionSnapshot)
-    {
-        if (sessionSnapshot is null)
-        {
-            return requestHeaders;
-        }
-
-        var merged = new Dictionary<string, string>(requestHeaders, StringComparer.OrdinalIgnoreCase);
-
-        foreach (var header in sessionSnapshot.Headers)
-        {
-            merged[header.Key] = header.Value;
-        }
-
-        return merged;
-    }
 }
 
 public sealed class LinkedInFeasibilityResult
@@ -225,16 +113,14 @@ public sealed class LinkedInFeasibilityResult
 
     public static LinkedInFeasibilityResult Succeeded(
         int statusCode,
-        int returnedCount,
-        int totalCount,
-        IReadOnlyList<string> sampledJobCardUrns) =>
+        string message) =>
         new(
             true,
-            "LinkedIn job search replay succeeded.",
+            message,
             statusCode,
-            returnedCount,
-            totalCount,
-            sampledJobCardUrns,
+            0,
+            0,
+            Array.Empty<string>(),
             null);
 }
 
@@ -246,9 +132,4 @@ internal static partial class Log
         Message = "LinkedIn feasibility probe returned non-success status code {StatusCode}.")]
     public static partial void LinkedInProbeReturnedNonSuccessStatusCode(ILogger logger, int statusCode);
 
-    [LoggerMessage(
-        EventId = 1002,
-        Level = LogLevel.Error,
-        Message = "Failed to parse LinkedIn feasibility response JSON.")]
-    public static partial void LinkedInProbeFailedToParseJson(ILogger logger, Exception exception);
 }

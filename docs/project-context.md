@@ -35,6 +35,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The `Fetch & Score` workflow now publishes server-driven real-time progress updates over SignalR so the jobs page can reflect actual stage transitions while the request is running
 - The UI is now being refreshed toward a LinkedIn-inspired visual signature with denser cards, cleaner navigation, and a more compact jobs review table without changing the underlying workflow logic
 - The job details page is now being aligned with the same LinkedIn-inspired visual language so drill-down review feels consistent with the dashboard
+- The remaining legacy diagnostics path no longer reads onboarding samples at runtime and now uses lightweight public reachability plus stored-session verification checks instead
 
 ## Product Intent
 
