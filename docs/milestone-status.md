@@ -23,6 +23,7 @@ Date of this status snapshot: March 3, 2026.
 - CI-safe xUnit test project
 - controller tests for key AJAX/JSON flows
 - service-level tests for LinkedIn failure handling
+- service-level tests for workflow orchestration progress behavior
 - middleware tests
 - configuration and health-check tests
 
@@ -47,6 +48,7 @@ Date of this status snapshot: March 3, 2026.
 - startup configuration readiness warnings
 - basic security headers
 - narrow local rate limiting on sensitive POST actions
+- minimized persisted LinkedIn session headers
 
 ### Remaining
 
@@ -66,6 +68,7 @@ Date of this status snapshot: March 3, 2026.
 - liveness and readiness health endpoints
 - safe diagnostics summary
 - safe diagnostics posture that avoids secret exposure
+- `ProblemDetails` for high-value JSON failure paths across jobs, session, AI readiness, and diagnostics
 
 ### Remaining
 
@@ -103,8 +106,10 @@ Date of this status snapshot: March 3, 2026.
 - refreshed `README.md`
 - AI onboarding report
 - architecture overview
+- ADR 001 for local safety and session strategy
 - troubleshooting guide
 - documentation map
+- milestone status tracking
 
 ### Remaining
 
@@ -118,7 +123,7 @@ The following items remain intentionally deferred or only partially addressed:
 
 - global shared result contracts
 - full JSON contract normalization
-- global ProblemDetails shaping
+- global ProblemDetails shaping (the highest-value JSON endpoints are now covered, but not every JSON surface is fully normalized)
 - broader persistence integration tests
 - SQL Server container CI lane
 - OpenTelemetry traces/metrics

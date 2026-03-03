@@ -55,9 +55,19 @@ Open this when you need:
 
 This is the fastest way to understand how the solution is meant to stay organized.
 
+### 5. `docs/adr-001-local-safety-and-session-strategy.md`
+
+Open this when you need:
+
+- the most important safety-oriented architectural decision
+- the rationale for local-only scope
+- the reason browser-backed session capture is preferred
+
+This is the clearest short-form record of the project's core operating constraints.
+
 ## Operational Support
 
-### 5. `docs/troubleshooting.md`
+### 6. `docs/troubleshooting.md`
 
 Open this when you need:
 
@@ -68,7 +78,7 @@ Open this when you need:
 
 This is the best first stop when something works locally and then suddenly stops working.
 
-### 6. `docs/feasibility-notes.md`
+### 7. `docs/feasibility-notes.md`
 
 Open this when you need:
 
@@ -79,7 +89,7 @@ This is historical context and should not drive current architecture more than t
 
 ## Historical / Supporting Planning Docs
 
-### 7. `docs/plan.md`
+### 8. `docs/plan.md`
 
 Open this when you need:
 
@@ -88,7 +98,7 @@ Open this when you need:
 
 This is useful as history, but `docs/PLAN_REVISED.md` is the more important current planning source.
 
-### 8. `docs/technical-debt.md`
+### 9. `docs/technical-debt.md`
 
 Open this when you need:
 
@@ -106,7 +116,8 @@ This is useful for deciding whether a new change is a true priority or just clea
 2. `docs/project-context.md`
 3. `docs/ai-onboarding-report.md`
 4. `docs/architecture-overview.md`
-5. `README.md`
+5. `docs/adr-001-local-safety-and-session-strategy.md`
+6. `README.md`
 
 ### For debugging a broken local environment
 
