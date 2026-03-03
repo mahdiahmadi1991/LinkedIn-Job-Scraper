@@ -1,3 +1,5 @@
+using LinkedIn.JobScraper.Web.Contracts;
+
 namespace LinkedIn.JobScraper.Web.LinkedIn.Session;
 
 public interface ILinkedInBrowserLoginService
@@ -11,7 +13,7 @@ public interface ILinkedInBrowserLoginService
 
 public sealed record LinkedInBrowserLoginActionResult(
     bool Success,
-    string Message);
+    string Message) : OperationResult(Success, Message);
 
 public sealed record LinkedInBrowserLoginState(
     bool BrowserOpen,

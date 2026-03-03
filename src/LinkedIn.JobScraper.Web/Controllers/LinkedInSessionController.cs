@@ -46,7 +46,7 @@ public class LinkedInSessionController : Controller
 
         if (!result.Success)
         {
-            return await BuildActionResponseAsync(false, result.Message, cancellationToken, StatusCodes.Status409Conflict);
+            return await BuildActionResponseAsync(result, cancellationToken, StatusCodes.Status409Conflict);
         }
 
         return await VerifyAndBuildActionResponseAsync(
@@ -61,11 +61,7 @@ public class LinkedInSessionController : Controller
     public async Task<IActionResult> Launch(CancellationToken cancellationToken)
     {
         var result = await _linkedInBrowserLoginService.LaunchLoginAsync(cancellationToken);
-        return await BuildActionResponseAsync(
-            result.Success,
-            result.Message,
-            cancellationToken,
-            result.Success ? null : StatusCodes.Status409Conflict);
+        return await BuildActionResponseAsync(result, cancellationToken, result.Success ? null : StatusCodes.Status409Conflict);
     }
 
     [HttpPost]
@@ -89,15 +85,17 @@ public class LinkedInSessionController : Controller
             await _linkedInSessionStore.InvalidateCurrentAsync(cancellationToken);
 
             return await BuildActionResponseAsync(
-                true,
-                "The stored LinkedIn session was revoked. Use Connect Session to capture a fresh one.",
+                new OperationResult(
+                    true,
+                    "The stored LinkedIn session was revoked. Use Connect Session to capture a fresh one."),
                 cancellationToken);
         }
         catch (Exception exception)
         {
             return await BuildActionResponseAsync(
-                false,
-                $"The stored LinkedIn session could not be revoked: {exception.Message}",
+                new OperationResult(
+                    false,
+                    $"The stored LinkedIn session could not be revoked: {exception.Message}"),
                 cancellationToken,
                 StatusCodes.Status500InternalServerError);
         }
@@ -141,23 +139,22 @@ public class LinkedInSessionController : Controller
     }
 
     private async Task<IActionResult> BuildActionResponseAsync(
-        bool success,
-        string message,
+        OperationResult result,
         CancellationToken cancellationToken,
         int? failureStatusCode = null)
     {
-        WriteStatusMessage(success, message);
+        WriteStatusMessage(result.Success, result.Message);
 
         if (!IsAjaxRequest())
         {
             return RedirectToAction("Index", "Jobs");
         }
 
-        if (!success)
+        if (!result.Success)
         {
             return Problem(
                 title: "LinkedIn session action failed",
-                detail: message,
+                detail: result.Message,
                 statusCode: failureStatusCode ?? StatusCodes.Status409Conflict);
         }
 
@@ -178,16 +175,18 @@ public class LinkedInSessionController : Controller
                 : result.Message;
 
             return await BuildActionResponseAsync(
-                result.Success,
-                message,
+                new OperationResult(
+                    result.Success,
+                    message),
                 cancellationToken,
                 result.Success ? null : result.StatusCode);
         }
         catch (Exception exception)
         {
             return await BuildActionResponseAsync(
-                false,
-                $"{failurePrefix}: {exception.Message}",
+                new OperationResult(
+                    false,
+                    $"{failurePrefix}: {exception.Message}"),
                 cancellationToken,
                 StatusCodes.Status500InternalServerError);
         }

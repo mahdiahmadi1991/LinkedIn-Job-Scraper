@@ -67,6 +67,33 @@ public sealed class LinkedInSessionControllerTests
         Assert.Equal(bool.FalseString, controller.TempData["LinkedInSessionStatusSucceeded"]);
     }
 
+    [Fact]
+    public async Task LaunchReturnsProblemDetailsForAjaxFailures()
+    {
+        var controller = new LinkedInSessionController(
+            new FailingLinkedInBrowserLoginService(),
+            new FakeLinkedInSessionStore(),
+            new FakeLinkedInSessionVerificationService())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
+        };
+
+        controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
+
+        var result = await controller.Launch(CancellationToken.None);
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        var details = Assert.IsType<ProblemDetails>(problem.Value);
+
+        Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
+        Assert.Equal("LinkedIn session action failed", details.Title);
+        Assert.Equal("Browser launch failed.", details.Detail);
+    }
+
     private sealed class FakeLinkedInBrowserLoginService : ILinkedInBrowserLoginService
     {
         public Task<LinkedInBrowserLoginActionResult> CaptureAndSaveAsync(CancellationToken cancellationToken)
@@ -91,6 +118,24 @@ public sealed class LinkedInSessionControllerTests
         public Task<LinkedInBrowserLoginActionResult> LaunchLoginAsync(CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
+        }
+    }
+
+    private sealed class FailingLinkedInBrowserLoginService : ILinkedInBrowserLoginService
+    {
+        public Task<LinkedInBrowserLoginActionResult> CaptureAndSaveAsync(CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<LinkedInBrowserLoginState> GetStateAsync(CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<LinkedInBrowserLoginActionResult> LaunchLoginAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new LinkedInBrowserLoginActionResult(false, "Browser launch failed."));
         }
     }
 

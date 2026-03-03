@@ -78,6 +78,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The docs set now includes a first ADR so reviewers and future maintainers can quickly see the reasoning behind the project's local-only safety posture and browser-backed session strategy
 - High-value JSON success payloads (AI connection, session state/actions, diagnostics summary, and Fetch & Score success) now use explicit DTO contracts instead of anonymous objects while preserving the current wire shape
 - The remaining diagnostics success endpoints now also use explicit response DTOs, so diagnostics no longer expose service result types directly over JSON success responses
+- A limited shared `OperationResult` contract now exists for the LinkedIn session seam, reducing duplicated `success/message` handling between browser-login and session-verification flows without introducing a global result abstraction
 
 ## Product Intent
 
