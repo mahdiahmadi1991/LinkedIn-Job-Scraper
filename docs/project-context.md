@@ -88,6 +88,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The AI settings page now uses that AJAX save path as a progressive enhancement: a successful background save updates the hidden concurrency token and shows inline feedback without forcing a full page reload
 - The LinkedIn search settings page now follows the same progressive-enhancement pattern for the main save action, while preserving the separate full form submit path for location lookup
 - The Web layer no longer references the persistence `JobWorkflowStatus` enum directly in jobs controllers and views; a web-facing `JobWorkflowState` now carries that concern while mapping stays inside the `Jobs` module
+- `SearchSettingsController` is now thinner: its non-trivial normalization, validation, and read-model-to-view-model mapping for LinkedIn search settings have moved into a dedicated `LinkedIn.Search` adapter helper without changing behavior
 
 ## Product Intent
 

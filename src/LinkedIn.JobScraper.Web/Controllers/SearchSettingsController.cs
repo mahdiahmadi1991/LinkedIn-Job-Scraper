@@ -22,7 +22,7 @@ public sealed class SearchSettingsController : Controller
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
         var settings = await _linkedInSearchSettingsService.GetActiveAsync(cancellationToken);
-        var viewModel = ToViewModel(settings);
+        var viewModel = LinkedInSearchSettingsViewModelAdapter.ToViewModel(settings);
         viewModel.StatusMessage = TempData["SearchSettingsStatusMessage"] as string;
         viewModel.StatusSucceeded = string.Equals(
             TempData["SearchSettingsStatusSucceeded"] as string,
@@ -38,8 +38,8 @@ public sealed class SearchSettingsController : Controller
         LinkedInSearchSettingsPageViewModel viewModel,
         CancellationToken cancellationToken)
     {
-        NormalizeSelections(viewModel);
-        ResetSelectedLocation(viewModel);
+        LinkedInSearchSettingsViewModelAdapter.NormalizeSelections(viewModel);
+        LinkedInSearchSettingsViewModelAdapter.ResetSelectedLocation(viewModel);
         ModelState.Remove(nameof(viewModel.LocationDisplayName));
         ModelState.Remove(nameof(viewModel.LocationGeoId));
 
@@ -69,8 +69,12 @@ public sealed class SearchSettingsController : Controller
         LinkedInSearchSettingsPageViewModel viewModel,
         CancellationToken cancellationToken)
     {
-        NormalizeSelections(viewModel);
-        ValidateSelectionState(viewModel);
+        LinkedInSearchSettingsViewModelAdapter.NormalizeSelections(viewModel);
+
+        foreach (var error in LinkedInSearchSettingsViewModelAdapter.GetValidationErrors(viewModel))
+        {
+            ModelState.AddModelError(error.Key, error.Message);
+        }
 
         if (!ModelState.IsValid)
         {
@@ -138,67 +142,6 @@ public sealed class SearchSettingsController : Controller
         }
 
         return RedirectToAction(nameof(Index));
-    }
-
-    private static LinkedInSearchSettingsPageViewModel ToViewModel(LinkedInSearchSettings settings)
-    {
-        return new LinkedInSearchSettingsPageViewModel
-        {
-            ProfileName = settings.ProfileName,
-            Keywords = settings.Keywords,
-            ConcurrencyToken = settings.ConcurrencyToken,
-            LocationInput = settings.LocationInput,
-            LocationDisplayName = settings.LocationDisplayName,
-            LocationGeoId = settings.LocationGeoId,
-            EasyApply = settings.EasyApply,
-            WorkplaceTypeCodes = settings.WorkplaceTypeCodes.ToList(),
-            JobTypeCodes = settings.JobTypeCodes.ToList()
-        };
-    }
-
-    private static void NormalizeSelections(LinkedInSearchSettingsPageViewModel viewModel)
-    {
-        viewModel.WorkplaceTypeCodes ??= [];
-        viewModel.JobTypeCodes ??= [];
-    }
-
-    private static void ResetSelectedLocation(LinkedInSearchSettingsPageViewModel viewModel)
-    {
-        viewModel.LocationDisplayName = null;
-        viewModel.LocationGeoId = null;
-    }
-
-    private void ValidateSelectionState(LinkedInSearchSettingsPageViewModel viewModel)
-    {
-        if (viewModel.WorkplaceTypeCodes.Count == 0)
-        {
-            ModelState.AddModelError(
-                nameof(viewModel.WorkplaceTypeCodes),
-                "Select at least one workplace type.");
-        }
-
-        if (viewModel.JobTypeCodes.Count == 0)
-        {
-            ModelState.AddModelError(
-                nameof(viewModel.JobTypeCodes),
-                "Select at least one job type.");
-        }
-
-        if (!string.IsNullOrWhiteSpace(viewModel.LocationInput) &&
-            string.IsNullOrWhiteSpace(viewModel.LocationGeoId))
-        {
-            ModelState.AddModelError(
-                nameof(viewModel.LocationInput),
-                "Search LinkedIn locations and choose one result so a valid geoId is stored.");
-        }
-
-        if (!string.IsNullOrWhiteSpace(viewModel.LocationGeoId) &&
-            string.IsNullOrWhiteSpace(viewModel.LocationDisplayName))
-        {
-            ModelState.AddModelError(
-                nameof(viewModel.LocationInput),
-                "Choose a LinkedIn location result before saving.");
-        }
     }
 
     private bool IsAjaxRequest()
