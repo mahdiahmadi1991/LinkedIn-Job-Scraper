@@ -60,6 +60,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - Health checks are now split into simple liveness (`/health`) and configuration readiness (`/health/ready`), where readiness stays CI-safe by validating local config shape without touching SQL Server or external services
 - Diagnostics now expose a safe summary endpoint for local readiness and stored-session metadata that reports only boolean flags and timestamps, never connection strings, API keys, cookies, or session headers
 - Each HTTP request now carries a correlation id via `X-Correlation-Id`, reusing an incoming header when present or falling back to the ASP.NET trace identifier, so request-scoped logs can be traced more consistently
+- A basic GitHub Actions CI workflow is being restored to run `restore`, `build`, and `test` on `main`, `develop`, and pull requests using only the current CI-safe test suite
 
 ## Product Intent
 
