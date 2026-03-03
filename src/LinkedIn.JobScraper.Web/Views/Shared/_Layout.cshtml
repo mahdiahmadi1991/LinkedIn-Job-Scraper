@@ -95,6 +95,7 @@
         </div>
     </footer>
     <partial name="_LinkedInSessionModal" model="linkedInSessionViewModel" />
+    <div class="toast-container position-fixed top-0 end-0 p-3 app-toast-stack" data-app-toast-container aria-live="polite" aria-atomic="true"></div>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
@@ -110,60 +111,103 @@
             }
 
             const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
-            const feedback = modalElement.querySelector("[data-session-feedback]");
-            const autoCapture = modalElement.querySelector("[data-session-auto-capture]");
+            const toastContainer = document.querySelector("[data-app-toast-container]");
+            const feedbackNote = modalElement.querySelector("[data-session-feedback-note]");
+            const autoCaptureNote = modalElement.querySelector("[data-session-auto-capture-note]");
             const browserOpen = modalElement.querySelector("[data-session-browser-open]");
             const currentPage = modalElement.querySelector("[data-session-current-page]");
             const capturedAt = modalElement.querySelector("[data-session-captured-at]");
             const source = modalElement.querySelector("[data-session-source]");
             const statusLabel = modalElement.querySelector("[data-session-status-label]");
+            const waitingPanel = modalElement.querySelector("[data-session-waiting]");
             const launchButton = modalElement.querySelector("[data-session-launch]");
             const captureButton = modalElement.querySelector("[data-session-capture]");
-            const verifyButton = modalElement.querySelector("[data-session-verify]");
+            const revokeButton = modalElement.querySelector("[data-session-revoke]");
 
             let autoCloseArmed = false;
+            let autoVerifyInFlight = false;
             let pollTimer = null;
 
             const setBusy = (busy) => {
-                [launchButton, captureButton, verifyButton].forEach((button) => {
+                [launchButton, captureButton, revokeButton].forEach((button) => {
                     if (button) {
                         button.disabled = busy;
                     }
                 });
             };
 
-            const setFeedback = (message, success) => {
-                if (!feedback) {
+            const showToast = (message, success) => {
+                if (!toastContainer || !message) {
+                    return;
+                }
+
+                const toast = document.createElement("div");
+                toast.className = "toast align-items-center border-0 app-toast-shell";
+                toast.setAttribute("role", "status");
+                toast.setAttribute("aria-live", "polite");
+                toast.setAttribute("aria-atomic", "true");
+
+                const toneClass = success ? "app-toast-success" : "app-toast-danger";
+                const shell = document.createElement("div");
+                shell.className = `d-flex ${toneClass}`;
+
+                const body = document.createElement("div");
+                body.className = "toast-body";
+                body.textContent = message;
+
+                const closeButton = document.createElement("button");
+                closeButton.type = "button";
+                closeButton.className = "btn-close btn-close-white me-2 m-auto";
+                closeButton.setAttribute("data-bs-dismiss", "toast");
+                closeButton.setAttribute("aria-label", "Close");
+
+                shell.append(body, closeButton);
+                toast.appendChild(shell);
+
+                toastContainer.appendChild(toast);
+                const instance = bootstrap.Toast.getOrCreateInstance(toast, { delay: 4200 });
+                toast.addEventListener("hidden.bs.toast", () => toast.remove(), { once: true });
+                instance.show();
+            };
+
+            const setFeedback = (message, success, shouldToast) => {
+                if (!feedbackNote) {
                     return;
                 }
 
                 if (!message) {
-                    feedback.classList.add("d-none");
-                    feedback.textContent = "";
-                    feedback.classList.remove("alert-success", "alert-danger", "alert-secondary");
+                    feedbackNote.classList.add("d-none");
+                    feedbackNote.textContent = "";
+                    feedbackNote.classList.remove("success", "danger");
                     return;
                 }
 
-                feedback.classList.remove("d-none", "alert-success", "alert-danger", "alert-secondary");
-                feedback.classList.add(success ? "alert-success" : "alert-danger");
-                feedback.textContent = message;
+                feedbackNote.classList.remove("d-none", "success", "danger");
+                feedbackNote.classList.add(success ? "success" : "danger");
+                feedbackNote.textContent = message;
+
+                if (shouldToast) {
+                    showToast(message, success);
+                }
             };
 
             const setAutoCaptureMessage = (message, active) => {
-                if (!autoCapture) {
+                if (!autoCaptureNote) {
                     return;
                 }
 
                 if (!message) {
-                    autoCapture.classList.add("d-none");
-                    autoCapture.textContent = "";
-                    autoCapture.classList.remove("alert-primary", "alert-secondary");
+                    autoCaptureNote.classList.add("d-none");
+                    autoCaptureNote.textContent = "";
+                    autoCaptureNote.classList.remove("active");
                     return;
                 }
 
-                autoCapture.classList.remove("d-none", "alert-primary", "alert-secondary");
-                autoCapture.classList.add(active ? "alert-primary" : "alert-secondary");
-                autoCapture.textContent = message;
+                autoCaptureNote.classList.remove("d-none", "active");
+                if (active) {
+                    autoCaptureNote.classList.add("active");
+                }
+                autoCaptureNote.textContent = message;
             };
 
             const applyState = (state) => {
@@ -193,6 +237,22 @@
                     statusLabel.textContent = state.sessionIndicatorLabel || "Missing";
                 }
 
+                if (launchButton) {
+                    launchButton.textContent = state.primaryActionLabel || "Connect Session";
+                }
+
+                if (captureButton) {
+                    captureButton.classList.toggle("d-none", !state.showManualCaptureAction);
+                }
+
+                if (revokeButton) {
+                    revokeButton.classList.toggle("d-none", !state.storedSessionAvailable || state.autoCaptureActive);
+                }
+
+                if (waitingPanel) {
+                    waitingPanel.classList.toggle("d-none", !state.autoCaptureActive);
+                }
+
                 indicatorLabel.textContent = state.sessionIndicatorLabel || "Missing";
                 indicator.classList.remove("session-state-connected", "session-state-connecting", "session-state-missing");
                 if (state.sessionIndicatorClass) {
@@ -200,6 +260,19 @@
                 }
 
                 setAutoCaptureMessage(state.autoCaptureStatusMessage, state.autoCaptureActive);
+
+                if (autoCloseArmed && state.autoCaptureCompletedSuccessfully && state.storedSessionAvailable && !autoVerifyInFlight) {
+                    autoVerifyInFlight = true;
+                    void (async () => {
+                        try {
+                            await postAction("/LinkedInSession/Verify", true);
+                        } finally {
+                            autoVerifyInFlight = false;
+                            autoCloseArmed = false;
+                        }
+                    })();
+                    return;
+                }
 
                 if (autoCloseArmed && state.autoCaptureCompletedSuccessfully && state.storedSessionAvailable) {
                     autoCloseArmed = false;
@@ -227,7 +300,7 @@
                 }
 
                 const payload = await response.json();
-                setFeedback(payload.message, payload.success);
+                setFeedback(payload.message, payload.success, false);
                 applyState(payload.state);
                 return payload;
             };
@@ -249,7 +322,7 @@
                     });
 
                     const payload = await response.json();
-                    setFeedback(payload.message, payload.success);
+                    setFeedback(payload.message, payload.success, true);
                     applyState(payload.state);
 
                     if (closeOnSuccess && payload.success && payload.state?.storedSessionAvailable) {
@@ -281,11 +354,13 @@
 
             modalElement.addEventListener("show.bs.modal", () => {
                 autoCloseArmed = false;
+                autoVerifyInFlight = false;
                 void fetchState();
             });
 
             modalElement.addEventListener("hidden.bs.modal", () => {
                 autoCloseArmed = false;
+                autoVerifyInFlight = false;
                 window.clearTimeout(pollTimer);
                 pollTimer = null;
             });
@@ -306,9 +381,10 @@
                 });
             }
 
-            if (verifyButton) {
-                verifyButton.addEventListener("click", async () => {
-                    await postAction("/LinkedInSession/Verify", false);
+            if (revokeButton) {
+                revokeButton.addEventListener("click", async () => {
+                    autoCloseArmed = false;
+                    await postAction("/LinkedInSession/Revoke", false);
                 });
             }
         })();

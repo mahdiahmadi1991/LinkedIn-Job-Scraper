@@ -42,7 +42,7 @@ public sealed class LinkedInSessionVerificationService : ILinkedInSessionVerific
             Log.LinkedInSessionVerificationInvalidatedExpiredSession(_logger);
 
             return LinkedInSessionVerificationResult.Failed(
-                "Stored LinkedIn session has expired. Open LinkedIn Session and capture a new one.",
+                "Stored LinkedIn session has expired. Use the session control to capture a new one.",
                 response.StatusCode);
         }
 

@@ -37,7 +37,7 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
         if (sessionSnapshot is null)
         {
             return LinkedInJobSearchFetchResult.Failed(
-                "No active LinkedIn session is available. Open LinkedIn Session and capture a new one before fetching jobs.",
+                "No active LinkedIn session is available. Use the session control to capture a new one before fetching jobs.",
                 StatusCodes.Status502BadGateway);
         }
 
@@ -80,7 +80,7 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
                     await _sessionStore.InvalidateCurrentAsync(cancellationToken);
 
                     var expiredMessage =
-                        "Stored LinkedIn session expired during job fetch. Open LinkedIn Session and capture a new one.";
+                        "Stored LinkedIn session expired during job fetch. Use the session control to capture a new one.";
 
                     if (pagesFetched == 0)
                     {

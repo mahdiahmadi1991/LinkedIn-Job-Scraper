@@ -7,21 +7,22 @@ namespace LinkedIn.JobScraper.Web.Controllers;
 public class LinkedInSessionController : Controller
 {
     private readonly ILinkedInBrowserLoginService _linkedInBrowserLoginService;
+    private readonly ILinkedInSessionStore _linkedInSessionStore;
     private readonly ILinkedInSessionVerificationService _linkedInSessionVerificationService;
 
     public LinkedInSessionController(
         ILinkedInBrowserLoginService linkedInBrowserLoginService,
+        ILinkedInSessionStore linkedInSessionStore,
         ILinkedInSessionVerificationService linkedInSessionVerificationService)
     {
         _linkedInBrowserLoginService = linkedInBrowserLoginService;
+        _linkedInSessionStore = linkedInSessionStore;
         _linkedInSessionVerificationService = linkedInSessionVerificationService;
     }
 
     [HttpGet]
-    public async Task<IActionResult> Index(CancellationToken cancellationToken)
+    public IActionResult Index()
     {
-        await BuildViewModelAsync(cancellationToken);
-
         return RedirectToAction("Index", "Jobs");
     }
 
@@ -37,7 +38,16 @@ public class LinkedInSessionController : Controller
     public async Task<IActionResult> Capture(CancellationToken cancellationToken)
     {
         var result = await _linkedInBrowserLoginService.CaptureAndSaveAsync(cancellationToken);
-        return await BuildActionResponseAsync(result.Success, result.Message, cancellationToken);
+
+        if (!result.Success)
+        {
+            return await BuildActionResponseAsync(false, result.Message, cancellationToken);
+        }
+
+        return await VerifyAndBuildActionResponseAsync(
+            "LinkedIn session was captured, but automatic verification failed",
+            result.Message,
+            cancellationToken);
     }
 
     [HttpPost]
@@ -52,16 +62,30 @@ public class LinkedInSessionController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Verify(CancellationToken cancellationToken)
     {
+        return await VerifyAndBuildActionResponseAsync(
+            "Stored session verification failed",
+            null,
+            cancellationToken);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Revoke(CancellationToken cancellationToken)
+    {
         try
         {
-            var result = await _linkedInSessionVerificationService.VerifyCurrentAsync(cancellationToken);
-            return await BuildActionResponseAsync(result.Success, result.Message, cancellationToken);
+            await _linkedInSessionStore.InvalidateCurrentAsync(cancellationToken);
+
+            return await BuildActionResponseAsync(
+                true,
+                "The stored LinkedIn session was revoked. Use Connect Session to capture a fresh one.",
+                cancellationToken);
         }
         catch (Exception exception)
         {
             return await BuildActionResponseAsync(
                 false,
-                $"Stored session verification failed: {exception.Message}",
+                $"The stored LinkedIn session could not be revoked: {exception.Message}",
                 cancellationToken);
         }
     }
@@ -119,6 +143,29 @@ public class LinkedInSessionController : Controller
         return Json(CreatePayload(viewModel));
     }
 
+    private async Task<IActionResult> VerifyAndBuildActionResponseAsync(
+        string failurePrefix,
+        string? successPrefix,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _linkedInSessionVerificationService.VerifyCurrentAsync(cancellationToken);
+            var message = result.Success && !string.IsNullOrWhiteSpace(successPrefix)
+                ? $"{successPrefix} {result.Message}"
+                : result.Message;
+
+            return await BuildActionResponseAsync(result.Success, message, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            return await BuildActionResponseAsync(
+                false,
+                $"{failurePrefix}: {exception.Message}",
+                cancellationToken);
+        }
+    }
+
     private static object CreatePayload(LinkedInSessionPageViewModel viewModel)
     {
         return new
@@ -135,6 +182,8 @@ public class LinkedInSessionController : Controller
                 autoCaptureActive = viewModel.AutoCaptureActive,
                 autoCaptureStatusMessage = viewModel.AutoCaptureStatusMessage,
                 autoCaptureCompletedSuccessfully = viewModel.AutoCaptureCompletedSuccessfully,
+                showManualCaptureAction = viewModel.ShowManualCaptureAction,
+                primaryActionLabel = viewModel.PrimaryActionLabel,
                 sessionIndicatorLabel = viewModel.SessionIndicatorLabel,
                 sessionIndicatorClass = viewModel.SessionIndicatorClass
             }

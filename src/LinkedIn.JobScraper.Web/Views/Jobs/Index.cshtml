@@ -38,7 +38,7 @@
     var showSessionRecoveryAction =
         string.Equals(alertSeverity, "danger", StringComparison.OrdinalIgnoreCase) &&
         !string.IsNullOrWhiteSpace(alertMessage) &&
-        alertMessage.Contains("LinkedIn Session", StringComparison.OrdinalIgnoreCase);
+        alertMessage.Contains("LinkedIn session", StringComparison.OrdinalIgnoreCase);
 }
 
 <div class="jobs-page d-flex flex-column gap-4">
@@ -120,7 +120,7 @@
             <span>@alertMessage</span>
             @if (showSessionRecoveryAction)
             {
-                <a class="btn btn-sm btn-outline-secondary" asp-controller="LinkedInSession" asp-action="Index">Open LinkedIn Session</a>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#linkedInSessionModal">Open Session Control</button>
             }
         </div>
     }

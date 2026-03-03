@@ -22,6 +22,13 @@ public sealed class LinkedInSessionPageViewModel
 
     public bool StatusSucceeded { get; set; }
 
+    public bool ShowManualCaptureAction =>
+        !StoredSessionAvailable &&
+        !AutoCaptureActive &&
+        !string.IsNullOrWhiteSpace(AutoCaptureStatusMessage);
+
+    public string PrimaryActionLabel => StoredSessionAvailable ? "Refresh Session" : "Connect Session";
+
     public string SessionIndicatorLabel =>
         AutoCaptureActive
             ? "Connecting"

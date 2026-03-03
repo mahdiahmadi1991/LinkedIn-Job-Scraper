@@ -12,12 +12,25 @@
             </div>
             <div class="modal-body d-flex flex-column gap-3 pt-3">
                 <div class="small text-muted">
-                    Launch the controlled browser, complete login, and let auto-capture save the new session. The dialog closes automatically after capture succeeds.
+                    Launch the controlled browser, complete login, and let auto-capture save the new session. The dialog closes automatically after capture and verification succeed.
                 </div>
 
-                <div class="alert @(Model.StatusSucceeded ? "alert-success" : "alert-secondary") d-none" role="alert" data-session-feedback></div>
+                <div class="session-modal-status-stack">
+                    <div class="session-status-note @(string.IsNullOrWhiteSpace(Model.StatusMessage) ? "d-none" : string.Empty)" data-session-feedback-note>
+                        @Model.StatusMessage
+                    </div>
+                    <div class="session-status-note subtle @(string.IsNullOrWhiteSpace(Model.AutoCaptureStatusMessage) ? "d-none" : string.Empty)" data-session-auto-capture-note>
+                        @Model.AutoCaptureStatusMessage
+                    </div>
+                </div>
 
-                <div class="alert alert-primary d-none" role="alert" data-session-auto-capture></div>
+                <div class="session-modal-waiting @(Model.AutoCaptureActive ? string.Empty : "d-none")" data-session-waiting>
+                    <span class="session-modal-spinner" aria-hidden="true"></span>
+                    <div class="session-modal-waiting-copy">
+                        <div class="fw-semibold">Waiting for LinkedIn login...</div>
+                        <div class="small text-muted">Auto-capture is watching for authenticated cookies in the controlled browser.</div>
+                    </div>
+                </div>
 
                 <div class="selection-card selection-card-tight">
                     <div class="state-grid">
@@ -47,9 +60,19 @@
                 <form id="linkedInSessionAntiForgeryForm">@Html.AntiForgeryToken()</form>
 
                 <div class="stacked-actions">
-                    <button type="button" class="btn btn-primary" data-session-launch>Launch Login Browser</button>
-                    <button type="button" class="btn btn-outline-primary" data-session-capture>Capture Session</button>
-                    <button type="button" class="btn btn-outline-secondary" data-session-verify>Verify Session</button>
+                    <button type="button" class="btn btn-primary" data-session-launch>@Model.PrimaryActionLabel</button>
+                    <button
+                        type="button"
+                        class="btn btn-outline-primary @(Model.ShowManualCaptureAction ? string.Empty : "d-none")"
+                        data-session-capture>
+                        Capture Manually
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary @(!Model.StoredSessionAvailable || Model.AutoCaptureActive ? "d-none" : string.Empty)"
+                        data-session-revoke>
+                        Revoke Session
+                    </button>
                 </div>
             </div>
         </div>

@@ -6,10 +6,10 @@
     <section class="page-hero">
         <div class="section-label mb-2">Local MVP</div>
         <h1 class="hero-title display-6">LinkedIn Job Scraper</h1>
-        <p class="hero-lead lead mb-4">Start from the jobs dashboard for the full workflow, or refresh the LinkedIn session if the platform expires your stored cookies.</p>
+        <p class="hero-lead lead mb-4">Start from the jobs dashboard for the full workflow, and use the top-right session control whenever LinkedIn cookies need to be refreshed.</p>
         <div class="stacked-actions">
             <a class="btn btn-primary" asp-controller="Jobs" asp-action="Index">Open Jobs Dashboard</a>
-            <a class="btn btn-outline-secondary" asp-controller="LinkedInSession" asp-action="Index">Open LinkedIn Session</a>
+            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#linkedInSessionModal">Open Session Control</button>
             <a class="btn btn-outline-primary" asp-controller="SearchSettings" asp-action="Index">Adjust Search Settings</a>
         </div>
     </section>
@@ -19,8 +19,8 @@
             <div class="card h-100 app-panel">
                 <div class="card-body app-panel-body">
                     <div class="section-label mb-2">Capture</div>
-                    <h2 class="h5">LinkedIn Session</h2>
-                    <p class="text-muted mb-0">Open the controlled browser, sign in manually, and keep a reusable session ready for authenticated LinkedIn requests.</p>
+                    <h2 class="h5">Session Control</h2>
+                    <p class="text-muted mb-0">Open the top-bar modal, launch the controlled browser, and let auto-capture keep a reusable authenticated session ready.</p>
                 </div>
             </div>
         </div>

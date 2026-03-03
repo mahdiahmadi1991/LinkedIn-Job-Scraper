@@ -46,6 +46,8 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The expandable child rows in the jobs table now open and close with a lightweight animated transition instead of snapping instantly
 - The jobs lazy-load sentinel now shows an animated loading indicator so background row fetching feels explicit while additional batches are being appended
 - LinkedIn session management is moving into a compact top-bar status control with a modal workflow, replacing the dedicated session page and automatically closing the modal after successful auto-capture
+- Session action messages now surface as global toast notifications, while the session modal keeps only compact inline status notes so repeated updates do not stretch the dialog vertically
+- Home and recovery prompts now point to the top-bar session modal instead of the removed dedicated session page, so session-related UX stays consistent across the app
 
 ## Product Intent
 
