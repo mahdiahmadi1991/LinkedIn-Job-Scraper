@@ -12,6 +12,10 @@ public sealed class LinkedInSessionPageViewModel
 
     public bool StoredSessionAvailable { get; set; }
 
+    public bool AutoCaptureActive { get; set; }
+
+    public string? AutoCaptureStatusMessage { get; set; }
+
     public string? StatusMessage { get; set; }
 
     public bool StatusSucceeded { get; set; }

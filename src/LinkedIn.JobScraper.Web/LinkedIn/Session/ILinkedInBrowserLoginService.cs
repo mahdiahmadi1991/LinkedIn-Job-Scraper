@@ -18,4 +18,6 @@ public sealed record LinkedInBrowserLoginState(
     string? CurrentPageUrl,
     bool StoredSessionAvailable,
     DateTimeOffset? StoredSessionCapturedAtUtc,
-    string? StoredSessionSource);
+    string? StoredSessionSource,
+    bool AutoCaptureActive,
+    string? AutoCaptureStatusMessage);

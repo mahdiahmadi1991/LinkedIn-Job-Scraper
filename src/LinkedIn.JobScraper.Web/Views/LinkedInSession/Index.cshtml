@@ -9,13 +9,20 @@
         <div class="col-lg-9">
             <h1 class="mb-3">LinkedIn Session</h1>
             <p class="text-muted">
-                Launch a controlled browser, complete LinkedIn login manually, then capture the authenticated session for API use.
+                Launch a controlled browser and complete LinkedIn login manually. The app now watches for a successful login and tries to capture the authenticated session automatically.
             </p>
 
             @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
             {
                 <div class="alert @(Model.StatusSucceeded ? "alert-success" : "alert-danger")" role="alert">
                     @Model.StatusMessage
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(Model.AutoCaptureStatusMessage))
+            {
+                <div class="alert @(Model.AutoCaptureActive ? "alert-primary" : "alert-secondary")" role="alert">
+                    @Model.AutoCaptureStatusMessage
                 </div>
             }
 
@@ -37,6 +44,9 @@
 
                         <dt class="col-sm-4">Session Source</dt>
                         <dd class="col-sm-8">@(Model.StoredSessionSource ?? "Not available")</dd>
+
+                        <dt class="col-sm-4">Auto-Capture</dt>
+                        <dd class="col-sm-8">@(Model.AutoCaptureActive ? "Watching for login" : "Idle")</dd>
                     </dl>
                 </div>
             </div>

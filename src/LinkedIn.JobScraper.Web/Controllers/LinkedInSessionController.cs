@@ -38,6 +38,8 @@ public class LinkedInSessionController : Controller
             viewModel.StoredSessionAvailable = state.StoredSessionAvailable;
             viewModel.StoredSessionCapturedAtUtc = state.StoredSessionCapturedAtUtc;
             viewModel.StoredSessionSource = state.StoredSessionSource;
+            viewModel.AutoCaptureActive = state.AutoCaptureActive;
+            viewModel.AutoCaptureStatusMessage = state.AutoCaptureStatusMessage;
         }
         catch (Exception exception)
         {
