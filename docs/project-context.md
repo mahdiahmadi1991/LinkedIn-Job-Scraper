@@ -63,6 +63,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - A basic GitHub Actions CI workflow is being restored to run `restore`, `build`, and `test` on `main`, `develop`, and pull requests using only the current CI-safe test suite
 - The CI workflow now also enforces formatting plus warnings-as-errors during build, and pull requests get a lightweight dependency review check
 - The CI workflow now publishes TRX test results and XPlat code coverage artifacts so failures and coverage output can be inspected directly from GitHub Actions runs
+- The public README is being expanded to reflect the current product reality, local setup, CI posture, safety constraints, and modular-monolith architecture more accurately for portfolio review
 
 ## Product Intent
 
