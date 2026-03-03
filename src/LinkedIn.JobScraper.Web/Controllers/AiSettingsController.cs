@@ -28,6 +28,7 @@ public sealed class AiSettingsController : Controller
 
         var viewModel = new AiSettingsPageViewModel
         {
+            ConcurrencyToken = profile.ConcurrencyToken,
             ProfileName = profile.ProfileName,
             BehavioralInstructions = profile.BehavioralInstructions,
             PrioritySignals = profile.PrioritySignals,
@@ -69,7 +70,8 @@ public sealed class AiSettingsController : Controller
                     viewModel.BehavioralInstructions,
                     viewModel.PrioritySignals,
                     viewModel.ExclusionSignals,
-                    viewModel.OutputLanguageCode),
+                    viewModel.OutputLanguageCode,
+                    viewModel.ConcurrencyToken),
                 cancellationToken);
         }
         catch (InvalidOperationException exception)
@@ -79,6 +81,8 @@ public sealed class AiSettingsController : Controller
             viewModel.StatusSucceeded = false;
             return View("Index", viewModel);
         }
+
+        viewModel.ConcurrencyToken = savedProfile.ConcurrencyToken;
 
         TempData["AiSettingsStatusMessage"] =
             $"Saved AI behavior profile '{savedProfile.ProfileName}' with {AiOutputLanguage.GetDisplayName(savedProfile.OutputLanguageCode)} output.";

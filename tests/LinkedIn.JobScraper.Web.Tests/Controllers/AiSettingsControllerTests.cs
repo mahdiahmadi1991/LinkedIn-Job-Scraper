@@ -37,6 +37,7 @@ public sealed class AiSettingsControllerTests
         Assert.True(model.OpenAiConnectionReady);
         Assert.Equal("gpt-5-mini", model.OpenAiModel);
         Assert.Equal("https://api.openai.com/v1", model.OpenAiBaseUrl);
+        Assert.Equal("token-1", model.ConcurrencyToken);
     }
 
     [Fact]
@@ -60,7 +61,8 @@ public sealed class AiSettingsControllerTests
                 BehavioralInstructions = "Test",
                 PrioritySignals = "Test",
                 ExclusionSignals = "Test",
-                OutputLanguageCode = "en"
+                OutputLanguageCode = "en",
+                ConcurrencyToken = "token-2"
             },
             CancellationToken.None);
 
@@ -125,7 +127,8 @@ public sealed class AiSettingsControllerTests
                     "Behavior",
                     "Priority",
                     "Exclusion",
-                    "en"));
+                    "en",
+                    "token-1"));
         }
 
         public Task<AiBehaviorProfile> SaveAsync(AiBehaviorProfile profile, CancellationToken cancellationToken)

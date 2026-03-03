@@ -19,6 +19,7 @@ public sealed class SearchSettingsControllerTests
             {
                 ProfileName = "Default",
                 Keywords = "C# .Net",
+                ConcurrencyToken = "token-3",
                 WorkplaceTypeCodes = ["1"],
                 JobTypeCodes = ["F"]
             },

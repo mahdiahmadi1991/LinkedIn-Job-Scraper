@@ -4,6 +4,8 @@ namespace LinkedIn.JobScraper.Web.Models;
 
 public sealed class AiSettingsPageViewModel
 {
+    public string? ConcurrencyToken { get; set; }
+
     [Required]
     [Display(Name = "Profile Name")]
     public string ProfileName { get; set; } = string.Empty;

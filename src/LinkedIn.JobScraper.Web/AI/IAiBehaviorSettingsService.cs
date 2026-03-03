@@ -12,7 +12,8 @@ public sealed record AiBehaviorProfile(
     string BehavioralInstructions,
     string PrioritySignals,
     string ExclusionSignals,
-    string OutputLanguageCode)
+    string OutputLanguageCode,
+    string? ConcurrencyToken = null)
 {
     public string OutputDirection => AiOutputLanguage.GetDirection(OutputLanguageCode);
 }

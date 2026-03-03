@@ -91,7 +91,8 @@ public sealed class SearchSettingsController : Controller
                     viewModel.LocationGeoId,
                     viewModel.EasyApply,
                     viewModel.WorkplaceTypeCodes,
-                    viewModel.JobTypeCodes),
+                    viewModel.JobTypeCodes,
+                    viewModel.ConcurrencyToken),
                 cancellationToken);
         }
         catch (InvalidOperationException exception)
@@ -114,6 +115,7 @@ public sealed class SearchSettingsController : Controller
         {
             ProfileName = settings.ProfileName,
             Keywords = settings.Keywords,
+            ConcurrencyToken = settings.ConcurrencyToken,
             LocationInput = settings.LocationInput,
             LocationDisplayName = settings.LocationDisplayName,
             LocationGeoId = settings.LocationGeoId,

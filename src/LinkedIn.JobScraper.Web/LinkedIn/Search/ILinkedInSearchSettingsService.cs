@@ -42,6 +42,13 @@ public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsServi
         await EnsureDatabaseAsync(cancellationToken);
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
         var record = await GetOrCreateActiveRecordAsync(dbContext, cancellationToken);
+        var entry = dbContext.Entry(record);
+        var originalRowVersion = ConcurrencyTokenCodec.Decode(settings.ConcurrencyToken);
+
+        if (originalRowVersion is not null)
+        {
+            entry.Property(static current => current.RowVersion).OriginalValue = originalRowVersion;
+        }
 
         record.ProfileName = string.IsNullOrWhiteSpace(settings.ProfileName) ? "Default" : settings.ProfileName.Trim();
         record.Keywords = settings.Keywords.Trim();
@@ -107,7 +114,8 @@ public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsServi
             record.LocationGeoId,
             record.EasyApply,
             SplitCsv(record.WorkplaceTypeCodesCsv, DefaultWorkplaceTypeCodes),
-            SplitCsv(record.JobTypeCodesCsv, DefaultJobTypeCodes));
+            SplitCsv(record.JobTypeCodesCsv, DefaultJobTypeCodes),
+            ConcurrencyTokenCodec.Encode(record.RowVersion));
     }
 
     private static string? NormalizeNullable(string? value)
@@ -183,4 +191,5 @@ public sealed record LinkedInSearchSettings(
     string? LocationGeoId,
     bool EasyApply,
     IReadOnlyList<string> WorkplaceTypeCodes,
-    IReadOnlyList<string> JobTypeCodes);
+    IReadOnlyList<string> JobTypeCodes,
+    string? ConcurrencyToken = null);

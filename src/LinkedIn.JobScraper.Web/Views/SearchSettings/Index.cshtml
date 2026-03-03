@@ -28,6 +28,7 @@
                     <form asp-action="Save" method="post" class="d-flex flex-column gap-4" id="search-settings-form">
                         @Html.AntiForgeryToken()
 
+                        <input asp-for="ConcurrencyToken" type="hidden" />
                         <input asp-for="LocationDisplayName" type="hidden" />
                         <input asp-for="LocationGeoId" type="hidden" />
 

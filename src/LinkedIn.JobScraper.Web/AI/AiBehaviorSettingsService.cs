@@ -29,6 +29,14 @@ public sealed class AiBehaviorSettingsService : IAiBehaviorSettingsService
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var record = await GetOrCreateActiveRecordAsync(dbContext, cancellationToken);
+        var entry = dbContext.Entry(record);
+        var originalRowVersion = ConcurrencyTokenCodec.Decode(profile.ConcurrencyToken);
+
+        if (originalRowVersion is not null)
+        {
+            entry.Property(static settings => settings.RowVersion).OriginalValue = originalRowVersion;
+        }
+
         record.ProfileName = profile.ProfileName.Trim();
         record.BehavioralInstructions = profile.BehavioralInstructions.Trim();
         record.PrioritySignals = profile.PrioritySignals.Trim();
@@ -87,6 +95,7 @@ public sealed class AiBehaviorSettingsService : IAiBehaviorSettingsService
             record.BehavioralInstructions,
             record.PrioritySignals,
             record.ExclusionSignals,
-            AiOutputLanguage.Normalize(record.OutputLanguageCode));
+            AiOutputLanguage.Normalize(record.OutputLanguageCode),
+            ConcurrencyTokenCodec.Encode(record.RowVersion));
     }
 }

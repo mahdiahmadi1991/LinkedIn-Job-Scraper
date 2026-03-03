@@ -25,6 +25,7 @@
                 <div class="card-body app-panel-body">
                     <form asp-action="Save" method="post" class="d-flex flex-column gap-3">
                         @Html.AntiForgeryToken()
+                        <input asp-for="ConcurrencyToken" type="hidden" />
                         <div>
                             <label asp-for="ProfileName" class="form-label"></label>
                             <input asp-for="ProfileName" class="form-control" />
