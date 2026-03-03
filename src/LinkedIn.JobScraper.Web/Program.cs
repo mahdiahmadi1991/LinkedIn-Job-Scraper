@@ -44,6 +44,7 @@ app.UseBasicSecurityHeaders();
 app.UseRouting();
 app.UseRateLimiter();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");

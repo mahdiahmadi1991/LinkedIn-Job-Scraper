@@ -96,6 +96,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - Inline page scripts are being moved out of Razor views into versioned static files, and first-run settings forms no longer pre-populate workflow filters or AI guidance text
 - After a successful Playwright auto-capture, the controlled browser now closes automatically so the happy path no longer leaves the login window open after session capture
 - Internal app authentication is now being activated in a staged rollout: the current step adds the persisted `AppUser` model, password hashing, and startup-only seeded user synchronization, while the actual cookie-auth login UI will come in later steps
+- Cookie-based app authentication is now wired at the platform level with a dedicated local scheme and persistent-cookie support, but route protection and the login UI are still deferred to the next steps so current behavior does not break mid-rollout
 
 ## Product Intent
 

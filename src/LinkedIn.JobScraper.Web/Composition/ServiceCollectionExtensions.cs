@@ -9,7 +9,9 @@ using LinkedIn.JobScraper.Web.LinkedIn.Details;
 using LinkedIn.JobScraper.Web.LinkedIn.Search;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using LinkedIn.JobScraper.Web.Persistence;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.Composition;
@@ -32,8 +34,23 @@ public static class ServiceCollectionExtensions
 
         services.AddHostedService<ConfigurationReadinessStartupService>();
         services.AddHostedService<AppUserSeedingStartupService>();
+        services.AddAuthentication(AppAuthenticationDefaults.CookieScheme)
+            .AddCookie(
+                AppAuthenticationDefaults.CookieScheme,
+                options =>
+                {
+                    options.LoginPath = AppAuthenticationDefaults.LoginPath;
+                    options.LogoutPath = AppAuthenticationDefaults.LogoutPath;
+                    options.SlidingExpiration = true;
+                    options.ExpireTimeSpan = TimeSpan.FromDays(14);
+                    options.Cookie.Name = "ljs.auth";
+                    options.Cookie.HttpOnly = true;
+                    options.Cookie.IsEssential = true;
+                    options.Cookie.SameSite = SameSiteMode.Lax;
+                });
         services.AddSignalR();
         services.AddSingleton<IAppUserPasswordHasher, AppUserPasswordHasher>();
+        services.AddTransient<IAppUserAuthenticationService, AppUserAuthenticationService>();
         services.AddSingleton<ISqlServerConnectionStringProvider, ConfiguredSqlServerConnectionStringProvider>();
         services.AddSingleton<ILinkedInSessionStore, DatabaseLinkedInSessionStore>();
         services.AddSingleton<ILinkedInBrowserLoginService, PlaywrightLinkedInBrowserLoginService>();
