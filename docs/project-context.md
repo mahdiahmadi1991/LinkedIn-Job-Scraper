@@ -56,6 +56,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The HTTP pipeline now applies a small set of low-risk security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`) globally, while preserving any explicitly-set response values
 - A narrow local-only rate-limit policy now protects the most sensitive POST actions (session launch/capture/verify/revoke and `Fetch & Score`) without throttling normal dashboard reads or session-state polling
 - Application startup now emits warning logs for missing SQL Server or OpenAI configuration instead of failing startup immediately, so local misconfiguration surfaces early while CI-safe test runs remain unaffected
+- The `Fetch & Score` workflow now emits structured start/stage/completion logs with a per-run workflow identifier so background activity can be correlated more easily during diagnostics
 
 ## Product Intent
 

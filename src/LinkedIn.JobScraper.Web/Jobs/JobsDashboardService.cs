@@ -8,25 +8,58 @@ namespace LinkedIn.JobScraper.Web.Jobs;
 public sealed class JobsDashboardService : IJobsDashboardService
 {
     private const int JobsPageSize = 40;
+    private static readonly Action<ILogger, string, string?, Exception?> LogWorkflowStarted =
+        LoggerMessage.Define<string, string?>(
+            LogLevel.Information,
+            new EventId(2001, nameof(LogWorkflowStarted)),
+            "Fetch and score workflow started. WorkflowId={WorkflowId}, ProgressConnectionId={ProgressConnectionId}");
+    private static readonly Action<ILogger, string, int, int, int, int, Exception?> LogImportCompleted =
+        LoggerMessage.Define<string, int, int, int, int>(
+            LogLevel.Information,
+            new EventId(2002, nameof(LogImportCompleted)),
+            "Fetch and score import completed. WorkflowId={WorkflowId}, PagesFetched={PagesFetched}, FetchedCount={FetchedCount}, ImportedCount={ImportedCount}, RefreshedCount={RefreshedCount}");
+    private static readonly Action<ILogger, string, int, int, int, int, Exception?> LogEnrichmentCompleted =
+        LoggerMessage.Define<string, int, int, int, int>(
+            LogLevel.Information,
+            new EventId(2003, nameof(LogEnrichmentCompleted)),
+            "Fetch and score enrichment completed. WorkflowId={WorkflowId}, RequestedCount={RequestedCount}, ProcessedCount={ProcessedCount}, EnrichedCount={EnrichedCount}, FailedCount={FailedCount}");
+    private static readonly Action<ILogger, string, int, int, int, int, Exception?> LogScoringCompleted =
+        LoggerMessage.Define<string, int, int, int, int>(
+            LogLevel.Information,
+            new EventId(2004, nameof(LogScoringCompleted)),
+            "Fetch and score scoring completed. WorkflowId={WorkflowId}, RequestedCount={RequestedCount}, ProcessedCount={ProcessedCount}, ScoredCount={ScoredCount}, FailedCount={FailedCount}");
+    private static readonly Action<ILogger, string, bool, string, Exception?> LogWorkflowCompleted =
+        LoggerMessage.Define<string, bool, string>(
+            LogLevel.Information,
+            new EventId(2005, nameof(LogWorkflowCompleted)),
+            "Fetch and score workflow completed. WorkflowId={WorkflowId}, Success={Success}, Severity={Severity}");
+    private static readonly Action<ILogger, string, string, Exception?> LogWorkflowFailed =
+        LoggerMessage.Define<string, string>(
+            LogLevel.Warning,
+            new EventId(2006, nameof(LogWorkflowFailed)),
+            "Fetch and score workflow failed early. WorkflowId={WorkflowId}, Reason={Reason}");
 
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly IJobEnrichmentService _jobEnrichmentService;
     private readonly IJobImportService _jobImportService;
     private readonly IJobsWorkflowProgressNotifier _jobsWorkflowProgressNotifier;
     private readonly IJobBatchScoringService _jobBatchScoringService;
+    private readonly ILogger<JobsDashboardService> _logger;
 
     public JobsDashboardService(
         IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
         IJobImportService jobImportService,
         IJobEnrichmentService jobEnrichmentService,
         IJobBatchScoringService jobBatchScoringService,
-        IJobsWorkflowProgressNotifier jobsWorkflowProgressNotifier)
+        IJobsWorkflowProgressNotifier jobsWorkflowProgressNotifier,
+        ILogger<JobsDashboardService> logger)
     {
         _dbContextFactory = dbContextFactory;
         _jobImportService = jobImportService;
         _jobEnrichmentService = jobEnrichmentService;
         _jobBatchScoringService = jobBatchScoringService;
         _jobsWorkflowProgressNotifier = jobsWorkflowProgressNotifier;
+        _logger = logger;
     }
 
     public async Task<JobsDashboardSnapshot> GetSnapshotAsync(
@@ -137,6 +170,9 @@ public sealed class JobsDashboardService : IJobsDashboardService
         string? progressConnectionId,
         CancellationToken cancellationToken)
     {
+        var workflowId = Guid.NewGuid().ToString("N");
+        LogWorkflowStarted(_logger, workflowId, progressConnectionId, null);
+
         await PublishProgressAsync(
             progressConnectionId,
             new JobsWorkflowProgressUpdate(
@@ -150,6 +186,8 @@ public sealed class JobsDashboardService : IJobsDashboardService
 
         if (!importResult.Success)
         {
+            LogWorkflowFailed(_logger, workflowId, importResult.Message, null);
+
             await PublishProgressAsync(
                 progressConnectionId,
                 new JobsWorkflowProgressUpdate(
@@ -171,6 +209,15 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 null,
                 null);
         }
+
+        LogImportCompleted(
+            _logger,
+            workflowId,
+            importResult.PagesFetched,
+            importResult.FetchedCount,
+            importResult.ImportedCount,
+            importResult.UpdatedExistingCount,
+            null);
 
         await PublishProgressAsync(
             progressConnectionId,
@@ -206,6 +253,15 @@ public sealed class JobsDashboardService : IJobsDashboardService
         var enrichmentResult = await _jobEnrichmentService.EnrichIncompleteJobsAsync(
             enrichmentBatchSize,
             cancellationToken);
+
+        LogEnrichmentCompleted(
+            _logger,
+            workflowId,
+            enrichmentResult.RequestedCount,
+            enrichmentResult.ProcessedCount,
+            enrichmentResult.EnrichedCount,
+            enrichmentResult.FailedCount,
+            null);
 
         await PublishProgressAsync(
             progressConnectionId,
@@ -245,6 +301,15 @@ public sealed class JobsDashboardService : IJobsDashboardService
         var scoringResult = await _jobBatchScoringService.ScoreReadyJobsAsync(
             scoringBatchSize,
             cancellationToken);
+
+        LogScoringCompleted(
+            _logger,
+            workflowId,
+            scoringResult.RequestedCount,
+            scoringResult.ProcessedCount,
+            scoringResult.ScoredCount,
+            scoringResult.FailedCount,
+            null);
 
         var severity = "success";
         var messageParts = new List<string>
@@ -292,6 +357,8 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 scoringResult.ScoredCount,
                 scoringResult.FailedCount),
             cancellationToken);
+
+        LogWorkflowCompleted(_logger, workflowId, workflowResult.Success, workflowResult.Severity, null);
 
         return workflowResult;
     }

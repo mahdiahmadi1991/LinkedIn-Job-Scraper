@@ -39,6 +39,10 @@ public sealed class JobsControllerTests
         Assert.Equal("/Jobs?sortBy=last-seen", document.RootElement.GetProperty("redirectUrl").GetString());
         Assert.Equal("Workflow complete.", controller.TempData["JobsAlertMessage"]);
         Assert.Equal("success", controller.TempData["JobsAlertSeverity"]);
+        Assert.Equal(25, controller.TempData["JobsWorkflowImportFetchedCount"]);
+        Assert.Equal(100, controller.TempData["JobsWorkflowImportTotalCount"]);
+        Assert.Equal(3, controller.TempData["JobsWorkflowEnrichmentEnrichedCount"]);
+        Assert.Equal(3, controller.TempData["JobsWorkflowScoringScoredCount"]);
         Assert.Equal("connection-1", service.LastConnectionId);
     }
 
