@@ -1,5 +1,6 @@
 using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Configuration;
+using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -99,18 +100,15 @@ public sealed class AiSettingsController : Controller
                 statusCode: StatusCodes.Status503ServiceUnavailable);
         }
 
-        return Json(new
-        {
-            success = true,
-            message = payload.Message,
-            state = new
-            {
-                apiKeyConfigured = payload.ApiKeyConfigured,
-                model = payload.Model,
-                baseUrl = payload.BaseUrl,
-                ready = payload.Ready
-            }
-        });
+        return Json(
+            new AiConnectionStatusResponse(
+                true,
+                payload.Message,
+                new AiConnectionStateResponse(
+                    payload.ApiKeyConfigured,
+                    payload.Model,
+                    payload.BaseUrl,
+                    payload.Ready)));
     }
 
     private void PopulateConnectionStatus(AiSettingsPageViewModel viewModel)

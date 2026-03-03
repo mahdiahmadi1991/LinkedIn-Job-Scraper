@@ -76,6 +76,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The `Jobs` table now defines explicit non-unique indexes for the dashboard's real filter/sort fields (`CurrentStatus`, `AiLabel`, `AiScore`, `LastSeenAtUtc`, `ListedAtUtc`) to reduce read-path scan pressure without changing behavior
 - Persisted LinkedIn session payloads are now minimized before storage: only the headers needed for future authenticated reuse are retained, while transient request-shape headers such as `Accept`, `Referer`, and PEM metadata are discarded
 - The docs set now includes a first ADR so reviewers and future maintainers can quickly see the reasoning behind the project's local-only safety posture and browser-backed session strategy
+- High-value JSON success payloads (AI connection, session state/actions, diagnostics summary, and Fetch & Score success) now use explicit DTO contracts instead of anonymous objects while preserving the current wire shape
 
 ## Product Intent
 

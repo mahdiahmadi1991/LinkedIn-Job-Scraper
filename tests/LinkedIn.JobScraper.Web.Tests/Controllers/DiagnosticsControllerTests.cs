@@ -1,6 +1,6 @@
-using System.Text.Json;
 using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Configuration;
+using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.Controllers;
 using LinkedIn.JobScraper.Web.Diagnostics;
 using LinkedIn.JobScraper.Web.Jobs;
@@ -18,37 +18,18 @@ public sealed class DiagnosticsControllerTests
     [Fact]
     public async Task SummaryReturnsSafeReadinessAndSessionShape()
     {
-        var controller = new DiagnosticsController(
-            new LinkedInFeasibilityProbe(
-                new FakeLinkedInApiClient(),
-                new FakeLinkedInSessionVerificationService(),
-                NullLogger<LinkedInFeasibilityProbe>.Instance),
-            new FakeJobImportService(),
-            new FakeJobEnrichmentService(),
-            new FakeJobBatchScoringService(),
-            Options.Create(new SqlServerOptions
-            {
-                ConnectionString = "Server=.;Database=LinkedInJobScraper;Trusted_Connection=True;"
-            }),
-            Options.Create(new OpenAiSecurityOptions
-            {
-                ApiKey = "test-key",
-                Model = "gpt-5-mini"
-            }),
-            new FakeLinkedInSessionStore());
+        var controller = CreateController();
 
         var result = await controller.Summary(CancellationToken.None);
 
         var json = Assert.IsType<JsonResult>(result);
-        using var document = JsonDocument.Parse(JsonSerializer.Serialize(json.Value));
+        var payload = Assert.IsType<DiagnosticsSummaryResponse>(json.Value);
 
-        Assert.True(document.RootElement.GetProperty("config").GetProperty("sqlServerConfigured").GetBoolean());
-        Assert.True(document.RootElement.GetProperty("config").GetProperty("openAiApiKeyConfigured").GetBoolean());
-        Assert.True(document.RootElement.GetProperty("config").GetProperty("openAiModelConfigured").GetBoolean());
-        Assert.True(document.RootElement.GetProperty("session").GetProperty("storedSessionAvailable").GetBoolean());
-        Assert.Equal("PlaywrightManualLogin", document.RootElement.GetProperty("session").GetProperty("source").GetString());
-        Assert.False(document.RootElement.GetProperty("session").TryGetProperty("cookie", out _));
-        Assert.False(document.RootElement.GetProperty("session").TryGetProperty("headers", out _));
+        Assert.True(payload.Config.SqlServerConfigured);
+        Assert.True(payload.Config.OpenAiApiKeyConfigured);
+        Assert.True(payload.Config.OpenAiModelConfigured);
+        Assert.True(payload.Session.StoredSessionAvailable);
+        Assert.Equal("PlaywrightManualLogin", payload.Session.Source);
     }
 
     [Fact]

@@ -3,6 +3,7 @@ using LinkedIn.JobScraper.Web.Persistence.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using LinkedIn.JobScraper.Web.Configuration;
+using LinkedIn.JobScraper.Web.Contracts;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace LinkedIn.JobScraper.Web.Controllers;
@@ -75,13 +76,12 @@ public class JobsController : Controller
                         : StatusCodes.Status409Conflict);
             }
 
-            return Json(new
-            {
-                success = true,
-                severity = result.Severity,
-                message = result.Message,
-                redirectUrl
-            });
+            return Json(
+                new FetchAndScoreAjaxResponse(
+                    true,
+                    result.Severity,
+                    result.Message,
+                    redirectUrl));
         }
 
         return Redirect(redirectUrl);

@@ -1,5 +1,5 @@
-using System.Text.Json;
 using LinkedIn.JobScraper.Web.Controllers;
+using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using LinkedIn.JobScraper.Web.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http;
@@ -29,13 +29,13 @@ public sealed class LinkedInSessionControllerTests
         var result = await controller.State(CancellationToken.None);
 
         var json = Assert.IsType<JsonResult>(result);
-        using var document = JsonDocument.Parse(JsonSerializer.Serialize(json.Value));
+        var payload = Assert.IsType<LinkedInSessionActionResponse>(json.Value);
 
-        Assert.False(document.RootElement.GetProperty("success").GetBoolean());
-        Assert.True(document.RootElement.GetProperty("state").GetProperty("storedSessionAvailable").GetBoolean());
-        Assert.Equal("Refresh Session", document.RootElement.GetProperty("state").GetProperty("primaryActionLabel").GetString());
-        Assert.Equal("Connected", document.RootElement.GetProperty("state").GetProperty("sessionIndicatorLabel").GetString());
-        Assert.Equal("session-state-connected", document.RootElement.GetProperty("state").GetProperty("sessionIndicatorClass").GetString());
+        Assert.False(payload.Success);
+        Assert.True(payload.State.StoredSessionAvailable);
+        Assert.Equal("Refresh Session", payload.State.PrimaryActionLabel);
+        Assert.Equal("Connected", payload.State.SessionIndicatorLabel);
+        Assert.Equal("session-state-connected", payload.State.SessionIndicatorClass);
     }
 
     [Fact]

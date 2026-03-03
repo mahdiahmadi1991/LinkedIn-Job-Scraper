@@ -1,5 +1,6 @@
 using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Configuration;
+using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.Diagnostics;
 using LinkedIn.JobScraper.Web.Jobs;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
@@ -55,22 +56,17 @@ public class DiagnosticsController : Controller
         var sqlServerOptions = _sqlServerOptions.Value;
         var openAiSecurityOptions = _openAiSecurityOptions.Value;
 
-        return Json(new
-        {
-            config = new
-            {
-                sqlServerConfigured = !string.IsNullOrWhiteSpace(sqlServerOptions.ConnectionString),
-                openAiApiKeyConfigured = !string.IsNullOrWhiteSpace(openAiSecurityOptions.ApiKey),
-                openAiModelConfigured = !string.IsNullOrWhiteSpace(openAiSecurityOptions.Model)
-            },
-            session = new
-            {
-                storedSessionAvailable = sessionSnapshot is not null,
-                capturedAtUtc = sessionSnapshot?.CapturedAtUtc,
-                source = sessionSnapshot?.Source,
-                readError = sessionReadError
-            }
-        });
+        return Json(
+            new DiagnosticsSummaryResponse(
+                new DiagnosticsConfigSummaryResponse(
+                    !string.IsNullOrWhiteSpace(sqlServerOptions.ConnectionString),
+                    !string.IsNullOrWhiteSpace(openAiSecurityOptions.ApiKey),
+                    !string.IsNullOrWhiteSpace(openAiSecurityOptions.Model)),
+                new DiagnosticsSessionSummaryResponse(
+                    sessionSnapshot is not null,
+                    sessionSnapshot?.CapturedAtUtc,
+                    sessionSnapshot?.Source,
+                    sessionReadError)));
     }
 
     [HttpGet("linkedin-feasibility")]

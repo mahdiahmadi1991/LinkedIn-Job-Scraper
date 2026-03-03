@@ -1,5 +1,6 @@
 using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Configuration;
+using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.Controllers;
 using LinkedIn.JobScraper.Web.Models;
 using LinkedIn.JobScraper.Web.Tests.Infrastructure;
@@ -7,7 +8,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Options;
-using System.Text.Json;
 
 namespace LinkedIn.JobScraper.Web.Tests.Controllers;
 
@@ -108,11 +108,11 @@ public sealed class AiSettingsControllerTests
         var result = controller.ConnectionStatus();
 
         var json = Assert.IsType<JsonResult>(result);
-        using var document = JsonDocument.Parse(JsonSerializer.Serialize(json.Value));
+        var payload = Assert.IsType<AiConnectionStatusResponse>(json.Value);
 
-        Assert.True(document.RootElement.GetProperty("success").GetBoolean());
-        Assert.True(document.RootElement.GetProperty("state").GetProperty("ready").GetBoolean());
-        Assert.Equal("gpt-5-mini", document.RootElement.GetProperty("state").GetProperty("model").GetString());
+        Assert.True(payload.Success);
+        Assert.True(payload.State.Ready);
+        Assert.Equal("gpt-5-mini", payload.State.Model);
     }
 
     private sealed class FakeAiBehaviorSettingsService : IAiBehaviorSettingsService

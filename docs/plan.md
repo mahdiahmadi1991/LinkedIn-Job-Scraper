@@ -214,6 +214,16 @@ This queue records the approved post-MVP implementation order so follow-up work 
 4. Reduce session-storage risk further through payload minimization and, if justified, local encryption-at-rest
 5. Continue portfolio polish only where it materially improves maintainability or reviewer comprehension
 
+## Deferred Backlog Activation Queue
+
+This queue records the current activation order for the larger deliberately deferred items.
+
+1. Standardize high-value JSON success payloads with explicit DTO contracts while preserving the current wire shape
+2. Continue JSON contract normalization for the remaining lower-value JSON endpoints
+3. Introduce shared result contracts only where a concrete controller/service seam benefits directly
+4. Add broader persistence integration coverage without making CI depend on SQL Server
+5. Revisit optional SQL Server container coverage and richer telemetry only after the steps above are stable
+
 ## Post-MVP Feedback Plan
 
 This section captures the first round of manual-test feedback after the MVP baseline was completed.

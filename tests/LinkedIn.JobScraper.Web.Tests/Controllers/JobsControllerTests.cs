@@ -1,6 +1,6 @@
-using System.Text.Json;
 using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Controllers;
+using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.Jobs;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
 using LinkedIn.JobScraper.Web.Tests.Infrastructure;
@@ -31,12 +31,12 @@ public sealed class JobsControllerTests
         var result = await controller.FetchAndScore(new JobsDashboardQuery(), "connection-1", CancellationToken.None);
 
         var json = Assert.IsType<JsonResult>(result);
-        using var document = JsonDocument.Parse(JsonSerializer.Serialize(json.Value));
+        var payload = Assert.IsType<FetchAndScoreAjaxResponse>(json.Value);
 
-        Assert.True(document.RootElement.GetProperty("success").GetBoolean());
-        Assert.Equal("success", document.RootElement.GetProperty("severity").GetString());
-        Assert.Equal("Workflow complete.", document.RootElement.GetProperty("message").GetString());
-        Assert.Equal("/Jobs?sortBy=last-seen", document.RootElement.GetProperty("redirectUrl").GetString());
+        Assert.True(payload.Success);
+        Assert.Equal("success", payload.Severity);
+        Assert.Equal("Workflow complete.", payload.Message);
+        Assert.Equal("/Jobs?sortBy=last-seen", payload.RedirectUrl);
         Assert.Equal("Workflow complete.", controller.TempData["JobsAlertMessage"]);
         Assert.Equal("success", controller.TempData["JobsAlertSeverity"]);
         Assert.Equal(25, controller.TempData["JobsWorkflowImportFetchedCount"]);

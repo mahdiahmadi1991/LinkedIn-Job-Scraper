@@ -1,4 +1,5 @@
 using LinkedIn.JobScraper.Web.Configuration;
+using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using LinkedIn.JobScraper.Web.Models;
 using Microsoft.AspNetCore.Http;
@@ -192,28 +193,24 @@ public class LinkedInSessionController : Controller
         }
     }
 
-    private static object CreatePayload(LinkedInSessionPageViewModel viewModel)
+    private static LinkedInSessionActionResponse CreatePayload(LinkedInSessionPageViewModel viewModel)
     {
-        return new
-        {
-            success = viewModel.StatusSucceeded,
-            message = viewModel.StatusMessage,
-            state = new
-            {
-                browserOpen = viewModel.BrowserOpen,
-                currentPageUrl = viewModel.CurrentPageUrl,
-                storedSessionAvailable = viewModel.StoredSessionAvailable,
-                storedSessionCapturedAtUtc = viewModel.StoredSessionCapturedAtUtc,
-                storedSessionSource = viewModel.StoredSessionSource,
-                autoCaptureActive = viewModel.AutoCaptureActive,
-                autoCaptureStatusMessage = viewModel.AutoCaptureStatusMessage,
-                autoCaptureCompletedSuccessfully = viewModel.AutoCaptureCompletedSuccessfully,
-                showManualCaptureAction = viewModel.ShowManualCaptureAction,
-                primaryActionLabel = viewModel.PrimaryActionLabel,
-                sessionIndicatorLabel = viewModel.SessionIndicatorLabel,
-                sessionIndicatorClass = viewModel.SessionIndicatorClass
-            }
-        };
+        return new LinkedInSessionActionResponse(
+            viewModel.StatusSucceeded,
+            viewModel.StatusMessage,
+            new LinkedInSessionStateResponse(
+                viewModel.BrowserOpen,
+                viewModel.CurrentPageUrl,
+                viewModel.StoredSessionAvailable,
+                viewModel.StoredSessionCapturedAtUtc,
+                viewModel.StoredSessionSource,
+                viewModel.AutoCaptureActive,
+                viewModel.AutoCaptureStatusMessage,
+                viewModel.AutoCaptureCompletedSuccessfully,
+                viewModel.ShowManualCaptureAction,
+                viewModel.PrimaryActionLabel,
+                viewModel.SessionIndicatorLabel,
+                viewModel.SessionIndicatorClass));
     }
 
     private bool IsAjaxRequest()
