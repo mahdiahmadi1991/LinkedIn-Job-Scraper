@@ -46,7 +46,7 @@ public sealed class LinkedInJobDetailService : ILinkedInJobDetailService
         if (sessionSnapshot is null)
         {
             return LinkedInJobDetailFetchResult.Failed(
-                "No stored LinkedIn session is available yet.",
+                "No active LinkedIn session is available. Open LinkedIn Session and capture a new one before enriching jobs.",
                 StatusCodes.Status502BadGateway);
         }
 
@@ -60,6 +60,15 @@ public sealed class LinkedInJobDetailService : ILinkedInJobDetailService
         if (response.StatusCode != (int)HttpStatusCode.OK)
         {
             Log.LinkedInJobDetailReturnedNonSuccessStatusCode(_logger, response.StatusCode);
+
+            if (response.StatusCode == (int)HttpStatusCode.Unauthorized)
+            {
+                await _sessionStore.InvalidateCurrentAsync(cancellationToken);
+
+                return LinkedInJobDetailFetchResult.Failed(
+                    "Stored LinkedIn session expired during job enrichment. Open LinkedIn Session and capture a new one.",
+                    response.StatusCode);
+            }
 
             return LinkedInJobDetailFetchResult.Failed(
                 $"LinkedIn job detail request failed with HTTP {response.StatusCode}.",

@@ -38,6 +38,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The remaining legacy diagnostics path no longer reads onboarding samples at runtime and now uses lightweight public reachability plus stored-session verification checks instead
 - The jobs table and job details view are being tightened further so AI rationale stays scannable, actions stay compact, and long text no longer dominates the review surface
 - The batch pipeline is being tuned for larger runs by reducing dashboard count queries and suppressing repeated EF Core change detection inside import, enrichment, and scoring loops
+- Stored LinkedIn sessions are now explicitly invalidated on `401` responses so expired sessions clear themselves and the UI can steer the user back to the recapture flow
 
 ## Product Intent
 

@@ -36,6 +36,16 @@ public sealed class LinkedInSessionVerificationService : ILinkedInSessionVerific
         var headers = BuildHeaders(sessionSnapshot);
         var response = await _linkedInApiClient.GetAsync(requestUri, headers, cancellationToken);
 
+        if (response.StatusCode == (int)HttpStatusCode.Unauthorized)
+        {
+            await _sessionStore.InvalidateCurrentAsync(cancellationToken);
+            Log.LinkedInSessionVerificationInvalidatedExpiredSession(_logger);
+
+            return LinkedInSessionVerificationResult.Failed(
+                "Stored LinkedIn session has expired. Open LinkedIn Session and capture a new one.",
+                response.StatusCode);
+        }
+
         if (response.StatusCode != (int)HttpStatusCode.OK)
         {
             Log.LinkedInSessionVerificationReturnedNonSuccessStatusCode(_logger, response.StatusCode);
@@ -56,6 +66,8 @@ public sealed class LinkedInSessionVerificationService : ILinkedInSessionVerific
                     "Stored session verification failed because LinkedIn returned an unexpected payload.",
                     response.StatusCode);
             }
+
+            await _sessionStore.MarkCurrentValidatedAsync(DateTimeOffset.UtcNow, cancellationToken);
 
             return LinkedInSessionVerificationResult.Succeeded(
                 $"Stored session is valid. LinkedIn location lookup is responding normally for '{matchedLocationName}'.",
@@ -138,4 +150,10 @@ internal static partial class Log
         Level = LogLevel.Error,
         Message = "LinkedIn session verification failed to parse JSON.")]
     public static partial void LinkedInSessionVerificationFailedToParseJson(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        EventId = 2103,
+        Level = LogLevel.Warning,
+        Message = "Stored LinkedIn session was invalidated after a 401 response during verification.")]
+    public static partial void LinkedInSessionVerificationInvalidatedExpiredSession(ILogger logger);
 }

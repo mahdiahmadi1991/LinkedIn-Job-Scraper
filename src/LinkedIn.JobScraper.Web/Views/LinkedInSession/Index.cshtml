@@ -33,6 +33,13 @@
                 </div>
             }
 
+            @if (!Model.StoredSessionAvailable && !Model.AutoCaptureActive)
+            {
+                <div class="alert alert-warning" role="alert">
+                    No active LinkedIn session is available. If your last session expired, launch the browser again and let auto-capture save a fresh session.
+                </div>
+            }
+
             <div class="card app-panel mb-4">
                 <div class="card-body app-panel-body">
                     <div class="section-label mb-3">Current State</div>

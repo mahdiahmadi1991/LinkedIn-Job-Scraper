@@ -16,4 +16,17 @@ public sealed class InMemoryLinkedInSessionStore : ILinkedInSessionStore
         _currentSnapshot = sessionSnapshot;
         return Task.CompletedTask;
     }
+
+    public Task InvalidateCurrentAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _currentSnapshot = null;
+        return Task.CompletedTask;
+    }
+
+    public Task MarkCurrentValidatedAsync(DateTimeOffset validatedAtUtc, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
 }

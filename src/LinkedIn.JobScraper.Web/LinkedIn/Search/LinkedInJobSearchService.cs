@@ -37,7 +37,7 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
         if (sessionSnapshot is null)
         {
             return LinkedInJobSearchFetchResult.Failed(
-                "No stored LinkedIn session is available yet.",
+                "No active LinkedIn session is available. Open LinkedIn Session and capture a new one before fetching jobs.",
                 StatusCodes.Status502BadGateway);
         }
 
@@ -74,6 +74,27 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
             if (response.StatusCode != (int)HttpStatusCode.OK)
             {
                 Log.LinkedInSearchReturnedNonSuccessStatusCode(_logger, response.StatusCode);
+
+                if (response.StatusCode == (int)HttpStatusCode.Unauthorized)
+                {
+                    await _sessionStore.InvalidateCurrentAsync(cancellationToken);
+
+                    var expiredMessage =
+                        "Stored LinkedIn session expired during job fetch. Open LinkedIn Session and capture a new one.";
+
+                    if (pagesFetched == 0)
+                    {
+                        return LinkedInJobSearchFetchResult.Failed(expiredMessage, response.StatusCode);
+                    }
+
+                    return LinkedInJobSearchFetchResult.Succeeded(
+                        response.StatusCode,
+                        pagesFetched,
+                        aggregatedJobs.Count,
+                        totalAvailableCount,
+                        aggregatedJobs,
+                        $"{expiredMessage} Partial results from earlier pages were kept.");
+                }
 
                 if (pagesFetched == 0)
                 {

@@ -35,6 +35,10 @@
     var scoringFailedCount =
         TempData["JobsWorkflowScoringFailedCount"] is int scoringFailed ? scoringFailed : 0;
     var query = Model.Query;
+    var showSessionRecoveryAction =
+        string.Equals(alertSeverity, "danger", StringComparison.OrdinalIgnoreCase) &&
+        !string.IsNullOrWhiteSpace(alertMessage) &&
+        alertMessage.Contains("LinkedIn Session", StringComparison.OrdinalIgnoreCase);
 }
 
 <div class="jobs-page d-flex flex-column gap-4">
@@ -99,8 +103,12 @@
 
     @if (!string.IsNullOrWhiteSpace(alertMessage))
     {
-        <div class="alert alert-@alertSeverity mb-0" role="alert">
-            @alertMessage
+        <div class="alert alert-@alertSeverity mb-0 d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3" role="alert">
+            <span>@alertMessage</span>
+            @if (showSessionRecoveryAction)
+            {
+                <a class="btn btn-sm btn-outline-secondary" asp-controller="LinkedInSession" asp-action="Index">Open LinkedIn Session</a>
+            }
         </div>
     }
 

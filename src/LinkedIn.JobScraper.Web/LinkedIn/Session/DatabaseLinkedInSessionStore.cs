@@ -70,6 +70,46 @@ public sealed class DatabaseLinkedInSessionStore : ILinkedInSessionStore, IDispo
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task InvalidateCurrentAsync(CancellationToken cancellationToken)
+    {
+        await EnsureDatabaseAsync(cancellationToken);
+
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var existingRecord = await dbContext.LinkedInSessions.SingleOrDefaultAsync(
+            static session => session.SessionKey == PrimarySessionKey && session.IsActive,
+            cancellationToken);
+
+        if (existingRecord is null)
+        {
+            return;
+        }
+
+        existingRecord.IsActive = false;
+        existingRecord.LastValidatedAtUtc = DateTimeOffset.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task MarkCurrentValidatedAsync(DateTimeOffset validatedAtUtc, CancellationToken cancellationToken)
+    {
+        await EnsureDatabaseAsync(cancellationToken);
+
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var existingRecord = await dbContext.LinkedInSessions.SingleOrDefaultAsync(
+            static session => session.SessionKey == PrimarySessionKey && session.IsActive,
+            cancellationToken);
+
+        if (existingRecord is null)
+        {
+            return;
+        }
+
+        existingRecord.LastValidatedAtUtc = validatedAtUtc;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     private async Task EnsureDatabaseAsync(CancellationToken cancellationToken)
     {
         if (_databaseEnsured)
