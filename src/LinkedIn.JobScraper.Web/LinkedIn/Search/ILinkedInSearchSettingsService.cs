@@ -53,7 +53,17 @@ public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsServi
         record.JobTypeCodesCsv = ToCsv(settings.JobTypeCodes, DefaultJobTypeCodes);
         record.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new InvalidOperationException(
+                "LinkedIn search settings were updated by another operation. Reload the page and try again.",
+                exception);
+        }
+
         return Map(record);
     }
 

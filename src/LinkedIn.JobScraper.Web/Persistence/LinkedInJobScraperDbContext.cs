@@ -37,6 +37,7 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.Property(static job => job.EmploymentStatus).HasMaxLength(128);
                 entity.Property(static job => job.CompanyApplyUrl).HasMaxLength(2048);
                 entity.Property(static job => job.AiLabel).HasMaxLength(64);
+                entity.Property(static job => job.RowVersion).IsRowVersion();
 
                 entity.Property(static job => job.CurrentStatus)
                     .HasConversion<string>()
@@ -87,6 +88,7 @@ public sealed class LinkedInJobScraperDbContext : DbContext
 
                 entity.Property(static settings => settings.ProfileName).HasMaxLength(128).IsRequired();
                 entity.Property(static settings => settings.OutputLanguageCode).HasMaxLength(8).IsRequired();
+                entity.Property(static settings => settings.RowVersion).IsRowVersion();
             });
 
         modelBuilder.Entity<LinkedInSearchSettingsRecord>(
@@ -102,6 +104,7 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.Property(static settings => settings.LocationGeoId).HasMaxLength(32);
                 entity.Property(static settings => settings.WorkplaceTypeCodesCsv).HasMaxLength(128).IsRequired();
                 entity.Property(static settings => settings.JobTypeCodesCsv).HasMaxLength(128).IsRequired();
+                entity.Property(static settings => settings.RowVersion).IsRowVersion();
             });
     }
 }

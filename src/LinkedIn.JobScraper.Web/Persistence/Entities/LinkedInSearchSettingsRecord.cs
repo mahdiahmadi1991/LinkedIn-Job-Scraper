@@ -21,4 +21,6 @@ public sealed class LinkedInSearchSettingsRecord
     public string JobTypeCodesCsv { get; set; } = string.Empty;
 
     public DateTimeOffset UpdatedAtUtc { get; set; }
+
+    public byte[] RowVersion { get; set; } = [];
 }

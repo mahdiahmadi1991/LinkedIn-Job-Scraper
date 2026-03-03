@@ -46,14 +46,25 @@ public sealed class AiSettingsController : Controller
             return View("Index", viewModel);
         }
 
-        var savedProfile = await _aiBehaviorSettingsService.SaveAsync(
-            new AiBehaviorProfile(
-                viewModel.ProfileName,
-                viewModel.BehavioralInstructions,
-                viewModel.PrioritySignals,
-                viewModel.ExclusionSignals,
-                viewModel.OutputLanguageCode),
-            cancellationToken);
+        AiBehaviorProfile savedProfile;
+
+        try
+        {
+            savedProfile = await _aiBehaviorSettingsService.SaveAsync(
+                new AiBehaviorProfile(
+                    viewModel.ProfileName,
+                    viewModel.BehavioralInstructions,
+                    viewModel.PrioritySignals,
+                    viewModel.ExclusionSignals,
+                    viewModel.OutputLanguageCode),
+                cancellationToken);
+        }
+        catch (InvalidOperationException exception)
+        {
+            viewModel.StatusMessage = exception.Message;
+            viewModel.StatusSucceeded = false;
+            return View("Index", viewModel);
+        }
 
         TempData["AiSettingsStatusMessage"] =
             $"Saved AI behavior profile '{savedProfile.ProfileName}' with {AiOutputLanguage.GetDisplayName(savedProfile.OutputLanguageCode)} output.";

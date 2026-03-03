@@ -66,6 +66,8 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The public README is being expanded to reflect the current product reality, local setup, CI posture, safety constraints, and modular-monolith architecture more accurately for portfolio review
 - The documentation set now includes a dedicated architecture overview and troubleshooting guide so maintainers can understand both the intended structure and common local recovery paths more quickly
 - The documentation set now includes a dedicated documentation map so new maintainers and AI agents can choose the right context file quickly instead of re-reading every document
+- A milestone status document now tracks which revised-plan milestones are materially complete, and mutable core entities now use `RowVersion` concurrency tokens with user-friendly conflict handling on settings and status updates
+- The EF design-time DbContext factory now loads `user-secrets` as well, so migration commands stay aligned with the repo's secret-free tracked config model
 
 ## Product Intent
 

@@ -389,7 +389,17 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 ChangedAtUtc = DateTimeOffset.UtcNow
             });
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return new JobStatusChangeResult(
+                false,
+                "Job status was updated by another operation. Refresh the dashboard and try again.",
+                "danger");
+        }
 
         return new JobStatusChangeResult(
             true,

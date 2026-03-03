@@ -36,7 +36,16 @@ public sealed class AiBehaviorSettingsService : IAiBehaviorSettingsService
         record.OutputLanguageCode = AiOutputLanguage.Normalize(profile.OutputLanguageCode);
         record.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new InvalidOperationException(
+                "AI behavior settings were updated by another operation. Reload the page and try again.",
+                exception);
+        }
 
         return Map(record);
     }

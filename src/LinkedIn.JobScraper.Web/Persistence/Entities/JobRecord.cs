@@ -42,5 +42,7 @@ public sealed class JobRecord
 
     public DateTimeOffset? LastScoredAtUtc { get; set; }
 
+    public byte[] RowVersion { get; set; } = [];
+
     public ICollection<JobStatusHistoryRecord> StatusHistory { get; set; } = new List<JobStatusHistoryRecord>();
 }

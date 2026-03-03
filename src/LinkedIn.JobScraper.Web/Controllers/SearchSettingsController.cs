@@ -78,17 +78,28 @@ public sealed class SearchSettingsController : Controller
             return View("Index", viewModel);
         }
 
-        var savedSettings = await _linkedInSearchSettingsService.SaveAsync(
-            new LinkedInSearchSettings(
-                viewModel.ProfileName,
-                viewModel.Keywords,
-                viewModel.LocationInput,
-                viewModel.LocationDisplayName,
-                viewModel.LocationGeoId,
-                viewModel.EasyApply,
-                viewModel.WorkplaceTypeCodes,
-                viewModel.JobTypeCodes),
-            cancellationToken);
+        LinkedInSearchSettings savedSettings;
+
+        try
+        {
+            savedSettings = await _linkedInSearchSettingsService.SaveAsync(
+                new LinkedInSearchSettings(
+                    viewModel.ProfileName,
+                    viewModel.Keywords,
+                    viewModel.LocationInput,
+                    viewModel.LocationDisplayName,
+                    viewModel.LocationGeoId,
+                    viewModel.EasyApply,
+                    viewModel.WorkplaceTypeCodes,
+                    viewModel.JobTypeCodes),
+                cancellationToken);
+        }
+        catch (InvalidOperationException exception)
+        {
+            viewModel.StatusMessage = exception.Message;
+            viewModel.StatusSucceeded = false;
+            return View("Index", viewModel);
+        }
 
         TempData["SearchSettingsStatusMessage"] =
             $"Saved LinkedIn fetch settings for '{savedSettings.ProfileName}'.";

@@ -15,4 +15,6 @@ public sealed class AiBehaviorSettingsRecord
     public string OutputLanguageCode { get; set; } = "en";
 
     public DateTimeOffset UpdatedAtUtc { get; set; }
+
+    public byte[] RowVersion { get; set; } = [];
 }

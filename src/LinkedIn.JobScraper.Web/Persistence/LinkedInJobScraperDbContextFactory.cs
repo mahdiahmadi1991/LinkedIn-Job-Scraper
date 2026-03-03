@@ -15,6 +15,7 @@ public sealed class LinkedInJobScraperDbContextFactory : IDesignTimeDbContextFac
             .SetBasePath(projectDirectory)
             .AddJsonFile("appsettings.json", optional: false)
             .AddJsonFile($"appsettings.{environmentName}.json", optional: true)
+            .AddUserSecrets<Program>(optional: true)
             .AddEnvironmentVariables()
             .Build();
 
@@ -22,7 +23,9 @@ public sealed class LinkedInJobScraperDbContextFactory : IDesignTimeDbContextFac
 
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            throw new InvalidOperationException("SqlServer:ConnectionString is not configured for design-time operations.");
+            throw new InvalidOperationException(
+                "SqlServer:ConnectionString is not configured for design-time operations. " +
+                "Set it with 'dotnet user-secrets set \"SqlServer:ConnectionString\" \"<your-sql-connection-string>\" --project src/LinkedIn.JobScraper.Web' or provide it via environment variables.");
         }
 
         var optionsBuilder = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>();
