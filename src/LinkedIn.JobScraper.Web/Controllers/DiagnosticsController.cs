@@ -97,7 +97,15 @@ public class DiagnosticsController : Controller
                 statusCode: result.StatusCode ?? StatusCodes.Status502BadGateway);
         }
 
-        return Json(result);
+        return Json(
+            new LinkedInFeasibilityResponse(
+                result.Success,
+                result.Message,
+                result.StatusCode,
+                result.ReturnedCount,
+                result.TotalCount,
+                result.SampledJobCardUrns,
+                result.ResponsePreview));
     }
 
     [HttpPost("import-current-search")]
@@ -113,7 +121,17 @@ public class DiagnosticsController : Controller
                 statusCode: result.StatusCode);
         }
 
-        return Json(result);
+        return Json(
+            new DiagnosticsImportResponse(
+                result.Success,
+                result.Message,
+                result.StatusCode,
+                result.PagesFetched,
+                result.FetchedCount,
+                result.TotalAvailableCount,
+                result.ImportedCount,
+                result.UpdatedExistingCount,
+                result.SkippedCount));
     }
 
     [HttpPost("enrich-incomplete-jobs")]
@@ -131,7 +149,16 @@ public class DiagnosticsController : Controller
                 statusCode: result.StatusCode);
         }
 
-        return Json(result);
+        return Json(
+            new DiagnosticsEnrichmentResponse(
+                result.Success,
+                result.Message,
+                result.StatusCode,
+                result.RequestedCount,
+                result.ProcessedCount,
+                result.EnrichedCount,
+                result.FailedCount,
+                result.WarningCount));
     }
 
     [HttpPost("score-ready-jobs")]
@@ -149,6 +176,14 @@ public class DiagnosticsController : Controller
                 statusCode: result.StatusCode);
         }
 
-        return Json(result);
+        return Json(
+            new DiagnosticsScoringResponse(
+                result.Success,
+                result.Message,
+                result.StatusCode,
+                result.RequestedCount,
+                result.ProcessedCount,
+                result.ScoredCount,
+                result.FailedCount));
     }
 }

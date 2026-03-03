@@ -49,6 +49,20 @@ public sealed class DiagnosticsControllerTests
     }
 
     [Fact]
+    public async Task LinkedInFeasibilityReturnsTypedSuccessPayload()
+    {
+        var controller = CreateController();
+
+        var result = await controller.LinkedInFeasibility(false, CancellationToken.None);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var payload = Assert.IsType<LinkedInFeasibilityResponse>(json.Value);
+
+        Assert.True(payload.Success);
+        Assert.Equal(StatusCodes.Status200OK, payload.StatusCode);
+    }
+
+    [Fact]
     public async Task ImportCurrentSearchReturnsProblemDetailsWhenImportFails()
     {
         var controller = CreateController(jobImportService: new FailingJobImportService());
@@ -61,6 +75,21 @@ public sealed class DiagnosticsControllerTests
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, problem.StatusCode);
         Assert.Equal("LinkedIn import diagnostics failed", details.Title);
         Assert.Equal("Import failed.", details.Detail);
+    }
+
+    [Fact]
+    public async Task ImportCurrentSearchReturnsTypedSuccessPayload()
+    {
+        var controller = CreateController(jobImportService: new SuccessfulJobImportService());
+
+        var result = await controller.ImportCurrentSearch(CancellationToken.None);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var payload = Assert.IsType<DiagnosticsImportResponse>(json.Value);
+
+        Assert.True(payload.Success);
+        Assert.Equal(1, payload.PagesFetched);
+        Assert.Equal(25, payload.FetchedCount);
     }
 
     [Fact]
@@ -79,6 +108,21 @@ public sealed class DiagnosticsControllerTests
     }
 
     [Fact]
+    public async Task EnrichIncompleteJobsReturnsTypedSuccessPayload()
+    {
+        var controller = CreateController(jobEnrichmentService: new SuccessfulJobEnrichmentService());
+
+        var result = await controller.EnrichIncompleteJobs(5, CancellationToken.None);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var payload = Assert.IsType<DiagnosticsEnrichmentResponse>(json.Value);
+
+        Assert.True(payload.Success);
+        Assert.Equal(5, payload.RequestedCount);
+        Assert.Equal(4, payload.EnrichedCount);
+    }
+
+    [Fact]
     public async Task ScoreReadyJobsReturnsProblemDetailsWhenScoringFails()
     {
         var controller = CreateController(jobBatchScoringService: new FailingJobBatchScoringService());
@@ -91,6 +135,21 @@ public sealed class DiagnosticsControllerTests
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, problem.StatusCode);
         Assert.Equal("AI scoring diagnostics failed", details.Title);
         Assert.Equal("Scoring failed.", details.Detail);
+    }
+
+    [Fact]
+    public async Task ScoreReadyJobsReturnsTypedSuccessPayload()
+    {
+        var controller = CreateController(jobBatchScoringService: new SuccessfulJobBatchScoringService());
+
+        var result = await controller.ScoreReadyJobs(3, CancellationToken.None);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var payload = Assert.IsType<DiagnosticsScoringResponse>(json.Value);
+
+        Assert.True(payload.Success);
+        Assert.Equal(3, payload.RequestedCount);
+        Assert.Equal(3, payload.ScoredCount);
     }
 
     private static DiagnosticsController CreateController(
@@ -184,6 +243,21 @@ public sealed class DiagnosticsControllerTests
         }
     }
 
+    private sealed class SuccessfulJobImportService : IJobImportService
+    {
+        public Task<JobImportResult> ImportCurrentSearchAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                JobImportResult.Succeeded(
+                    pagesFetched: 1,
+                    fetchedCount: 25,
+                    totalAvailableCount: 100,
+                    importedCount: 5,
+                    updatedExistingCount: 20,
+                    skippedCount: 0));
+        }
+    }
+
     private sealed class FailingJobImportService : IJobImportService
     {
         public Task<JobImportResult> ImportCurrentSearchAsync(CancellationToken cancellationToken)
@@ -200,6 +274,20 @@ public sealed class DiagnosticsControllerTests
         }
     }
 
+    private sealed class SuccessfulJobEnrichmentService : IJobEnrichmentService
+    {
+        public Task<JobEnrichmentResult> EnrichIncompleteJobsAsync(int count, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                JobEnrichmentResult.Succeeded(
+                    requestedCount: count,
+                    processedCount: count,
+                    enrichedCount: count - 1,
+                    failedCount: 0,
+                    warningCount: 1));
+        }
+    }
+
     private sealed class FailingJobEnrichmentService : IJobEnrichmentService
     {
         public Task<JobEnrichmentResult> EnrichIncompleteJobsAsync(int count, CancellationToken cancellationToken)
@@ -213,6 +301,19 @@ public sealed class DiagnosticsControllerTests
         public Task<JobBatchScoringResult> ScoreReadyJobsAsync(int count, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
+        }
+    }
+
+    private sealed class SuccessfulJobBatchScoringService : IJobBatchScoringService
+    {
+        public Task<JobBatchScoringResult> ScoreReadyJobsAsync(int count, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                JobBatchScoringResult.Succeeded(
+                    requestedCount: count,
+                    processedCount: count,
+                    scoredCount: count,
+                    failedCount: 0));
         }
     }
 
