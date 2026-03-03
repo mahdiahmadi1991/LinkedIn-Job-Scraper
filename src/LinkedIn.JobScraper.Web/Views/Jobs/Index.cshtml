@@ -37,11 +37,12 @@
     var query = Model.Query;
 }
 
-<div class="d-flex flex-column gap-4">
-    <section class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
-        <div>
+<div class="jobs-page d-flex flex-column gap-4">
+    <section class="dashboard-hero p-4 p-xl-5 d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-4">
+        <div class="dashboard-hero-copy">
+            <div class="section-label mb-2">Workflow Console</div>
             <h1 class="h2 mb-1">Jobs Dashboard</h1>
-            <p class="text-muted mb-0">Review imported jobs, run the end-to-end fetch flow, and keep manual status current.</p>
+            <p class="dashboard-lead mb-0">Review imported jobs, run the end-to-end fetch flow, and keep manual status current.</p>
         </div>
         <form asp-action="FetchAndScore" method="post" data-fetch-score-form>
             @Html.AntiForgeryToken()
@@ -58,11 +59,11 @@
         </form>
     </section>
 
-    <section class="card d-none" data-fetch-progress aria-live="polite">
+    <section class="card workflow-panel d-none" data-fetch-progress aria-live="polite">
         <div class="card-body d-flex flex-column gap-3">
             <div class="d-flex justify-content-between align-items-center gap-3">
                 <div>
-                    <div class="small text-muted text-uppercase">Fetch Workflow</div>
+                    <div class="section-label">Fetch Workflow</div>
                     <div class="fw-semibold" data-progress-status>Preparing workflow...</div>
                 </div>
                 <div class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></div>
@@ -72,21 +73,21 @@
             </div>
             <div class="row g-2" data-progress-stages>
                 <div class="col-12 col-md-4">
-                    <div class="border rounded p-3 bg-light" data-progress-stage="0">
+                    <div class="progress-stage p-3" data-progress-stage="0">
                         <div class="small text-muted text-uppercase">Step 1</div>
                         <div class="fw-semibold">Fetch new jobs</div>
                         <div class="small text-body-secondary">Replays the stored LinkedIn search and refreshes what is already known.</div>
                     </div>
                 </div>
                 <div class="col-12 col-md-4">
-                    <div class="border rounded p-3 bg-light" data-progress-stage="1">
+                    <div class="progress-stage p-3" data-progress-stage="1">
                         <div class="small text-muted text-uppercase">Step 2</div>
                         <div class="fw-semibold">Enrich details</div>
                         <div class="small text-body-secondary">Loads richer job detail data for the most relevant incomplete records.</div>
                     </div>
                 </div>
                 <div class="col-12 col-md-4">
-                    <div class="border rounded p-3 bg-light" data-progress-stage="2">
+                    <div class="progress-stage p-3" data-progress-stage="2">
                         <div class="small text-muted text-uppercase">Step 3</div>
                         <div class="fw-semibold">Run AI scoring</div>
                         <div class="small text-body-secondary">Scores ready jobs using the current OpenAI behavior profile.</div>
@@ -105,29 +106,29 @@
 
     @if (workflowSummaryAvailable)
     {
-        <section class="card border-0 shadow-sm">
+        <section class="card summary-panel">
             <div class="card-body d-flex flex-column gap-3">
                 <div>
-                    <div class="small text-muted text-uppercase">Last Workflow Result</div>
+                    <div class="section-label">Last Workflow Result</div>
                     <div class="fw-semibold">Structured summary of the latest fetch, enrichment, and AI scoring run.</div>
                 </div>
                 <div class="row g-3">
                     <div class="col-12 col-lg-4">
-                        <div class="border rounded p-3 h-100">
+                        <div class="summary-tile">
                             <div class="small text-muted text-uppercase">Fetch</div>
                             <div class="fw-semibold">@importFetchedCount fetched from @importTotalCount available</div>
                             <div class="small text-body-secondary">@importImportedCount new, @importRefreshedCount refreshed, @importSkippedCount skipped.</div>
                         </div>
                     </div>
                     <div class="col-12 col-lg-4">
-                        <div class="border rounded p-3 h-100">
+                        <div class="summary-tile">
                             <div class="small text-muted text-uppercase">Enrichment</div>
                             <div class="fw-semibold">@enrichmentEnrichedCount enriched out of @enrichmentProcessedCount processed</div>
                             <div class="small text-body-secondary">@enrichmentRequestedCount requested, @enrichmentWarningCount warnings, @enrichmentFailedCount failed.</div>
                         </div>
                     </div>
                     <div class="col-12 col-lg-4">
-                        <div class="border rounded p-3 h-100">
+                        <div class="summary-tile">
                             <div class="small text-muted text-uppercase">AI Scoring</div>
                             <div class="fw-semibold">@scoringScoredCount scored out of @scoringProcessedCount processed</div>
                             <div class="small text-body-secondary">@scoringRequestedCount requested, @scoringFailedCount failed.</div>
@@ -138,7 +139,7 @@
         </section>
     }
 
-    <section class="card">
+    <section class="card filters-panel">
         <div class="card-body">
             <form asp-action="Index" method="get" class="row g-3 align-items-end">
                 <div class="col-12 col-xl-4">
@@ -194,60 +195,59 @@
         </div>
     </section>
 
-    <section class="row g-3">
+    <section class="row g-3 stats-panel">
         <div class="col-6 col-xl-3">
             <div class="card h-100">
-                <div class="card-body">
+                <div class="card-body stat-tile">
                     <div class="text-muted small text-uppercase">Total Jobs</div>
-                    <div class="display-6 fw-semibold">@Model.TotalJobs</div>
+                    <div class="stat-value">@Model.TotalJobs</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-xl-3">
             <div class="card h-100">
-                <div class="card-body">
+                <div class="card-body stat-tile">
                     <div class="text-muted small text-uppercase">Scored</div>
-                    <div class="display-6 fw-semibold">@Model.ScoredJobs</div>
+                    <div class="stat-value">@Model.ScoredJobs</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-xl-3">
             <div class="card h-100">
-                <div class="card-body">
+                <div class="card-body stat-tile">
                     <div class="text-muted small text-uppercase">Strong Matches</div>
-                    <div class="display-6 fw-semibold">@Model.StrongMatches</div>
+                    <div class="stat-value">@Model.StrongMatches</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-xl-3">
             <div class="card h-100">
-                <div class="card-body">
+                <div class="card-body stat-tile">
                     <div class="text-muted small text-uppercase">Unscored</div>
-                    <div class="display-6 fw-semibold">@Model.UnscoredJobs</div>
+                    <div class="stat-value">@Model.UnscoredJobs</div>
                 </div>
             </div>
         </div>
     </section>
 
-    <section class="card">
+    <section class="card jobs-list-panel">
         <div class="card-body p-0">
             @if (Model.Jobs.Count == 0)
             {
-                <div class="p-4 text-center text-muted">
+                <div class="empty-state-card">
                     No jobs are stored yet. Capture a LinkedIn session, then run <strong>Fetch &amp; Score</strong>.
                 </div>
             }
             else
             {
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
+                    <table class="table table-hover align-middle jobs-table">
+                        <thead>
                             <tr>
-                                <th>Job</th>
+                                <th>Opportunity</th>
                                 <th>Fit</th>
-                                <th>Status</th>
-                                <th>Dates</th>
-                                <th>Apply</th>
+                                <th>Workflow</th>
+                                <th>Activity</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -263,43 +263,43 @@
 
                             <tr>
                                 <td class="w-50">
-                                    <div class="fw-semibold">
-                                        <a asp-action="Details" asp-route-jobId="@job.Id" class="link-body-emphasis text-decoration-none">
+                                    <div>
+                                        <a asp-action="Details" asp-route-jobId="@job.Id" class="job-title-link">
                                             @job.Title
                                         </a>
                                     </div>
-                                    <div class="text-muted small">
-                                        @(job.CompanyName ?? "Unknown company")
+                                    <div class="job-meta-wrap">
+                                        <span class="job-meta-pill">@(job.CompanyName ?? "Unknown company")</span>
                                         @if (!string.IsNullOrWhiteSpace(job.LocationName))
                                         {
-                                            <span> | @job.LocationName</span>
+                                            <span class="job-meta-pill">@job.LocationName</span>
                                         }
                                         @if (!string.IsNullOrWhiteSpace(job.EmploymentStatus))
                                         {
-                                            <span> | @job.EmploymentStatus</span>
+                                            <span class="job-meta-pill">@job.EmploymentStatus</span>
                                         }
                                     </div>
                                     @if (!string.IsNullOrWhiteSpace(job.AiSummary))
                                     {
-                                        <div class="small mt-2 text-body-secondary">
+                                        <div class="job-summary line-clamp-2">
                                             @job.AiSummary
                                         </div>
                                     }
                                     @if (!string.IsNullOrWhiteSpace(job.AiWhyMatched) || !string.IsNullOrWhiteSpace(job.AiConcerns))
                                     {
-                                        <div class="small mt-2 d-flex flex-column gap-1">
+                                        <div class="job-signal-stack">
                                             @if (!string.IsNullOrWhiteSpace(job.AiWhyMatched))
                                             {
-                                                <div>
-                                                    <span class="fw-semibold text-success">Why matched:</span>
-                                                    <span class="text-body-secondary">@job.AiWhyMatched</span>
+                                                <div class="job-signal-item">
+                                                    <span class="job-signal-label match">Match</span>
+                                                    <span class="text-body-secondary line-clamp-2">@job.AiWhyMatched</span>
                                                 </div>
                                             }
                                             @if (!string.IsNullOrWhiteSpace(job.AiConcerns))
                                             {
-                                                <div>
-                                                    <span class="fw-semibold text-warning-emphasis">Concerns:</span>
-                                                    <span class="text-body-secondary">@job.AiConcerns</span>
+                                                <div class="job-signal-item">
+                                                    <span class="job-signal-label concern">Concern</span>
+                                                    <span class="text-body-secondary line-clamp-2">@job.AiConcerns</span>
                                                 </div>
                                             }
                                         </div>
@@ -308,11 +308,11 @@
                                 <td>
                                     @if (job.AiScore.HasValue)
                                     {
-                                        <div class="fw-semibold">@job.AiScore / 100</div>
+                                        <div class="fit-score">@job.AiScore<span class="fit-score-muted">/100</span></div>
                                     }
                                     else
                                     {
-                                        <div class="text-muted small">Not scored</div>
+                                        <div class="fit-score-muted">Not scored</div>
                                     }
 
                                     <div class="badge rounded-pill @fitBadgeClass mt-1">
@@ -320,7 +320,7 @@
                                     </div>
                                 </td>
                                 <td>
-                                    <form asp-action="UpdateStatus" method="post" class="d-flex flex-column gap-2">
+                                    <form asp-action="UpdateStatus" method="post" class="d-flex flex-column gap-2 status-form-compact">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="jobId" value="@job.Id" />
                                         <input type="hidden" name="Search" value="@query.Search" />
@@ -338,32 +338,37 @@
                                             }
                                         </select>
                                         <button type="submit" class="btn btn-outline-secondary btn-sm">Save</button>
+                                        <div class="apply-actions d-flex flex-column gap-2 pt-1">
+                                            <a asp-action="Details" asp-route-jobId="@job.Id" class="btn btn-outline-secondary btn-sm">
+                                                Open Details
+                                            </a>
+                                            @if (!string.IsNullOrWhiteSpace(job.CompanyApplyUrl))
+                                            {
+                                                <a class="btn btn-outline-primary btn-sm" href="@job.CompanyApplyUrl" target="_blank" rel="noreferrer">
+                                                    Open Apply
+                                                </a>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted small">No direct apply URL</span>
+                                            }
+                                        </div>
                                     </form>
                                 </td>
                                 <td class="small text-muted">
-                                    <div>Seen: @job.LastSeenAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</div>
-                                    <div>
-                                        Listed:
-                                        @(job.ListedAtUtc.HasValue
-                                            ? job.ListedAtUtc.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
-                                            : "Unknown")
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="d-flex flex-column gap-2">
-                                    <a asp-action="Details" asp-route-jobId="@job.Id" class="btn btn-outline-secondary btn-sm">
-                                        Open Details
-                                    </a>
-                                    @if (!string.IsNullOrWhiteSpace(job.CompanyApplyUrl))
-                                    {
-                                        <a class="btn btn-outline-primary btn-sm" href="@job.CompanyApplyUrl" target="_blank" rel="noreferrer">
-                                            Open Apply
-                                        </a>
-                                    }
-                                    else
-                                    {
-                                        <span class="text-muted small">No direct apply URL</span>
-                                    }
+                                    <div class="dates-stack">
+                                        <div>
+                                            <strong>Last Seen</strong>
+                                            <span>@job.LastSeenAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</span>
+                                        </div>
+                                        <div>
+                                            <strong>Listed</strong>
+                                            <span>
+                                                @(job.ListedAtUtc.HasValue
+                                                    ? job.ListedAtUtc.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
+                                                    : "Unknown")
+                                            </span>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>

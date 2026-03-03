@@ -33,6 +33,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - LinkedIn fetch settings are now persisted in SQL Server, editable in the UI, and include real LinkedIn location lookup that resolves free-text input to a stored geoId
 - LinkedIn search import now fetches multiple pages conservatively, capped at 5 pages / 125 jobs with a small delay between requests to reduce burstiness
 - The `Fetch & Score` workflow now publishes server-driven real-time progress updates over SignalR so the jobs page can reflect actual stage transitions while the request is running
+- The UI is now being refreshed toward a LinkedIn-inspired visual signature with denser cards, cleaner navigation, and a more compact jobs review table without changing the underlying workflow logic
 
 ## Product Intent
 

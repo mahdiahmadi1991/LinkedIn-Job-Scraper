@@ -1,5 +1,21 @@
+:root {
+  --app-blue-700: #0a66c2;
+  --app-blue-800: #004182;
+  --app-blue-050: #e8f3ff;
+  --app-ink-900: #1d2226;
+  --app-ink-700: #38434f;
+  --app-ink-500: #5e6a75;
+  --app-border: #dce6f1;
+  --app-border-strong: #c7d7e8;
+  --app-surface: #f3f6f8;
+  --app-surface-raised: #ffffff;
+  --app-shadow: 0 18px 40px -28px rgba(17, 55, 94, 0.34);
+}
+
 html {
   font-size: 14px;
+  position: relative;
+  min-height: 100%;
 }
 
 @media (min-width: 768px) {
@@ -8,24 +24,375 @@ html {
   }
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-html {
-  position: relative;
-  min-height: 100%;
-}
-
 body {
-  margin-bottom: 60px;
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top right, rgba(10, 102, 194, 0.07), transparent 36%),
+    linear-gradient(180deg, #eef4f9 0%, #f7fafc 30%, #f4f7fa 100%);
+  color: var(--app-ink-900);
+  font-family: "Aptos", "Segoe UI Variable Text", "Segoe UI", sans-serif;
 }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
+a {
+  color: var(--app-blue-700);
+}
+
+a:hover {
+  color: var(--app-blue-800);
+}
+
+.btn:focus,
+.btn:active:focus,
+.btn-link.nav-link:focus,
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+  border-color: rgba(10, 102, 194, 0.35);
+  box-shadow: 0 0 0 0.2rem rgba(10, 102, 194, 0.16);
+}
+
+.btn-primary {
+  border-color: var(--app-blue-700);
+  background-color: var(--app-blue-700);
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
+  border-color: var(--app-blue-800);
+  background-color: var(--app-blue-800);
+}
+
+.btn-outline-primary {
+  border-color: rgba(10, 102, 194, 0.34);
+  color: var(--app-blue-700);
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary:focus,
+.btn-outline-primary:active {
+  border-color: var(--app-blue-700);
+  background-color: var(--app-blue-050);
+  color: var(--app-blue-800);
+}
+
+.form-control,
+.form-select {
+  border-color: var(--app-border-strong);
+}
+
+.app-shell {
+  max-width: 1440px;
+}
+
+.app-topbar {
+  margin: 0 0 1.5rem;
+  border-bottom: 1px solid rgba(10, 102, 194, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 24px -26px rgba(17, 55, 94, 0.45);
+  backdrop-filter: blur(16px);
+}
+
+.app-topbar .navbar-brand {
+  color: var(--app-ink-900);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  margin-right: 0.75rem;
+  border-radius: 0.7rem;
+  background: linear-gradient(135deg, var(--app-blue-700), #2d8cff);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 800;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.app-topbar .nav-link {
+  border-radius: 999px;
+  color: var(--app-ink-700);
+  font-weight: 600;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.app-topbar .nav-link:hover,
+.app-topbar .nav-link:focus {
+  background: rgba(10, 102, 194, 0.08);
+  color: var(--app-blue-700);
+}
+
+.app-main {
+  padding-bottom: 3rem;
+}
+
+.app-footer {
+  padding: 1rem 0 2rem;
+  color: var(--app-ink-500);
+  font-size: 0.9rem;
+}
+
+.card {
+  border: 1px solid var(--app-border);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--app-shadow);
+}
+
+.card .card-body {
+  padding: 1.25rem;
+}
+
+.jobs-page .section-label {
+  color: var(--app-blue-700);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.jobs-page .dashboard-hero {
+  border: 1px solid rgba(10, 102, 194, 0.08);
+  border-radius: 1.25rem;
+  background:
+    linear-gradient(140deg, rgba(255, 255, 255, 0.98), rgba(238, 246, 255, 0.92)),
+    linear-gradient(90deg, rgba(10, 102, 194, 0.06), transparent);
+  box-shadow: 0 22px 42px -30px rgba(17, 55, 94, 0.34);
+}
+
+.jobs-page .dashboard-hero-copy {
+  max-width: 44rem;
+}
+
+.jobs-page .dashboard-lead {
+  color: var(--app-ink-500);
+}
+
+.jobs-page .workflow-panel,
+.jobs-page .filters-panel,
+.jobs-page .summary-panel,
+.jobs-page .stats-panel,
+.jobs-page .jobs-list-panel {
+  overflow: hidden;
+}
+
+.jobs-page .summary-tile,
+.jobs-page .progress-tile,
+.jobs-page .stat-tile {
+  height: 100%;
+  border: 1px solid var(--app-border);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 254, 0.96));
+}
+
+.jobs-page .summary-tile,
+.jobs-page .progress-tile {
+  padding: 1rem;
+}
+
+.jobs-page .stat-tile {
+  padding: 1.1rem 1rem;
+}
+
+.jobs-page .stat-value {
+  font-size: clamp(1.5rem, 2vw, 2.35rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.jobs-page .progress-stage {
+  height: 100%;
+  border: 1px solid var(--app-border);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #fff, #f7fbff);
+  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+}
+
+.jobs-page .jobs-list-panel .card-body {
+  padding: 0;
+}
+
+.jobs-page .jobs-table {
+  margin: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.jobs-page .jobs-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.95rem 1rem;
+  border-bottom: 1px solid var(--app-border);
+  background: linear-gradient(180deg, #f9fbfd, #eef5fb);
+  color: var(--app-ink-500);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.jobs-page .jobs-table tbody tr {
+  border-bottom: 1px solid rgba(220, 230, 241, 0.85);
+}
+
+.jobs-page .jobs-table tbody td {
+  padding: 1rem;
+  border-bottom: 1px solid rgba(220, 230, 241, 0.72);
+  vertical-align: top;
+}
+
+.jobs-page .jobs-table tbody tr:hover {
+  background: rgba(10, 102, 194, 0.03);
+}
+
+.job-title-link {
+  color: var(--app-ink-900);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.job-title-link:hover,
+.job-title-link:focus {
+  color: var(--app-blue-700);
+}
+
+.job-meta-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.4rem;
+}
+
+.job-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: #f1f6fb;
+  color: var(--app-ink-700);
+  font-size: 0.77rem;
+  font-weight: 600;
+}
+
+.line-clamp-2,
+.line-clamp-3 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+}
+
+.line-clamp-2 {
+  -webkit-line-clamp: 2;
+}
+
+.line-clamp-3 {
+  -webkit-line-clamp: 3;
+}
+
+.job-summary {
+  margin-top: 0.7rem;
+  color: var(--app-ink-700);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.job-signal-stack {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+
+.job-signal-item {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.job-signal-label {
+  min-width: 5.4rem;
+  font-weight: 700;
+}
+
+.job-signal-label.match {
+  color: #117a37;
+}
+
+.job-signal-label.concern {
+  color: #9a6700;
+}
+
+.fit-score {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.fit-score-muted {
+  color: var(--app-ink-500);
+  font-size: 0.85rem;
+}
+
+.status-form-compact {
+  min-width: 10rem;
+}
+
+.dates-stack {
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+}
+
+.dates-stack strong {
+  display: block;
+  color: var(--app-ink-700);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.apply-actions {
+  min-width: 9.25rem;
+}
+
+.apply-actions .btn {
+  width: 100%;
+}
+
+.empty-state-card {
+  padding: 3rem 1.5rem;
+  color: var(--app-ink-500);
+  text-align: center;
+}
+
+.form-floating > .form-control-plaintext::placeholder,
+.form-floating > .form-control::placeholder {
   color: var(--bs-secondary-color);
   text-align: end;
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
+.form-floating > .form-control-plaintext:focus::placeholder,
+.form-floating > .form-control:focus::placeholder {
   text-align: start;
+}
+
+@media (max-width: 991.98px) {
+  .app-topbar .navbar-nav {
+    gap: 0.35rem;
+    padding-top: 0.75rem;
+  }
+
+  .jobs-page .jobs-table thead th {
+    position: static;
+  }
 }
