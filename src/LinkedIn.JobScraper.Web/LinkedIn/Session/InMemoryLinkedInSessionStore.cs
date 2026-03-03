@@ -13,7 +13,10 @@ public sealed class InMemoryLinkedInSessionStore : ILinkedInSessionStore
     public Task SaveAsync(LinkedInSessionSnapshot sessionSnapshot, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _currentSnapshot = sessionSnapshot;
+        _currentSnapshot = new LinkedInSessionSnapshot(
+            LinkedInSessionHeaderSanitizer.SanitizeForStorage(sessionSnapshot.Headers),
+            sessionSnapshot.CapturedAtUtc,
+            sessionSnapshot.Source);
         return Task.CompletedTask;
     }
 

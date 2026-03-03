@@ -74,6 +74,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - Diagnostics JSON endpoints now use `ProblemDetails` for failure responses as well, so the remaining high-value AJAX/JSON surfaces share the same error-reporting pattern
 - CI-safe orchestration coverage now includes `JobsDashboardService.RunFetchAndScoreAsync`, with explicit tests for progress stage ordering and early-stop behavior when import fails
 - The `Jobs` table now defines explicit non-unique indexes for the dashboard's real filter/sort fields (`CurrentStatus`, `AiLabel`, `AiScore`, `LastSeenAtUtc`, `ListedAtUtc`) to reduce read-path scan pressure without changing behavior
+- Persisted LinkedIn session payloads are now minimized before storage: only the headers needed for future authenticated reuse are retained, while transient request-shape headers such as `Accept`, `Referer`, and PEM metadata are discarded
 
 ## Product Intent
 

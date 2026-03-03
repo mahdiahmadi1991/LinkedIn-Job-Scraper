@@ -46,6 +46,7 @@ public sealed class DatabaseLinkedInSessionStore : ILinkedInSessionStore, IDispo
         await EnsureDatabaseAsync(cancellationToken);
 
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var sanitizedHeaders = LinkedInSessionHeaderSanitizer.SanitizeForStorage(sessionSnapshot.Headers);
 
         var existingRecord = await dbContext.LinkedInSessions.SingleOrDefaultAsync(
             static session => session.SessionKey == PrimarySessionKey,
@@ -61,7 +62,7 @@ public sealed class DatabaseLinkedInSessionStore : ILinkedInSessionStore, IDispo
             dbContext.LinkedInSessions.Add(existingRecord);
         }
 
-        existingRecord.RequestHeadersJson = JsonSerializer.Serialize(sessionSnapshot.Headers);
+        existingRecord.RequestHeadersJson = JsonSerializer.Serialize(sanitizedHeaders);
         existingRecord.CapturedAtUtc = sessionSnapshot.CapturedAtUtc;
         existingRecord.Source = sessionSnapshot.Source;
         existingRecord.IsActive = true;
