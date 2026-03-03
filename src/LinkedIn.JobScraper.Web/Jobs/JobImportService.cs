@@ -30,11 +30,13 @@ public sealed class JobImportService : IJobImportService
         if (searchResult.Jobs.Count == 0)
         {
             return JobImportResult.Succeeded(
+                searchResult.PagesFetched,
                 searchResult.ReturnedCount,
                 searchResult.TotalCount,
                 0,
                 0,
-                0);
+                0,
+                searchResult.Message);
         }
 
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -102,10 +104,12 @@ public sealed class JobImportService : IJobImportService
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return JobImportResult.Succeeded(
+            searchResult.PagesFetched,
             searchResult.ReturnedCount,
             searchResult.TotalCount,
             importedCount,
             updatedExistingCount,
-            skippedCount);
+            skippedCount,
+            searchResult.Message);
     }
 }

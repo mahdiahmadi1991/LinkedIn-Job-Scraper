@@ -8,6 +8,10 @@ namespace LinkedIn.JobScraper.Web.LinkedIn.Search;
 public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
 {
     private const string JobPostingCardType = "com.linkedin.voyager.dash.jobs.JobPostingCard";
+    private const int SearchPageCap = LinkedInRequestDefaults.DefaultSearchPageCap;
+    private const int SearchJobCap = LinkedInRequestDefaults.DefaultSearchJobCap;
+    private static readonly TimeSpan SearchPageDelay = TimeSpan.FromMilliseconds(
+        LinkedInRequestDefaults.DefaultSearchPageDelayMilliseconds);
 
     private readonly ILinkedInApiClient _linkedInApiClient;
     private readonly ILogger<LinkedInJobSearchService> _logger;
@@ -39,65 +43,144 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
 
         var searchSettings = await _linkedInSearchSettingsService.GetActiveAsync(cancellationToken);
         var headers = MergeHeaders(sessionSnapshot, searchSettings);
-        var response = await _linkedInApiClient.GetAsync(
-            LinkedInRequestDefaults.BuildSearchUri(
-                searchSettings.Keywords,
-                searchSettings.LocationGeoId,
-                searchSettings.EasyApply,
-                searchSettings.JobTypeCodes,
-                searchSettings.WorkplaceTypeCodes),
-            headers,
-            cancellationToken);
+        var aggregatedJobs = new List<LinkedInJobSearchItem>(SearchJobCap);
+        var seenJobIds = new HashSet<string>(StringComparer.Ordinal);
+        var totalAvailableCount = 0;
+        var pagesFetched = 0;
 
-        if (response.StatusCode != (int)HttpStatusCode.OK)
+        for (var pageIndex = 0; pageIndex < SearchPageCap && aggregatedJobs.Count < SearchJobCap; pageIndex++)
         {
-            Log.LinkedInSearchReturnedNonSuccessStatusCode(_logger, response.StatusCode);
+            var remainingCapacity = SearchJobCap - aggregatedJobs.Count;
+            var requestedCount = Math.Min(LinkedInRequestDefaults.DefaultSearchPageSize, remainingCapacity);
+            var start = pageIndex * LinkedInRequestDefaults.DefaultSearchPageSize;
 
-            return LinkedInJobSearchFetchResult.Failed(
-                $"LinkedIn job search failed with HTTP {response.StatusCode}.",
-                response.StatusCode);
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(response.Body);
-            var root = document.RootElement;
-
-            if (!root.TryGetProperty("data", out var dataNode))
+            if (totalAvailableCount > 0 && start >= totalAvailableCount)
             {
-                return LinkedInJobSearchFetchResult.Failed(
-                    "Response JSON did not contain a top-level 'data' node.",
-                    StatusCodes.Status502BadGateway);
+                break;
             }
 
-            var returnedCardUrns = ReadReturnedCardUrns(dataNode);
-            var totalCount = ReadTotalCount(dataNode);
-            var cardsByUrn = ReadIncludedCards(root);
+            var response = await _linkedInApiClient.GetAsync(
+                LinkedInRequestDefaults.BuildSearchUri(
+                    searchSettings.Keywords,
+                    searchSettings.LocationGeoId,
+                    searchSettings.EasyApply,
+                    searchSettings.JobTypeCodes,
+                    searchSettings.WorkplaceTypeCodes,
+                    start,
+                    requestedCount),
+                headers,
+                cancellationToken);
 
-            var orderedJobs = new List<LinkedInJobSearchItem>(returnedCardUrns.Count);
-
-            foreach (var cardUrn in returnedCardUrns)
+            if (response.StatusCode != (int)HttpStatusCode.OK)
             {
-                if (cardsByUrn.TryGetValue(cardUrn, out var item))
+                Log.LinkedInSearchReturnedNonSuccessStatusCode(_logger, response.StatusCode);
+
+                if (pagesFetched == 0)
                 {
-                    orderedJobs.Add(item);
+                    return LinkedInJobSearchFetchResult.Failed(
+                        $"LinkedIn job search failed with HTTP {response.StatusCode}.",
+                        response.StatusCode);
+                }
+
+                return LinkedInJobSearchFetchResult.Succeeded(
+                    response.StatusCode,
+                    pagesFetched,
+                    aggregatedJobs.Count,
+                    totalAvailableCount,
+                    aggregatedJobs,
+                    $"LinkedIn job search stopped early after page {pagesFetched} because LinkedIn returned HTTP {response.StatusCode}.");
+            }
+
+            LinkedInJobSearchPageResult pageResult;
+
+            try
+            {
+                pageResult = ParsePage(response.Body);
+            }
+            catch (JsonException exception)
+            {
+                Log.LinkedInSearchFailedToParseJson(_logger, exception);
+
+                if (pagesFetched == 0)
+                {
+                    return LinkedInJobSearchFetchResult.Failed(
+                        "LinkedIn search response was not valid JSON.",
+                        StatusCodes.Status502BadGateway);
+                }
+
+                return LinkedInJobSearchFetchResult.Succeeded(
+                    response.StatusCode,
+                    pagesFetched,
+                    aggregatedJobs.Count,
+                    totalAvailableCount,
+                    aggregatedJobs,
+                    "LinkedIn job search stopped early because a later page response could not be parsed.");
+            }
+
+            if (pageResult.TotalCount > 0)
+            {
+                totalAvailableCount = pageResult.TotalCount;
+            }
+
+            foreach (var job in pageResult.Jobs)
+            {
+                if (seenJobIds.Add(job.LinkedInJobId))
+                {
+                    aggregatedJobs.Add(job);
                 }
             }
 
-            return LinkedInJobSearchFetchResult.Succeeded(
-                response.StatusCode,
-                returnedCardUrns.Count,
-                totalCount,
-                orderedJobs);
-        }
-        catch (JsonException exception)
-        {
-            Log.LinkedInSearchFailedToParseJson(_logger, exception);
+            pagesFetched++;
 
-            return LinkedInJobSearchFetchResult.Failed(
-                "LinkedIn search response was not valid JSON.",
-                StatusCodes.Status502BadGateway);
+            if (pageResult.ReturnedCount == 0 ||
+                pageResult.ReturnedCount < requestedCount ||
+                aggregatedJobs.Count >= SearchJobCap)
+            {
+                break;
+            }
+
+            if (totalAvailableCount > 0 &&
+                ((pageIndex + 1) * LinkedInRequestDefaults.DefaultSearchPageSize) >= totalAvailableCount)
+            {
+                break;
+            }
+
+            await Task.Delay(SearchPageDelay, cancellationToken);
         }
+
+        return LinkedInJobSearchFetchResult.Succeeded(
+            StatusCodes.Status200OK,
+            pagesFetched,
+            aggregatedJobs.Count,
+            totalAvailableCount,
+            aggregatedJobs);
+    }
+
+    private static LinkedInJobSearchPageResult ParsePage(string body)
+    {
+        using var document = JsonDocument.Parse(body);
+        var root = document.RootElement;
+
+        if (!root.TryGetProperty("data", out var dataNode))
+        {
+            throw new JsonException("Response JSON did not contain a top-level 'data' node.");
+        }
+
+        var returnedCardUrns = ReadReturnedCardUrns(dataNode);
+        var totalCount = ReadTotalCount(dataNode);
+        var cardsByUrn = ReadIncludedCards(root);
+
+        var orderedJobs = new List<LinkedInJobSearchItem>(returnedCardUrns.Count);
+
+        foreach (var cardUrn in returnedCardUrns)
+        {
+            if (cardsByUrn.TryGetValue(cardUrn, out var item))
+            {
+                orderedJobs.Add(item);
+            }
+        }
+
+        return new LinkedInJobSearchPageResult(returnedCardUrns.Count, totalCount, orderedJobs);
     }
 
     private static Dictionary<string, LinkedInJobSearchItem> ReadIncludedCards(JsonElement root)
@@ -278,6 +361,11 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
         return merged;
     }
 }
+
+internal sealed record LinkedInJobSearchPageResult(
+    int ReturnedCount,
+    int TotalCount,
+    IReadOnlyList<LinkedInJobSearchItem> Jobs);
 
 internal static partial class Log
 {

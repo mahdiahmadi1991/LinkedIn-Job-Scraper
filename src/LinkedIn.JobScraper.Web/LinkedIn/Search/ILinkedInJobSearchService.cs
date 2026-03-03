@@ -9,19 +9,22 @@ public sealed record LinkedInJobSearchFetchResult(
     bool Success,
     string Message,
     int StatusCode,
+    int PagesFetched,
     int ReturnedCount,
     int TotalCount,
     IReadOnlyList<LinkedInJobSearchItem> Jobs)
 {
     public static LinkedInJobSearchFetchResult Failed(string message, int statusCode) =>
-        new(false, message, statusCode, 0, 0, Array.Empty<LinkedInJobSearchItem>());
+        new(false, message, statusCode, 0, 0, 0, Array.Empty<LinkedInJobSearchItem>());
 
     public static LinkedInJobSearchFetchResult Succeeded(
         int statusCode,
+        int pagesFetched,
         int returnedCount,
         int totalCount,
-        IReadOnlyList<LinkedInJobSearchItem> jobs) =>
-        new(true, "LinkedIn search fetch succeeded.", statusCode, returnedCount, totalCount, jobs);
+        IReadOnlyList<LinkedInJobSearchItem> jobs,
+        string message = "LinkedIn search fetch succeeded.") =>
+        new(true, message, statusCode, pagesFetched, returnedCount, totalCount, jobs);
 }
 
 public sealed record LinkedInJobSearchItem(

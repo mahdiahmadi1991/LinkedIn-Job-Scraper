@@ -9,6 +9,7 @@ public sealed record JobImportResult(
     bool Success,
     string Message,
     int StatusCode,
+    int PagesFetched,
     int FetchedCount,
     int TotalAvailableCount,
     int ImportedCount,
@@ -16,18 +17,21 @@ public sealed record JobImportResult(
     int SkippedCount)
 {
     public static JobImportResult Failed(string message, int statusCode) =>
-        new(false, message, statusCode, 0, 0, 0, 0, 0);
+        new(false, message, statusCode, 0, 0, 0, 0, 0, 0);
 
     public static JobImportResult Succeeded(
+        int pagesFetched,
         int fetchedCount,
         int totalAvailableCount,
         int importedCount,
         int updatedExistingCount,
-        int skippedCount) =>
+        int skippedCount,
+        string message = "LinkedIn job import completed.") =>
         new(
             true,
-            "LinkedIn job import completed.",
+            message,
             StatusCodes.Status200OK,
+            pagesFetched,
             fetchedCount,
             totalAvailableCount,
             importedCount,

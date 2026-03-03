@@ -21,6 +21,9 @@ public static class LinkedInRequestDefaults
         "Voyager - Search Single Typeahead=jobs-geo";
 
     public const int DefaultSearchPageSize = 25;
+    public const int DefaultSearchPageCap = 5;
+    public const int DefaultSearchJobCap = 125;
+    public const int DefaultSearchPageDelayMilliseconds = 650;
 
     public static Uri BuildSearchUri(
         string keywords,
