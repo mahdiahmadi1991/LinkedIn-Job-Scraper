@@ -1,7 +1,10 @@
 using LinkedIn.JobScraper.Web.AI;
+using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Diagnostics;
 using LinkedIn.JobScraper.Web.Jobs;
+using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.Controllers;
 
@@ -12,17 +15,62 @@ public class DiagnosticsController : Controller
     private readonly LinkedInFeasibilityProbe _linkedInFeasibilityProbe;
     private readonly IJobEnrichmentService _jobEnrichmentService;
     private readonly IJobImportService _jobImportService;
+    private readonly IOptions<SqlServerOptions> _sqlServerOptions;
+    private readonly IOptions<OpenAiSecurityOptions> _openAiSecurityOptions;
+    private readonly ILinkedInSessionStore _linkedInSessionStore;
 
     public DiagnosticsController(
         LinkedInFeasibilityProbe linkedInFeasibilityProbe,
         IJobImportService jobImportService,
         IJobEnrichmentService jobEnrichmentService,
-        IJobBatchScoringService jobBatchScoringService)
+        IJobBatchScoringService jobBatchScoringService,
+        IOptions<SqlServerOptions> sqlServerOptions,
+        IOptions<OpenAiSecurityOptions> openAiSecurityOptions,
+        ILinkedInSessionStore linkedInSessionStore)
     {
         _linkedInFeasibilityProbe = linkedInFeasibilityProbe;
         _jobImportService = jobImportService;
         _jobEnrichmentService = jobEnrichmentService;
         _jobBatchScoringService = jobBatchScoringService;
+        _sqlServerOptions = sqlServerOptions;
+        _openAiSecurityOptions = openAiSecurityOptions;
+        _linkedInSessionStore = linkedInSessionStore;
+    }
+
+    [HttpGet("summary")]
+    public async Task<IActionResult> Summary(CancellationToken cancellationToken)
+    {
+        LinkedInSessionSnapshot? sessionSnapshot = null;
+        string? sessionReadError = null;
+
+        try
+        {
+            sessionSnapshot = await _linkedInSessionStore.GetCurrentAsync(cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            sessionReadError = exception.Message;
+        }
+
+        var sqlServerOptions = _sqlServerOptions.Value;
+        var openAiSecurityOptions = _openAiSecurityOptions.Value;
+
+        return Json(new
+        {
+            config = new
+            {
+                sqlServerConfigured = !string.IsNullOrWhiteSpace(sqlServerOptions.ConnectionString),
+                openAiApiKeyConfigured = !string.IsNullOrWhiteSpace(openAiSecurityOptions.ApiKey),
+                openAiModelConfigured = !string.IsNullOrWhiteSpace(openAiSecurityOptions.Model)
+            },
+            session = new
+            {
+                storedSessionAvailable = sessionSnapshot is not null,
+                capturedAtUtc = sessionSnapshot?.CapturedAtUtc,
+                source = sessionSnapshot?.Source,
+                readError = sessionReadError
+            }
+        });
     }
 
     [HttpGet("linkedin-feasibility")]
