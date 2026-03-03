@@ -23,8 +23,22 @@ jobs:
       - name: Restore
         run: dotnet restore LinkedIn.JobScraper.sln
 
-      - name: Build
-        run: dotnet build LinkedIn.JobScraper.sln --configuration Release --no-restore
+      - name: Format Check
+        run: dotnet format LinkedIn.JobScraper.sln --verify-no-changes --no-restore
+
+      - name: Build (Warnings as Errors)
+        run: dotnet build LinkedIn.JobScraper.sln --configuration Release --no-restore -warnaserror
 
       - name: Test
         run: dotnet test LinkedIn.JobScraper.sln --configuration Release --no-build
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
