@@ -26,10 +26,12 @@ public static class ServiceCollectionExtensions
         services.AddOptions<LinkedInBrowserAutomationOptions>()
             .Bind(configuration.GetSection(LinkedInBrowserAutomationOptions.SectionName));
 
+        services.AddSignalR();
         services.AddSingleton<ISqlServerConnectionStringProvider, ConfiguredSqlServerConnectionStringProvider>();
         services.AddSingleton<ILinkedInSessionStore, DatabaseLinkedInSessionStore>();
         services.AddSingleton<ILinkedInBrowserLoginService, PlaywrightLinkedInBrowserLoginService>();
         services.AddSingleton<ILinkedInSearchSettingsService, LinkedInSearchSettingsService>();
+        services.AddSingleton<IJobsWorkflowProgressNotifier, SignalRJobsWorkflowProgressNotifier>();
         services.AddTransient<ILinkedInSessionVerificationService, LinkedInSessionVerificationService>();
         services.AddTransient<IAiBehaviorSettingsService, AiBehaviorSettingsService>();
         services.AddTransient<ILinkedInLocationLookupService, LinkedInLocationLookupService>();

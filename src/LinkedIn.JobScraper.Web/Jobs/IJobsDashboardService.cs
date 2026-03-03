@@ -13,7 +13,9 @@ public interface IJobsDashboardService
         Guid jobId,
         CancellationToken cancellationToken);
 
-    Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(CancellationToken cancellationToken);
+    Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(
+        string? progressConnectionId,
+        CancellationToken cancellationToken);
 
     Task<JobStatusChangeResult> UpdateStatusAsync(
         Guid jobId,

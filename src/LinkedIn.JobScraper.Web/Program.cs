@@ -1,5 +1,6 @@
 using System.Net;
 using LinkedIn.JobScraper.Web.Composition;
+using LinkedIn.JobScraper.Web.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +26,7 @@ app.UseAuthorization();
 
 app.MapHealthChecks("/health");
 app.MapStaticAssets();
+app.MapHub<JobsWorkflowProgressHub>("/hubs/jobs-workflow-progress");
 
 app.MapControllerRoute(
     name: "default",

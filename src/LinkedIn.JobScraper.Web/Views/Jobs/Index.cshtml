@@ -378,6 +378,7 @@
 
 @section Scripts
 {
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
     <script>
         (() => {
             const form = document.querySelector("[data-fetch-score-form]");
@@ -392,13 +393,11 @@
             const progressBar = document.querySelector("[data-progress-bar]");
             const progressStatus = document.querySelector("[data-progress-status]");
             const stageNodes = Array.from(document.querySelectorAll("[data-progress-stage]"));
-            const stageMessages = [
-                "Fetching the latest jobs from LinkedIn...",
-                "Enriching newly discovered job details...",
-                "Scoring ready jobs with AI..."
-            ];
+            const stageOrder = ["fetch", "enrichment", "scoring"];
+            let signalRConnection = null;
+            let isSubmitting = false;
 
-            form.addEventListener("submit", () => {
+            const setBusyState = () => {
                 if (button) {
                     button.disabled = true;
                 }
@@ -414,32 +413,142 @@
                 if (progressPanel) {
                     progressPanel.classList.remove("d-none");
                 }
+            };
 
-                let stageIndex = 0;
+            const setIdleState = () => {
+                if (button) {
+                    button.disabled = false;
+                }
 
-                const applyStage = (index) => {
-                    if (progressStatus && stageMessages[index]) {
-                        progressStatus.textContent = stageMessages[index];
-                    }
+                if (idleText) {
+                    idleText.classList.remove("d-none");
+                }
 
-                    if (progressBar) {
-                        const widths = ["34%", "68%", "96%"];
-                        progressBar.style.width = widths[index] ?? "96%";
-                    }
+                if (busyText) {
+                    busyText.classList.add("d-none");
+                }
+            };
 
-                    stageNodes.forEach((node, currentIndex) => {
-                        node.classList.toggle("border-primary", currentIndex === index);
-                        node.classList.toggle("bg-primary-subtle", currentIndex === index);
-                        node.classList.toggle("text-primary-emphasis", currentIndex === index);
+            const applyProgressUpdate = (update) => {
+                if (!update) {
+                    return;
+                }
+
+                if (progressPanel) {
+                    progressPanel.classList.remove("d-none");
+                }
+
+                if (progressStatus && update.message) {
+                    progressStatus.textContent = update.message;
+                }
+
+                if (progressBar) {
+                    const percent = Math.max(0, Math.min(100, Number(update.percent) || 0));
+                    progressBar.style.width = `${percent}%`;
+                    progressBar.setAttribute("aria-valuenow", String(percent));
+                    progressBar.classList.toggle("progress-bar-animated", update.state === "running");
+                    progressBar.classList.toggle("progress-bar-striped", update.state === "running");
+                    progressBar.classList.toggle("bg-warning", update.state === "warning");
+                    progressBar.classList.toggle("bg-danger", update.state === "failed");
+                    progressBar.classList.toggle("bg-success", update.state === "completed");
+                }
+
+                const activeIndex = stageOrder.indexOf(update.stage);
+
+                stageNodes.forEach((node, currentIndex) => {
+                    const isActive = currentIndex === activeIndex;
+                    const isCompleted = activeIndex > currentIndex || update.stage === "completed";
+
+                    node.classList.toggle("border-primary", isActive);
+                    node.classList.toggle("bg-primary-subtle", isActive);
+                    node.classList.toggle("text-primary-emphasis", isActive);
+                    node.classList.toggle("border-success", !isActive && isCompleted);
+                    node.classList.toggle("bg-success-subtle", !isActive && isCompleted);
+                    node.classList.toggle("text-success-emphasis", !isActive && isCompleted);
+                });
+            };
+
+            const ensureConnection = async () => {
+                if (!window.signalR) {
+                    return null;
+                }
+
+                if (signalRConnection && signalRConnection.state === "Connected") {
+                    return signalRConnection;
+                }
+
+                signalRConnection = new signalR.HubConnectionBuilder()
+                    .withUrl("/hubs/jobs-workflow-progress")
+                    .withAutomaticReconnect()
+                    .build();
+
+                signalRConnection.on("WorkflowProgress", (update) => {
+                    applyProgressUpdate(update);
+                });
+
+                await signalRConnection.start();
+                return signalRConnection;
+            };
+
+            form.addEventListener("submit", async (event) => {
+                if (isSubmitting) {
+                    event.preventDefault();
+                    return;
+                }
+
+                let connection = null;
+
+                try {
+                    connection = await ensureConnection();
+                } catch {
+                    connection = null;
+                }
+
+                if (!connection || !connection.connectionId) {
+                    setBusyState();
+                    return;
+                }
+
+                event.preventDefault();
+                isSubmitting = true;
+                setBusyState();
+                applyProgressUpdate({
+                    state: "running",
+                    stage: "fetch",
+                    percent: 6,
+                    message: "Starting Fetch & Score workflow..."
+                });
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: "POST",
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest",
+                            "X-Progress-ConnectionId": connection.connectionId
+                        },
+                        body: new FormData(form),
+                        credentials: "same-origin"
                     });
-                };
 
-                applyStage(stageIndex);
+                    const payload = await response.json();
 
-                window.setInterval(() => {
-                    stageIndex = Math.min(stageIndex + 1, stageMessages.length - 1);
-                    applyStage(stageIndex);
-                }, 1800);
+                    if (!response.ok || !payload || !payload.redirectUrl) {
+                        throw new Error(payload?.message || "Fetch & Score request failed.");
+                    }
+
+                    window.setTimeout(() => {
+                        window.location.assign(payload.redirectUrl);
+                    }, 250);
+                } catch (error) {
+                    applyProgressUpdate({
+                        state: "failed",
+                        stage: "completed",
+                        percent: 100,
+                        message: error instanceof Error ? error.message : "Fetch & Score request failed."
+                    });
+                    isSubmitting = false;
+                    setIdleState();
+                }
             });
         })();
     </script>

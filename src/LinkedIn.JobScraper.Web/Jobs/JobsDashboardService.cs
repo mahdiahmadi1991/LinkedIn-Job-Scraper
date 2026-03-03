@@ -10,18 +10,21 @@ public sealed class JobsDashboardService : IJobsDashboardService
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly IJobEnrichmentService _jobEnrichmentService;
     private readonly IJobImportService _jobImportService;
+    private readonly IJobsWorkflowProgressNotifier _jobsWorkflowProgressNotifier;
     private readonly IJobBatchScoringService _jobBatchScoringService;
 
     public JobsDashboardService(
         IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
         IJobImportService jobImportService,
         IJobEnrichmentService jobEnrichmentService,
-        IJobBatchScoringService jobBatchScoringService)
+        IJobBatchScoringService jobBatchScoringService,
+        IJobsWorkflowProgressNotifier jobsWorkflowProgressNotifier)
     {
         _dbContextFactory = dbContextFactory;
         _jobImportService = jobImportService;
         _jobEnrichmentService = jobEnrichmentService;
         _jobBatchScoringService = jobBatchScoringService;
+        _jobsWorkflowProgressNotifier = jobsWorkflowProgressNotifier;
     }
 
     public async Task<JobsDashboardSnapshot> GetSnapshotAsync(
@@ -162,12 +165,36 @@ public sealed class JobsDashboardService : IJobsDashboardService
             job.AiConcerns);
     }
 
-    public async Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(CancellationToken cancellationToken)
+    public async Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(
+        string? progressConnectionId,
+        CancellationToken cancellationToken)
     {
+        await PublishProgressAsync(
+            progressConnectionId,
+            new JobsWorkflowProgressUpdate(
+                "running",
+                "fetch",
+                10,
+                "Fetching job pages from LinkedIn..."),
+            cancellationToken);
+
         var importResult = await _jobImportService.ImportCurrentSearchAsync(cancellationToken);
 
         if (!importResult.Success)
         {
+            await PublishProgressAsync(
+                progressConnectionId,
+                new JobsWorkflowProgressUpdate(
+                    "failed",
+                    "fetch",
+                    100,
+                    importResult.Message,
+                    importResult.FetchedCount,
+                    importResult.FetchedCount,
+                    importResult.ImportedCount + importResult.UpdatedExistingCount,
+                    1),
+                cancellationToken);
+
             return new FetchAndScoreWorkflowResult(
                 false,
                 $"Fetch failed. {importResult.Message}",
@@ -177,13 +204,54 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 null);
         }
 
+        await PublishProgressAsync(
+            progressConnectionId,
+            new JobsWorkflowProgressUpdate(
+                "running",
+                "fetch",
+                38,
+                $"Fetch completed. {importResult.FetchedCount} jobs collected across {importResult.PagesFetched} page(s).",
+                importResult.TotalAvailableCount,
+                importResult.FetchedCount,
+                importResult.ImportedCount + importResult.UpdatedExistingCount,
+                0),
+            cancellationToken);
+
         var enrichmentBatchSize = Math.Clamp(
             importResult.ImportedCount > 0 ? importResult.ImportedCount : Math.Min(importResult.FetchedCount, 5),
             1,
             25);
 
+        await PublishProgressAsync(
+            progressConnectionId,
+            new JobsWorkflowProgressUpdate(
+                "running",
+                "enrichment",
+                52,
+                $"Enriching up to {enrichmentBatchSize} jobs with detail data...",
+                enrichmentBatchSize,
+                0,
+                0,
+                0),
+            cancellationToken);
+
         var enrichmentResult = await _jobEnrichmentService.EnrichIncompleteJobsAsync(
             enrichmentBatchSize,
+            cancellationToken);
+
+        await PublishProgressAsync(
+            progressConnectionId,
+            new JobsWorkflowProgressUpdate(
+                enrichmentResult.Success ? "running" : "warning",
+                "enrichment",
+                72,
+                enrichmentResult.Success
+                    ? $"Enrichment completed. {enrichmentResult.EnrichedCount} jobs updated."
+                    : $"Enrichment issue: {enrichmentResult.Message}",
+                enrichmentResult.RequestedCount,
+                enrichmentResult.ProcessedCount,
+                enrichmentResult.EnrichedCount,
+                enrichmentResult.FailedCount),
             cancellationToken);
 
         var scoringBatchSize = Math.Clamp(
@@ -192,6 +260,19 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 : Math.Max(Math.Min(importResult.ImportedCount, 5), 1),
             1,
             10);
+
+        await PublishProgressAsync(
+            progressConnectionId,
+            new JobsWorkflowProgressUpdate(
+                "running",
+                "scoring",
+                84,
+                $"Scoring up to {scoringBatchSize} jobs with AI...",
+                scoringBatchSize,
+                0,
+                0,
+                0),
+            cancellationToken);
 
         var scoringResult = await _jobBatchScoringService.ScoreReadyJobsAsync(
             scoringBatchSize,
@@ -223,13 +304,28 @@ public sealed class JobsDashboardService : IJobsDashboardService
             messageParts.Add($"AI scoring issue: {scoringResult.Message}");
         }
 
-        return new FetchAndScoreWorkflowResult(
+        var workflowResult = new FetchAndScoreWorkflowResult(
             true,
             string.Join(' ', messageParts),
             severity,
             importResult,
             enrichmentResult,
             scoringResult);
+
+        await PublishProgressAsync(
+            progressConnectionId,
+            new JobsWorkflowProgressUpdate(
+                severity == "danger" ? "failed" : severity == "warning" ? "warning" : "completed",
+                "completed",
+                100,
+                workflowResult.Message,
+                scoringResult.RequestedCount,
+                scoringResult.ProcessedCount,
+                scoringResult.ScoredCount,
+                scoringResult.FailedCount),
+            cancellationToken);
+
+        return workflowResult;
     }
 
     public async Task<JobStatusChangeResult> UpdateStatusAsync(
@@ -264,5 +360,13 @@ public sealed class JobsDashboardService : IJobsDashboardService
             true,
             $"Status for '{job.Title}' was updated to {status}.",
             "success");
+    }
+
+    private Task PublishProgressAsync(
+        string? progressConnectionId,
+        JobsWorkflowProgressUpdate update,
+        CancellationToken cancellationToken)
+    {
+        return _jobsWorkflowProgressNotifier.PublishAsync(progressConnectionId, update, cancellationToken);
     }
 }

@@ -39,14 +39,28 @@ public class JobsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> FetchAndScore(
         [FromForm] JobsDashboardQuery query,
+        [FromHeader(Name = "X-Progress-ConnectionId")] string? progressConnectionId,
         CancellationToken cancellationToken)
     {
-        var result = await _jobsDashboardService.RunFetchAndScoreAsync(cancellationToken);
+        var result = await _jobsDashboardService.RunFetchAndScoreAsync(progressConnectionId, cancellationToken);
         TempData["JobsAlertMessage"] = result.Message;
         TempData["JobsAlertSeverity"] = result.Severity;
         WriteWorkflowSummary(result);
 
-        return RedirectToAction(nameof(Index), BuildRouteValues(query));
+        var redirectUrl = Url.Action(nameof(Index), BuildRouteValues(query)) ?? Url.Action(nameof(Index)) ?? "/Jobs";
+
+        if (Request.Headers.XRequestedWith == "XMLHttpRequest")
+        {
+            return Json(new
+            {
+                success = result.Success,
+                severity = result.Severity,
+                message = result.Message,
+                redirectUrl
+            });
+        }
+
+        return Redirect(redirectUrl);
     }
 
     [HttpPost]
