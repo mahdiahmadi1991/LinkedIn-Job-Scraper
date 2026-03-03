@@ -54,54 +54,70 @@ public sealed class JobImportService : IJobImportService
         var existingById = existingJobs.ToDictionary(
             static job => job.LinkedInJobId,
             StringComparer.Ordinal);
+        var insertedRecords = new List<JobRecord>(searchResult.Jobs.Count);
 
         var importedCount = 0;
         var updatedExistingCount = 0;
         var skippedCount = 0;
+        var originalAutoDetectChanges = dbContext.ChangeTracker.AutoDetectChangesEnabled;
+        dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
 
-        foreach (var job in searchResult.Jobs)
+        try
         {
-            if (existingById.TryGetValue(job.LinkedInJobId, out var existing))
+            foreach (var job in searchResult.Jobs)
             {
-                existing.LastSeenAtUtc = seenAtUtc;
-
-                if (string.IsNullOrWhiteSpace(existing.LocationName) &&
-                    !string.IsNullOrWhiteSpace(job.LocationName))
+                if (existingById.TryGetValue(job.LinkedInJobId, out var existing))
                 {
-                    existing.LocationName = job.LocationName;
+                    existing.LastSeenAtUtc = seenAtUtc;
+
+                    if (string.IsNullOrWhiteSpace(existing.LocationName) &&
+                        !string.IsNullOrWhiteSpace(job.LocationName))
+                    {
+                        existing.LocationName = job.LocationName;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(existing.CompanyName) &&
+                        !string.IsNullOrWhiteSpace(job.CompanyName))
+                    {
+                        existing.CompanyName = job.CompanyName;
+                    }
+
+                    updatedExistingCount++;
+                    skippedCount++;
+                    continue;
                 }
 
-                if (string.IsNullOrWhiteSpace(existing.CompanyName) &&
-                    !string.IsNullOrWhiteSpace(job.CompanyName))
+                var record = new JobRecord
                 {
-                    existing.CompanyName = job.CompanyName;
-                }
+                    LinkedInJobId = job.LinkedInJobId,
+                    LinkedInJobPostingUrn = job.LinkedInJobPostingUrn,
+                    LinkedInJobCardUrn = job.LinkedInJobCardUrn,
+                    Title = job.Title,
+                    CompanyName = job.CompanyName,
+                    LocationName = job.LocationName,
+                    ListedAtUtc = job.ListedAtUtc,
+                    FirstDiscoveredAtUtc = seenAtUtc,
+                    LastSeenAtUtc = seenAtUtc,
+                    CurrentStatus = JobWorkflowStatus.New
+                };
 
-                updatedExistingCount++;
-                skippedCount++;
-                continue;
+                insertedRecords.Add(record);
+                existingById[job.LinkedInJobId] = record;
+                importedCount++;
             }
 
-            var record = new JobRecord
+            if (insertedRecords.Count > 0)
             {
-                LinkedInJobId = job.LinkedInJobId,
-                LinkedInJobPostingUrn = job.LinkedInJobPostingUrn,
-                LinkedInJobCardUrn = job.LinkedInJobCardUrn,
-                Title = job.Title,
-                CompanyName = job.CompanyName,
-                LocationName = job.LocationName,
-                ListedAtUtc = job.ListedAtUtc,
-                FirstDiscoveredAtUtc = seenAtUtc,
-                LastSeenAtUtc = seenAtUtc,
-                CurrentStatus = JobWorkflowStatus.New
-            };
+                dbContext.Jobs.AddRange(insertedRecords);
+            }
 
-            dbContext.Jobs.Add(record);
-            existingById[job.LinkedInJobId] = record;
-            importedCount++;
+            dbContext.ChangeTracker.DetectChanges();
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
+        finally
+        {
+            dbContext.ChangeTracker.AutoDetectChangesEnabled = originalAutoDetectChanges;
+        }
 
         return JobImportResult.Succeeded(
             searchResult.PagesFetched,

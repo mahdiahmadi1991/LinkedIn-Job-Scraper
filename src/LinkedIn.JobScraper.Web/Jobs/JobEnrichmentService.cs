@@ -49,72 +49,82 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
         var processedCount = 0;
         string? firstFailureMessage = null;
         int? firstFailureStatusCode = null;
+        var originalAutoDetectChanges = dbContext.ChangeTracker.AutoDetectChangesEnabled;
+        dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
 
-        foreach (var job in jobsToEnrich)
+        try
         {
-            processedCount++;
-
-            var detailResult = await _linkedInJobDetailService.FetchAsync(job.LinkedInJobId, cancellationToken);
-
-            if (!detailResult.Success || detailResult.Job is null)
+            foreach (var job in jobsToEnrich)
             {
-                failedCount++;
-                firstFailureMessage ??= detailResult.Message;
-                firstFailureStatusCode ??= detailResult.StatusCode;
-                continue;
+                processedCount++;
+
+                var detailResult = await _linkedInJobDetailService.FetchAsync(job.LinkedInJobId, cancellationToken);
+
+                if (!detailResult.Success || detailResult.Job is null)
+                {
+                    failedCount++;
+                    firstFailureMessage ??= detailResult.Message;
+                    firstFailureStatusCode ??= detailResult.StatusCode;
+                    continue;
+                }
+
+                warningCount += detailResult.Warnings.Count;
+
+                var detail = detailResult.Job;
+                job.Title = detail.Title;
+
+                if (!string.IsNullOrWhiteSpace(detail.CompanyName))
+                {
+                    job.CompanyName = detail.CompanyName;
+                }
+
+                if (!string.IsNullOrWhiteSpace(detail.LocationName))
+                {
+                    job.LocationName = detail.LocationName;
+                }
+
+                if (!string.IsNullOrWhiteSpace(detail.EmploymentStatus))
+                {
+                    job.EmploymentStatus = detail.EmploymentStatus;
+                }
+
+                if (!string.IsNullOrWhiteSpace(detail.Description))
+                {
+                    job.Description = detail.Description;
+                }
+
+                if (!string.IsNullOrWhiteSpace(detail.CompanyApplyUrl))
+                {
+                    job.CompanyApplyUrl = detail.CompanyApplyUrl;
+                }
+
+                if (detail.ListedAtUtc.HasValue)
+                {
+                    job.ListedAtUtc = detail.ListedAtUtc;
+                }
+
+                enrichedCount++;
             }
 
-            warningCount += detailResult.Warnings.Count;
-
-            var detail = detailResult.Job;
-            job.Title = detail.Title;
-
-            if (!string.IsNullOrWhiteSpace(detail.CompanyName))
+            if (enrichedCount == 0 && failedCount > 0)
             {
-                job.CompanyName = detail.CompanyName;
+                return JobEnrichmentResult.Failed(
+                    firstFailureMessage ?? "No jobs were enriched.",
+                    firstFailureStatusCode ?? StatusCodes.Status502BadGateway,
+                    maxCount,
+                    processedCount,
+                    0,
+                    failedCount,
+                    warningCount);
             }
 
-            if (!string.IsNullOrWhiteSpace(detail.LocationName))
-            {
-                job.LocationName = detail.LocationName;
-            }
-
-            if (!string.IsNullOrWhiteSpace(detail.EmploymentStatus))
-            {
-                job.EmploymentStatus = detail.EmploymentStatus;
-            }
-
-            if (!string.IsNullOrWhiteSpace(detail.Description))
-            {
-                job.Description = detail.Description;
-            }
-
-            if (!string.IsNullOrWhiteSpace(detail.CompanyApplyUrl))
-            {
-                job.CompanyApplyUrl = detail.CompanyApplyUrl;
-            }
-
-            if (detail.ListedAtUtc.HasValue)
-            {
-                job.ListedAtUtc = detail.ListedAtUtc;
-            }
-
-            enrichedCount++;
+            dbContext.ChangeTracker.DetectChanges();
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
-
-        if (enrichedCount == 0 && failedCount > 0)
+        finally
         {
-            return JobEnrichmentResult.Failed(
-                firstFailureMessage ?? "No jobs were enriched.",
-                firstFailureStatusCode ?? StatusCodes.Status502BadGateway,
-                maxCount,
-                processedCount,
-                0,
-                failedCount,
-                warningCount);
+            dbContext.ChangeTracker.AutoDetectChangesEnabled = originalAutoDetectChanges;
         }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
 
         return JobEnrichmentResult.Succeeded(
             maxCount,

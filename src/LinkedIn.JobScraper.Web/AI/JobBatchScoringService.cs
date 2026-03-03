@@ -48,54 +48,64 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
         var failedCount = 0;
         string? firstFailureMessage = null;
         int? firstFailureStatusCode = null;
+        var originalAutoDetectChanges = dbContext.ChangeTracker.AutoDetectChangesEnabled;
+        dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
 
-        foreach (var job in jobsToScore)
+        try
         {
-            processedCount++;
-
-            var result = await _jobScoringGateway.ScoreAsync(
-                new JobScoringGatewayRequest(
-                    job.Title,
-                    job.Description!,
-                    behaviorProfile.BehavioralInstructions,
-                    behaviorProfile.PrioritySignals,
-                    behaviorProfile.ExclusionSignals,
-                    job.CompanyName,
-                    job.LocationName,
-                    job.EmploymentStatus),
-                cancellationToken);
-
-            if (!result.CanScore ||
-                !result.Score.HasValue ||
-                string.IsNullOrWhiteSpace(result.Label))
+            foreach (var job in jobsToScore)
             {
-                failedCount++;
-                firstFailureMessage ??= result.Message;
-                firstFailureStatusCode ??= result.StatusCode ?? StatusCodes.Status502BadGateway;
-                continue;
+                processedCount++;
+
+                var result = await _jobScoringGateway.ScoreAsync(
+                    new JobScoringGatewayRequest(
+                        job.Title,
+                        job.Description!,
+                        behaviorProfile.BehavioralInstructions,
+                        behaviorProfile.PrioritySignals,
+                        behaviorProfile.ExclusionSignals,
+                        job.CompanyName,
+                        job.LocationName,
+                        job.EmploymentStatus),
+                    cancellationToken);
+
+                if (!result.CanScore ||
+                    !result.Score.HasValue ||
+                    string.IsNullOrWhiteSpace(result.Label))
+                {
+                    failedCount++;
+                    firstFailureMessage ??= result.Message;
+                    firstFailureStatusCode ??= result.StatusCode ?? StatusCodes.Status502BadGateway;
+                    continue;
+                }
+
+                job.AiScore = result.Score.Value;
+                job.AiLabel = result.Label;
+                job.AiSummary = result.Summary;
+                job.AiWhyMatched = result.WhyMatched;
+                job.AiConcerns = result.Concerns;
+                job.LastScoredAtUtc = DateTimeOffset.UtcNow;
+                scoredCount++;
             }
 
-            job.AiScore = result.Score.Value;
-            job.AiLabel = result.Label;
-            job.AiSummary = result.Summary;
-            job.AiWhyMatched = result.WhyMatched;
-            job.AiConcerns = result.Concerns;
-            job.LastScoredAtUtc = DateTimeOffset.UtcNow;
-            scoredCount++;
-        }
+            if (scoredCount == 0 && failedCount > 0)
+            {
+                return JobBatchScoringResult.Failed(
+                    firstFailureMessage ?? "No jobs were scored.",
+                    firstFailureStatusCode ?? StatusCodes.Status502BadGateway,
+                    maxCount,
+                    processedCount,
+                    0,
+                    failedCount);
+            }
 
-        if (scoredCount == 0 && failedCount > 0)
+            dbContext.ChangeTracker.DetectChanges();
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        finally
         {
-            return JobBatchScoringResult.Failed(
-                firstFailureMessage ?? "No jobs were scored.",
-                firstFailureStatusCode ?? StatusCodes.Status502BadGateway,
-                maxCount,
-                processedCount,
-                0,
-                failedCount);
+            dbContext.ChangeTracker.AutoDetectChangesEnabled = originalAutoDetectChanges;
         }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
 
         return JobBatchScoringResult.Succeeded(maxCount, processedCount, scoredCount, failedCount);
     }

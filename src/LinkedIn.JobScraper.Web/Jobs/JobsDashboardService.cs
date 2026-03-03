@@ -99,11 +99,20 @@ public sealed class JobsDashboardService : IJobsDashboardService
             .Take(200)
             .ToListAsync(cancellationToken);
 
-        var totalJobs = await dbContext.Jobs.CountAsync(cancellationToken);
-        var scoredJobs = await dbContext.Jobs.CountAsync(static job => job.AiScore != null, cancellationToken);
-        var strongMatches = await dbContext.Jobs.CountAsync(
-            static job => job.AiLabel == "StrongMatch",
-            cancellationToken);
+        var dashboardCounts = await dbContext.Jobs
+            .GroupBy(static _ => 1)
+            .Select(
+                static jobs => new
+                {
+                    TotalJobs = jobs.Count(),
+                    ScoredJobs = jobs.Count(job => job.AiScore != null),
+                    StrongMatches = jobs.Count(job => job.AiLabel == "StrongMatch")
+                })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        var totalJobs = dashboardCounts?.TotalJobs ?? 0;
+        var scoredJobs = dashboardCounts?.ScoredJobs ?? 0;
+        var strongMatches = dashboardCounts?.StrongMatches ?? 0;
 
         return new JobsDashboardSnapshot(
             totalJobs,
