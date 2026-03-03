@@ -1,6 +1,7 @@
 using System.Net;
 using LinkedIn.JobScraper.Web.Composition;
 using LinkedIn.JobScraper.Web.Jobs;
+using LinkedIn.JobScraper.Web.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +21,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseBasicSecurityHeaders();
 app.UseRouting();
 
 app.UseAuthorization();

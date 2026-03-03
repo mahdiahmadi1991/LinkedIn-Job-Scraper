@@ -53,6 +53,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - A CI-safe automated test foundation is now being introduced, starting with pure/unit-level coverage that requires no live SQL Server, LinkedIn session, or OpenAI credentials
 - Tracked development configuration is moving to secret-free defaults, with local sensitive values expected to come from user-secrets or environment variables instead of committed appsettings
 - Missing SQL Server and OpenAI runtime configuration is now being validated with actionable error messages that point developers to the expected user-secrets setup
+- The HTTP pipeline now applies a small set of low-risk security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`) globally, while preserving any explicitly-set response values
 
 ## Product Intent
 
