@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Text;
 using LinkedIn.JobScraper.Web.Configuration;
 
@@ -7,13 +8,20 @@ namespace LinkedIn.JobScraper.Web.Logging;
 public sealed class PerRunFileLoggerProvider : ILoggerProvider, ISupportExternalScope
 {
     private const int LogMessageMaxLength = 4000;
+    private static readonly string[] InformationalDiagnosticsCategories =
+    [
+        "LinkedIn.JobScraper.Web.LinkedIn.Api.LinkedInApiClient",
+        "LinkedIn.JobScraper.Web.LinkedIn.Search.LinkedInJobSearchService",
+        "LinkedIn.JobScraper.Web.Jobs.JobImportService"
+    ];
 
     private readonly StreamWriter _writer;
     private readonly object _writeLock = new();
     private readonly ConcurrentDictionary<string, PerRunFileLogger> _loggers = new(StringComparer.Ordinal);
+    private readonly bool _enableInformationalDiagnostics;
     private IExternalScopeProvider? _scopeProvider;
 
-    public PerRunFileLoggerProvider(string filePath)
+    public PerRunFileLoggerProvider(string filePath, bool enableInformationalDiagnostics = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
@@ -29,6 +37,7 @@ public sealed class PerRunFileLoggerProvider : ILoggerProvider, ISupportExternal
         {
             AutoFlush = true
         };
+        _enableInformationalDiagnostics = enableInformationalDiagnostics;
     }
 
     public ILogger CreateLogger(string categoryName)
@@ -103,15 +112,32 @@ public sealed class PerRunFileLoggerProvider : ILoggerProvider, ISupportExternal
         }
     }
 
-    private static bool ShouldSkip(string categoryName, LogLevel logLevel)
+    private bool ShouldSkip(string categoryName, LogLevel logLevel)
     {
         if (logLevel == LogLevel.None || logLevel == LogLevel.Trace || logLevel == LogLevel.Debug)
         {
             return true;
         }
 
+        if (logLevel == LogLevel.Information &&
+            !ShouldIncludeInformationalDiagnosticsCategory(categoryName))
+        {
+            return true;
+        }
+
         return string.Equals(categoryName, "Microsoft.EntityFrameworkCore.Database.Command", StringComparison.Ordinal)
             && logLevel < LogLevel.Warning;
+    }
+
+    private bool ShouldIncludeInformationalDiagnosticsCategory(string categoryName)
+    {
+        if (!_enableInformationalDiagnostics)
+        {
+            return false;
+        }
+
+        return InformationalDiagnosticsCategories.Any(
+            configuredCategory => string.Equals(configuredCategory, categoryName, StringComparison.Ordinal));
     }
 
     private sealed class PerRunFileLogger : ILogger
@@ -132,7 +158,7 @@ public sealed class PerRunFileLoggerProvider : ILoggerProvider, ISupportExternal
 
         public bool IsEnabled(LogLevel logLevel)
         {
-            return logLevel >= LogLevel.Warning;
+            return !_provider.ShouldSkip(_categoryName, logLevel);
         }
 
         public void Log<TState>(

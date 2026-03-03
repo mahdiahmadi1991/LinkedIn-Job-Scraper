@@ -29,6 +29,9 @@ public static class ServiceCollectionExtensions
         services.AddOptions<OpenAiSecurityOptions>()
             .Bind(configuration.GetSection(OpenAiSecurityOptions.SectionName));
 
+        services.AddOptions<LinkedInFetchDiagnosticsOptions>()
+            .Bind(configuration.GetSection(LinkedInFetchDiagnosticsOptions.SectionName));
+
         services.AddOptions<LinkedInBrowserAutomationOptions>()
             .Bind(configuration.GetSection(LinkedInBrowserAutomationOptions.SectionName));
 

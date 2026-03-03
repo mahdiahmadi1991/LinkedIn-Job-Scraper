@@ -1,7 +1,9 @@
 using LinkedIn.JobScraper.Web.LinkedIn.Api;
 using LinkedIn.JobScraper.Web.LinkedIn.Search;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
+using LinkedIn.JobScraper.Web.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.Tests.LinkedIn;
 
@@ -17,6 +19,7 @@ public sealed class LinkedInJobSearchServiceTests
             apiClient,
             sessionStore,
             new FakeLinkedInSearchSettingsService(),
+            Options.Create(new LinkedInFetchDiagnosticsOptions()),
             NullLogger<LinkedInJobSearchService>.Instance);
 
         var result = await service.FetchCurrentSearchAsync(CancellationToken.None);
@@ -42,6 +45,7 @@ public sealed class LinkedInJobSearchServiceTests
             apiClient,
             sessionStore,
             new FakeLinkedInSearchSettingsService(),
+            Options.Create(new LinkedInFetchDiagnosticsOptions()),
             NullLogger<LinkedInJobSearchService>.Instance);
 
         var result = await service.FetchCurrentSearchAsync(CancellationToken.None);

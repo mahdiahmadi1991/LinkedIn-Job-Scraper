@@ -12,8 +12,9 @@ var perRunLogFilePath = PerRunLogFilePath.Create(
     builder.Environment.ContentRootPath,
     DateTimeOffset.UtcNow,
     Environment.ProcessId);
+var enableFetchDiagnostics = builder.Configuration.GetValue<bool>("LinkedIn:FetchDiagnostics:Enabled");
 
-builder.Logging.AddProvider(new PerRunFileLoggerProvider(perRunLogFilePath));
+builder.Logging.AddProvider(new PerRunFileLoggerProvider(perRunLogFilePath, enableFetchDiagnostics));
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();

@@ -1,27 +1,37 @@
+using System.Diagnostics;
+using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.LinkedIn.Search;
 using LinkedIn.JobScraper.Web.Persistence;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.Jobs;
 
 public sealed class JobImportService : IJobImportService
 {
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
+    private readonly LinkedInFetchDiagnosticsOptions _fetchDiagnosticsOptions;
     private readonly ILinkedInJobSearchService _linkedInJobSearchService;
+    private readonly ILogger<JobImportService> _logger;
 
     public JobImportService(
         IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
-        ILinkedInJobSearchService linkedInJobSearchService)
+        ILinkedInJobSearchService linkedInJobSearchService,
+        IOptions<LinkedInFetchDiagnosticsOptions> fetchDiagnosticsOptions,
+        ILogger<JobImportService> logger)
     {
         _dbContextFactory = dbContextFactory;
         _linkedInJobSearchService = linkedInJobSearchService;
+        _fetchDiagnosticsOptions = fetchDiagnosticsOptions.Value;
+        _logger = logger;
     }
 
     public async Task<JobImportResult> ImportCurrentSearchAsync(
         CancellationToken cancellationToken,
         JobStageProgressCallback? progressCallback = null)
     {
+        var diagnosticsEnabled = _fetchDiagnosticsOptions.Enabled;
         var searchResult = await _linkedInJobSearchService.FetchCurrentSearchAsync(cancellationToken);
 
         if (!searchResult.Success)
@@ -65,6 +75,15 @@ public sealed class JobImportService : IJobImportService
         var originalAutoDetectChanges = dbContext.ChangeTracker.AutoDetectChangesEnabled;
         dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
 
+        if (diagnosticsEnabled)
+        {
+            _logger.LogInformation(
+                "Job import diagnostics started. SearchReturnedCount={SearchReturnedCount}, DistinctLinkedInJobIds={DistinctLinkedInJobIds}, ExistingMatchCount={ExistingMatchCount}",
+                searchResult.Jobs.Count,
+                jobIds.Length,
+                existingJobs.Count);
+        }
+
         if (progressCallback is not null)
         {
             await progressCallback(
@@ -102,6 +121,15 @@ public sealed class JobImportService : IJobImportService
                     updatedExistingCount++;
                     skippedCount++;
                     progressMessage = $"Reconciled {processedCount + 1} of {searchResult.Jobs.Count}: refreshed '{job.Title}'.";
+
+                    if (diagnosticsEnabled)
+                    {
+                        _logger.LogInformation(
+                            "Job import diagnostics reconciled existing job. Sequence={Sequence}, LinkedInJobId={LinkedInJobId}, Title={Title}, Action=Refreshed",
+                            processedCount + 1,
+                            job.LinkedInJobId,
+                            SensitiveDataRedaction.SanitizeForMessage(job.Title, 256));
+                    }
                 }
                 else
                 {
@@ -123,6 +151,15 @@ public sealed class JobImportService : IJobImportService
                     existingById[job.LinkedInJobId] = record;
                     importedCount++;
                     progressMessage = $"Reconciled {processedCount + 1} of {searchResult.Jobs.Count}: added '{job.Title}'.";
+
+                    if (diagnosticsEnabled)
+                    {
+                        _logger.LogInformation(
+                            "Job import diagnostics reconciled new job. Sequence={Sequence}, LinkedInJobId={LinkedInJobId}, Title={Title}, Action=Inserted",
+                            processedCount + 1,
+                            job.LinkedInJobId,
+                            SensitiveDataRedaction.SanitizeForMessage(job.Title, 256));
+                    }
                 }
 
                 processedCount++;
@@ -145,6 +182,16 @@ public sealed class JobImportService : IJobImportService
                 dbContext.Jobs.AddRange(insertedRecords);
             }
 
+            if (diagnosticsEnabled)
+            {
+                _logger.LogInformation(
+                    "Job import diagnostics persisting reconciliation results. ProcessedCount={ProcessedCount}, ImportedCount={ImportedCount}, RefreshedCount={RefreshedCount}, InsertBatchCount={InsertBatchCount}",
+                    processedCount,
+                    importedCount,
+                    updatedExistingCount,
+                    insertedRecords.Count);
+            }
+
             if (progressCallback is not null)
             {
                 await progressCallback(
@@ -157,8 +204,21 @@ public sealed class JobImportService : IJobImportService
                     cancellationToken);
             }
 
+            var saveStopwatch = Stopwatch.StartNew();
             dbContext.ChangeTracker.DetectChanges();
             await dbContext.SaveChangesAsync(cancellationToken);
+            saveStopwatch.Stop();
+
+            if (diagnosticsEnabled)
+            {
+                _logger.LogInformation(
+                    "Job import diagnostics completed persistence. ProcessedCount={ProcessedCount}, ImportedCount={ImportedCount}, RefreshedCount={RefreshedCount}, SkippedCount={SkippedCount}, SaveElapsedMilliseconds={SaveElapsedMilliseconds}",
+                    processedCount,
+                    importedCount,
+                    updatedExistingCount,
+                    skippedCount,
+                    saveStopwatch.ElapsedMilliseconds);
+            }
         }
         finally
         {

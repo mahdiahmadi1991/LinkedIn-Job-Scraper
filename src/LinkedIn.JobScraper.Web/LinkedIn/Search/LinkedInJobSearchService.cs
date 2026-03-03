@@ -1,7 +1,9 @@
 using System.Net;
 using System.Text.Json;
+using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.LinkedIn.Api;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
+using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.LinkedIn.Search;
 
@@ -14,6 +16,7 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
         LinkedInRequestDefaults.DefaultSearchPageDelayMilliseconds);
 
     private readonly ILinkedInApiClient _linkedInApiClient;
+    private readonly LinkedInFetchDiagnosticsOptions _fetchDiagnosticsOptions;
     private readonly ILogger<LinkedInJobSearchService> _logger;
     private readonly ILinkedInSearchSettingsService _linkedInSearchSettingsService;
     private readonly ILinkedInSessionStore _sessionStore;
@@ -22,16 +25,19 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
         ILinkedInApiClient linkedInApiClient,
         ILinkedInSessionStore sessionStore,
         ILinkedInSearchSettingsService linkedInSearchSettingsService,
+        IOptions<LinkedInFetchDiagnosticsOptions> fetchDiagnosticsOptions,
         ILogger<LinkedInJobSearchService> logger)
     {
         _linkedInApiClient = linkedInApiClient;
         _sessionStore = sessionStore;
         _linkedInSearchSettingsService = linkedInSearchSettingsService;
+        _fetchDiagnosticsOptions = fetchDiagnosticsOptions.Value;
         _logger = logger;
     }
 
     public async Task<LinkedInJobSearchFetchResult> FetchCurrentSearchAsync(CancellationToken cancellationToken)
     {
+        var diagnosticsEnabled = _fetchDiagnosticsOptions.Enabled;
         var sessionSnapshot = await _sessionStore.GetCurrentAsync(cancellationToken);
 
         if (sessionSnapshot is null)
@@ -48,6 +54,20 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
         var totalAvailableCount = 0;
         var pagesFetched = 0;
 
+        if (diagnosticsEnabled)
+        {
+            _logger.LogInformation(
+                "LinkedIn fetch diagnostics started. SessionSource={SessionSource}, SearchPageCap={SearchPageCap}, SearchJobCap={SearchJobCap}, Keywords={Keywords}, LocationGeoId={LocationGeoId}, EasyApply={EasyApply}, JobTypes={JobTypes}, WorkplaceTypes={WorkplaceTypes}",
+                sessionSnapshot.Source,
+                SearchPageCap,
+                SearchJobCap,
+                SensitiveDataRedaction.SanitizeForMessage(searchSettings.Keywords, 256),
+                searchSettings.LocationGeoId ?? "(default)",
+                searchSettings.EasyApply,
+                searchSettings.JobTypeCodes.Count == 0 ? "(default)" : string.Join(',', searchSettings.JobTypeCodes),
+                searchSettings.WorkplaceTypeCodes.Count == 0 ? "(default)" : string.Join(',', searchSettings.WorkplaceTypeCodes));
+        }
+
         for (var pageIndex = 0; pageIndex < SearchPageCap && aggregatedJobs.Count < SearchJobCap; pageIndex++)
         {
             var remainingCapacity = SearchJobCap - aggregatedJobs.Count;
@@ -56,7 +76,28 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
 
             if (totalAvailableCount > 0 && start >= totalAvailableCount)
             {
+                if (diagnosticsEnabled)
+                {
+                    _logger.LogInformation(
+                        "LinkedIn fetch diagnostics stopped before page request. Reason=ReachedTotalCount, PageIndex={PageIndex}, Start={Start}, TotalAvailableCount={TotalAvailableCount}, AggregatedCount={AggregatedCount}",
+                        pageIndex,
+                        start,
+                        totalAvailableCount,
+                        aggregatedJobs.Count);
+                }
+
                 break;
+            }
+
+            if (diagnosticsEnabled)
+            {
+                _logger.LogInformation(
+                    "LinkedIn fetch diagnostics requesting page. PageIndex={PageIndex}, Start={Start}, RequestedCount={RequestedCount}, RemainingCapacity={RemainingCapacity}, AggregatedCount={AggregatedCount}",
+                    pageIndex,
+                    start,
+                    requestedCount,
+                    remainingCapacity,
+                    aggregatedJobs.Count);
             }
 
             var response = await _linkedInApiClient.GetAsync(
@@ -73,6 +114,16 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
 
             if (response.StatusCode != (int)HttpStatusCode.OK)
             {
+                if (diagnosticsEnabled)
+                {
+                    _logger.LogInformation(
+                        "LinkedIn fetch diagnostics received non-success page response. PageIndex={PageIndex}, StatusCode={StatusCode}, PagesFetched={PagesFetched}, AggregatedCount={AggregatedCount}",
+                        pageIndex,
+                        response.StatusCode,
+                        pagesFetched,
+                        aggregatedJobs.Count);
+                }
+
                 Log.LinkedInSearchReturnedNonSuccessStatusCode(_logger, response.StatusCode);
 
                 if (response.StatusCode == (int)HttpStatusCode.Unauthorized)
@@ -120,6 +171,16 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
             }
             catch (JsonException exception)
             {
+                if (diagnosticsEnabled)
+                {
+                    _logger.LogInformation(
+                        "LinkedIn fetch diagnostics failed to parse page JSON. PageIndex={PageIndex}, PagesFetched={PagesFetched}, AggregatedCount={AggregatedCount}, BodyLength={BodyLength}",
+                        pageIndex,
+                        pagesFetched,
+                        aggregatedJobs.Count,
+                        response.Body.Length);
+                }
+
                 Log.LinkedInSearchFailedToParseJson(_logger, exception);
 
                 if (pagesFetched == 0)
@@ -143,6 +204,8 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
                 totalAvailableCount = pageResult.TotalCount;
             }
 
+            var aggregatedCountBeforeMerge = aggregatedJobs.Count;
+
             foreach (var job in pageResult.Jobs)
             {
                 if (seenJobIds.Add(job.LinkedInJobId))
@@ -152,21 +215,80 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
             }
 
             pagesFetched++;
+            var addedCount = aggregatedJobs.Count - aggregatedCountBeforeMerge;
+            var duplicateCount = Math.Max(0, pageResult.Jobs.Count - addedCount);
+
+            if (diagnosticsEnabled)
+            {
+                _logger.LogInformation(
+                    "LinkedIn fetch diagnostics parsed page. PageIndex={PageIndex}, ReturnedCardCount={ReturnedCardCount}, ParsedJobCount={ParsedJobCount}, AddedCount={AddedCount}, DuplicateCount={DuplicateCount}, AggregatedCount={AggregatedCount}, TotalAvailableCount={TotalAvailableCount}",
+                    pageIndex,
+                    pageResult.ReturnedCount,
+                    pageResult.Jobs.Count,
+                    addedCount,
+                    duplicateCount,
+                    aggregatedJobs.Count,
+                    totalAvailableCount);
+            }
 
             if (pageResult.ReturnedCount == 0 ||
                 pageResult.ReturnedCount < requestedCount ||
                 aggregatedJobs.Count >= SearchJobCap)
             {
+                if (diagnosticsEnabled)
+                {
+                    var stopReason = pageResult.ReturnedCount == 0
+                        ? "EmptyPage"
+                        : pageResult.ReturnedCount < requestedCount
+                            ? "ShortPage"
+                            : "ReachedJobCap";
+
+                    _logger.LogInformation(
+                        "LinkedIn fetch diagnostics stopped after page. Reason={StopReason}, PageIndex={PageIndex}, ReturnedCardCount={ReturnedCardCount}, RequestedCount={RequestedCount}, AggregatedCount={AggregatedCount}",
+                        stopReason,
+                        pageIndex,
+                        pageResult.ReturnedCount,
+                        requestedCount,
+                        aggregatedJobs.Count);
+                }
+
                 break;
             }
 
             if (totalAvailableCount > 0 &&
                 ((pageIndex + 1) * LinkedInRequestDefaults.DefaultSearchPageSize) >= totalAvailableCount)
             {
+                if (diagnosticsEnabled)
+                {
+                    _logger.LogInformation(
+                        "LinkedIn fetch diagnostics stopped after page. Reason=ReachedTotalCount, PageIndex={PageIndex}, NextStart={NextStart}, TotalAvailableCount={TotalAvailableCount}, AggregatedCount={AggregatedCount}",
+                        pageIndex,
+                        (pageIndex + 1) * LinkedInRequestDefaults.DefaultSearchPageSize,
+                        totalAvailableCount,
+                        aggregatedJobs.Count);
+                }
+
                 break;
             }
 
+            if (diagnosticsEnabled)
+            {
+                _logger.LogInformation(
+                    "LinkedIn fetch diagnostics delaying before next page. DelayMilliseconds={DelayMilliseconds}, NextPageIndex={NextPageIndex}",
+                    (int)SearchPageDelay.TotalMilliseconds,
+                    pageIndex + 1);
+            }
+
             await Task.Delay(SearchPageDelay, cancellationToken);
+        }
+
+        if (diagnosticsEnabled)
+        {
+            _logger.LogInformation(
+                "LinkedIn fetch diagnostics completed. PagesFetched={PagesFetched}, AggregatedCount={AggregatedCount}, TotalAvailableCount={TotalAvailableCount}",
+                pagesFetched,
+                aggregatedJobs.Count,
+                totalAvailableCount);
         }
 
         return LinkedInJobSearchFetchResult.Succeeded(

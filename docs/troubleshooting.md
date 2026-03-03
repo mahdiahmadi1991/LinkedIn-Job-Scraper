@@ -80,6 +80,15 @@ What to do:
 2. Confirm the selected keywords, location, job types, and workplace types.
 3. Remember that the app intentionally fetches conservatively to reduce request pressure.
 
+### Symptom: You need detailed fetch-stage diagnostics
+
+What to do:
+
+1. Set `LinkedIn:FetchDiagnostics:Enabled` to `true`.
+2. Optionally set `LinkedIn:FetchDiagnostics:LogResponseBodies` to `true` for sanitized payload samples.
+3. Adjust `LinkedIn:FetchDiagnostics:ResponseBodyMaxLength` if you need longer response snippets.
+4. Re-run only the fetch/import path and inspect the per-run log file for page-level request, parse, and reconciliation details.
+
 ## 3. OpenAI Problems
 
 ### Symptom: AI scoring is unavailable
