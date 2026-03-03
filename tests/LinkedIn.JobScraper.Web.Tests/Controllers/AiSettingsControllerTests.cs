@@ -98,11 +98,12 @@ public sealed class AiSettingsControllerTests
 
         var result = await controller.Save(new AiSettingsPageViewModel(), CancellationToken.None);
 
-        var problem = Assert.IsType<ObjectResult>(result);
-        var details = Assert.IsType<ProblemDetails>(problem.Value);
+        var problem = Assert.IsType<BadRequestObjectResult>(result);
+        var details = Assert.IsType<ValidationProblemDetails>(problem.Value);
 
         Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
         Assert.Equal("AI settings validation failed", details.Title);
+        Assert.True(details.Errors.ContainsKey(nameof(AiSettingsPageViewModel.ProfileName)));
     }
 
     [Fact]

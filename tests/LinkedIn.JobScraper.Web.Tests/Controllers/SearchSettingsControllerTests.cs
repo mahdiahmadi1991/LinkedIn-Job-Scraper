@@ -64,12 +64,13 @@ public sealed class SearchSettingsControllerTests
             },
             CancellationToken.None);
 
-        var problem = Assert.IsType<ObjectResult>(result);
-        var details = Assert.IsType<ProblemDetails>(problem.Value);
+        var problem = Assert.IsType<BadRequestObjectResult>(result);
+        var details = Assert.IsType<ValidationProblemDetails>(problem.Value);
 
         Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
         Assert.Equal("Search settings validation failed", details.Title);
         Assert.Equal("Review the highlighted search settings and try again.", details.Detail);
+        Assert.True(details.Errors.ContainsKey(nameof(LinkedInSearchSettingsPageViewModel.LocationInput)));
     }
 
     [Fact]

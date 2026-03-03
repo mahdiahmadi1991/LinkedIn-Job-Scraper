@@ -84,10 +84,14 @@ public sealed class SearchSettingsController : Controller
 
             if (IsAjaxRequest())
             {
-                return Problem(
-                    title: "Search settings validation failed",
-                    detail: viewModel.StatusMessage,
-                    statusCode: StatusCodes.Status400BadRequest);
+                var details = new ValidationProblemDetails(ModelState)
+                {
+                    Title = "Search settings validation failed",
+                    Detail = viewModel.StatusMessage,
+                    Status = StatusCodes.Status400BadRequest
+                };
+
+                return BadRequest(details);
             }
 
             return View("Index", viewModel);

@@ -59,10 +59,14 @@ public sealed class AiSettingsController : Controller
 
             if (IsAjaxRequest())
             {
-                return Problem(
-                    title: "AI settings validation failed",
-                    detail: viewModel.StatusMessage,
-                    statusCode: StatusCodes.Status400BadRequest);
+                var details = new ValidationProblemDetails(ModelState)
+                {
+                    Title = "AI settings validation failed",
+                    Detail = viewModel.StatusMessage,
+                    Status = StatusCodes.Status400BadRequest
+                };
+
+                return BadRequest(details);
             }
 
             return View("Index", viewModel);

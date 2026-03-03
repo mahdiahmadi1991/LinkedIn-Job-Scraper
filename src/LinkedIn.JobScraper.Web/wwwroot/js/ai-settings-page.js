@@ -35,6 +35,47 @@
         }
     };
 
+    const clearValidationErrors = () => {
+        form.querySelectorAll("[data-valmsg-for]").forEach((element) => {
+            element.textContent = "";
+        });
+
+        form.querySelectorAll(".input-validation-error").forEach((element) => {
+            element.classList.remove("input-validation-error");
+        });
+    };
+
+    const applyValidationErrors = (errors) => {
+        if (!errors || typeof errors !== "object") {
+            return false;
+        }
+
+        let hasFieldErrors = false;
+
+        Object.entries(errors).forEach(([key, messages]) => {
+            if (!Array.isArray(messages) || messages.length === 0) {
+                return;
+            }
+
+            if (!key) {
+                return;
+            }
+
+            const validationMessage = form.querySelector(`[data-valmsg-for="${key}"]`);
+            if (validationMessage) {
+                validationMessage.textContent = String(messages[0]);
+            }
+
+            form.querySelectorAll(`[name="${key}"]`).forEach((element) => {
+                element.classList.add("input-validation-error");
+            });
+
+            hasFieldErrors = true;
+        });
+
+        return hasFieldErrors;
+    };
+
     const showInitialPageMessage = () => {
         const message = pageShell?.dataset.pageStatusMessage?.trim();
         if (!message) {
@@ -90,6 +131,7 @@
 
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
+        clearValidationErrors();
 
         const idleText = saveButton.textContent;
         setButtonLoading(saveButton, true, "Saving settings...");
@@ -107,7 +149,9 @@
             const payload = await tryReadProblem(response);
 
             if (!response.ok) {
-                showToast(payload?.detail || payload?.title || "Settings save failed.", false);
+                if (!applyValidationErrors(payload?.errors)) {
+                    showToast(payload?.detail || payload?.title || "Settings save failed.", false);
+                }
                 return;
             }
 
@@ -120,6 +164,7 @@
                 concurrencyTokenInput.value = payload.concurrencyToken;
             }
 
+            clearValidationErrors();
             showToast(payload.message || "AI behavior settings were saved.", true);
         } catch {
             showToast("Settings save failed.", false);
