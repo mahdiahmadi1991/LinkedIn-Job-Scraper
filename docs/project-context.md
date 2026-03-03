@@ -48,6 +48,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - LinkedIn session management is moving into a compact top-bar status control with a modal workflow, replacing the dedicated session page and automatically closing the modal after successful auto-capture
 - Session action messages now surface as global toast notifications, while the session modal keeps only compact inline status notes so repeated updates do not stretch the dialog vertically
 - Home and recovery prompts now point to the top-bar session modal instead of the removed dedicated session page, so session-related UX stays consistent across the app
+- The dedicated Home landing page is being retired; `/` now lands directly on the jobs dashboard so the core workflow is the default entry point
 
 ## Product Intent
 
