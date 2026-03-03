@@ -26,6 +26,7 @@ public static class ServiceCollectionExtensions
         services.AddOptions<LinkedInBrowserAutomationOptions>()
             .Bind(configuration.GetSection(LinkedInBrowserAutomationOptions.SectionName));
 
+        services.AddHostedService<ConfigurationReadinessStartupService>();
         services.AddSignalR();
         services.AddSingleton<ISqlServerConnectionStringProvider, ConfiguredSqlServerConnectionStringProvider>();
         services.AddSingleton<ILinkedInSessionStore, DatabaseLinkedInSessionStore>();
