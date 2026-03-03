@@ -49,6 +49,8 @@ Build a simple local web application for personal use that helps collect LinkedI
 - Session action messages now surface as global toast notifications, while the session modal keeps only compact inline status notes so repeated updates do not stretch the dialog vertically
 - Home and recovery prompts now point to the top-bar session modal instead of the removed dedicated session page, so session-related UX stays consistent across the app
 - The dedicated Home landing page is being retired; `/` now lands directly on the jobs dashboard so the core workflow is the default entry point
+- Primary navigation is moving from a horizontal top bar into a compact right-aligned hamburger menu, with the LinkedIn session status control kept beside it for a cleaner dashboard-first shell
+- A CI-safe automated test foundation is now being introduced, starting with pure/unit-level coverage that requires no live SQL Server, LinkedIn session, or OpenAI credentials
 
 ## Product Intent
 
