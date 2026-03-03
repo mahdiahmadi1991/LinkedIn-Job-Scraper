@@ -1,16 +1,56 @@
 using LinkedIn.JobScraper.Web.AI;
+using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Controllers;
 using LinkedIn.JobScraper.Web.Models;
+using LinkedIn.JobScraper.Web.Tests.Infrastructure;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.Tests.Controllers;
 
 public sealed class AiSettingsControllerTests
 {
     [Fact]
+    public async Task IndexPopulatesOpenAiConnectionStatus()
+    {
+        var controller = new AiSettingsController(
+            new FakeAiBehaviorSettingsService(),
+            Options.Create(new OpenAiSecurityOptions
+            {
+                ApiKey = "test-key",
+                Model = "gpt-5-mini",
+                BaseUrl = "https://api.openai.com/v1"
+            }))
+        {
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
+        };
+
+        var result = await controller.Index(CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<AiSettingsPageViewModel>(view.Model);
+
+        Assert.True(model.OpenAiApiKeyConfigured);
+        Assert.True(model.OpenAiConnectionReady);
+        Assert.Equal("gpt-5-mini", model.OpenAiModel);
+        Assert.Equal("https://api.openai.com/v1", model.OpenAiBaseUrl);
+    }
+
+    [Fact]
     public async Task SaveReturnsViewWithFriendlyMessageOnConcurrencyConflict()
     {
-        var controller = new AiSettingsController(new ConcurrencyFailureAiBehaviorSettingsService());
+        var controller = new AiSettingsController(
+            new ConcurrencyFailureAiBehaviorSettingsService(),
+            Options.Create(new OpenAiSecurityOptions
+            {
+                ApiKey = "test-key",
+                Model = "gpt-5-mini"
+            }))
+        {
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
+        };
 
         var result = await controller.Save(
             new AiSettingsPageViewModel
@@ -29,6 +69,26 @@ public sealed class AiSettingsControllerTests
         Assert.Equal("Index", view.ViewName);
         Assert.False(model.StatusSucceeded);
         Assert.Contains("updated by another operation", model.StatusMessage, StringComparison.Ordinal);
+        Assert.True(model.OpenAiApiKeyConfigured);
+    }
+
+    private sealed class FakeAiBehaviorSettingsService : IAiBehaviorSettingsService
+    {
+        public Task<AiBehaviorProfile> GetActiveAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                new AiBehaviorProfile(
+                    "Default",
+                    "Behavior",
+                    "Priority",
+                    "Exclusion",
+                    "en"));
+        }
+
+        public Task<AiBehaviorProfile> SaveAsync(AiBehaviorProfile profile, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class ConcurrencyFailureAiBehaviorSettingsService : IAiBehaviorSettingsService

@@ -27,4 +27,14 @@ public sealed class AiSettingsPageViewModel
     public string? StatusMessage { get; set; }
 
     public bool StatusSucceeded { get; set; }
+
+    public bool OpenAiApiKeyConfigured { get; set; }
+
+    public bool OpenAiConnectionReady { get; set; }
+
+    public string OpenAiConnectionStatusMessage { get; set; } = string.Empty;
+
+    public string OpenAiBaseUrl { get; set; } = "https://api.openai.com/v1";
+
+    public string? OpenAiModel { get; set; }
 }
