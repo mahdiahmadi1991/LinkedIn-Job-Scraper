@@ -16,13 +16,6 @@ public sealed class ConfiguredSqlServerConnectionStringProvider : ISqlServerConn
 
     public string GetRequiredConnectionString()
     {
-        var connectionString = _sqlServerOptions.Value.ConnectionString;
-
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            throw new InvalidOperationException("SqlServer:ConnectionString is not configured.");
-        }
-
-        return connectionString;
+        return _sqlServerOptions.Value.GetRequiredConnectionString();
     }
 }

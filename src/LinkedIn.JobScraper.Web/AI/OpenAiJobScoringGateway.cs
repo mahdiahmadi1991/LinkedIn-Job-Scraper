@@ -31,15 +31,11 @@ public sealed class OpenAiJobScoringGateway : IJobScoringGateway
         cancellationToken.ThrowIfCancellationRequested();
 
         var securityOptions = _securityOptions.Value;
+        var validationError = securityOptions.ValidateForScoring();
 
-        if (string.IsNullOrWhiteSpace(securityOptions.ApiKey))
+        if (validationError is not null)
         {
-            return new JobScoringGatewayResult(false, "OpenAI API key is not configured yet.");
-        }
-
-        if (string.IsNullOrWhiteSpace(securityOptions.Model))
-        {
-            return new JobScoringGatewayResult(false, "OpenAI model is not configured yet.");
+            return new JobScoringGatewayResult(false, validationError);
         }
 
         if (string.IsNullOrWhiteSpace(request.JobDescription))
