@@ -102,6 +102,7 @@ public sealed class SearchSettingsControllerTests
 
         Assert.True(payload.Success);
         Assert.Equal("/SearchSettings", payload.RedirectUrl);
+        Assert.Equal("token-saved", payload.ConcurrencyToken);
     }
 
     private sealed class ConcurrencyFailureLinkedInSearchSettingsService : ILinkedInSearchSettingsService

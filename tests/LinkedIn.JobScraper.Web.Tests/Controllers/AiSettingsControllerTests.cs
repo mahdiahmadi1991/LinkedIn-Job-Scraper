@@ -141,6 +141,7 @@ public sealed class AiSettingsControllerTests
 
         Assert.True(payload.Success);
         Assert.Equal("/AiSettings", payload.RedirectUrl);
+        Assert.Equal("token-saved", payload.ConcurrencyToken);
     }
 
     [Fact]

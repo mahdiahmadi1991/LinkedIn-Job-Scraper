@@ -108,11 +108,14 @@ public sealed class AiSettingsController : Controller
 
         if (IsAjaxRequest())
         {
+            var redirectUrl = Url is null ? "/AiSettings" : Url.Action(nameof(Index)) ?? "/AiSettings";
+
             return Json(
                 new SettingsSaveResponse(
                     true,
                     TempData["AiSettingsStatusMessage"] as string ?? "AI behavior settings were saved.",
-                    Url.Action(nameof(Index)) ?? "/AiSettings"));
+                    redirectUrl,
+                    savedProfile.ConcurrencyToken));
         }
 
         return RedirectToAction(nameof(Index));
@@ -178,7 +181,7 @@ public sealed class AiSettingsController : Controller
     private bool IsAjaxRequest()
     {
         return string.Equals(
-            Request.Headers.XRequestedWith.ToString(),
+            HttpContext?.Request.Headers.XRequestedWith.ToString(),
             "XMLHttpRequest",
             StringComparison.OrdinalIgnoreCase);
     }

@@ -127,11 +127,14 @@ public sealed class SearchSettingsController : Controller
 
         if (IsAjaxRequest())
         {
+            var redirectUrl = Url is null ? "/SearchSettings" : Url.Action(nameof(Index)) ?? "/SearchSettings";
+
             return Json(
                 new SettingsSaveResponse(
                     true,
                     TempData["SearchSettingsStatusMessage"] as string ?? "Search settings were saved.",
-                    Url.Action(nameof(Index)) ?? "/SearchSettings"));
+                    redirectUrl,
+                    savedSettings.ConcurrencyToken));
         }
 
         return RedirectToAction(nameof(Index));
@@ -201,7 +204,7 @@ public sealed class SearchSettingsController : Controller
     private bool IsAjaxRequest()
     {
         return string.Equals(
-            Request.Headers.XRequestedWith.ToString(),
+            HttpContext?.Request.Headers.XRequestedWith.ToString(),
             "XMLHttpRequest",
             StringComparison.OrdinalIgnoreCase);
     }

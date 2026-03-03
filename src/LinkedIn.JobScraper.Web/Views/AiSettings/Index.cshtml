@@ -12,18 +12,17 @@
         <p class="hero-lead">Adjust the behavioral profile used when scoring LinkedIn jobs. API keys stay in configuration, but scoring preferences live here.</p>
     </section>
 
-    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
-    {
-        <div class="alert alert-@alertSeverity mb-0" role="alert">
-            @Model.StatusMessage
-        </div>
-    }
+    <div class="alert alert-@alertSeverity mb-0 @((string.IsNullOrWhiteSpace(Model.StatusMessage) ? "d-none" : string.Empty))"
+         role="alert"
+         data-ai-settings-status>
+        @Model.StatusMessage
+    </div>
 
     <section class="row g-4">
         <div class="col-12 col-xl-8">
             <div class="card app-panel">
                 <div class="card-body app-panel-body">
-                    <form asp-action="Save" method="post" class="d-flex flex-column gap-3">
+                    <form asp-action="Save" method="post" class="d-flex flex-column gap-3" data-ai-settings-form>
                         @Html.AntiForgeryToken()
                         <input asp-for="ConcurrencyToken" type="hidden" />
                         <div>
@@ -55,7 +54,7 @@
                             <span asp-validation-for="OutputLanguageCode" class="text-danger small"></span>
                         </div>
                         <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary">Save Behavior Settings</button>
+                            <button type="submit" class="btn btn-primary" data-ai-settings-save-button>Save Behavior Settings</button>
                             <a asp-action="Index" class="btn btn-outline-secondary">Reset</a>
                         </div>
                     </form>
@@ -112,12 +111,16 @@
     <script>
         (() => {
             const button = document.querySelector("[data-ai-connection-check]");
+            const form = document.querySelector("[data-ai-settings-form]");
+            const saveButton = document.querySelector("[data-ai-settings-save-button]");
+            const statusAlert = document.querySelector("[data-ai-settings-status]");
             const statusNote = document.querySelector("[data-ai-connection-status-note]");
             const apiKeyValue = document.querySelector("[data-ai-connection-api-key-value]");
             const modelValue = document.querySelector("[data-ai-connection-model-value]");
             const baseUrlValue = document.querySelector("[data-ai-connection-base-url-value]");
+            const concurrencyTokenInput = document.querySelector('input[name="ConcurrencyToken"]');
 
-            if (!button || !statusNote || !apiKeyValue || !modelValue || !baseUrlValue) {
+            if (!button || !statusNote || !apiKeyValue || !modelValue || !baseUrlValue || !form || !saveButton || !statusAlert) {
                 return;
             }
 
@@ -138,6 +141,12 @@
                 } catch {
                     return null;
                 }
+            };
+
+            const setSaveStatus = (message, success) => {
+                statusAlert.textContent = message;
+                statusAlert.classList.remove("d-none", "alert-success", "alert-warning");
+                statusAlert.classList.add(success ? "alert-success" : "alert-warning");
             };
 
             button.addEventListener("click", async () => {
@@ -174,6 +183,48 @@
                 } finally {
                     button.disabled = false;
                     button.textContent = idleText;
+                }
+            });
+
+            form.addEventListener("submit", async (event) => {
+                event.preventDefault();
+
+                const idleText = saveButton.textContent;
+                saveButton.disabled = true;
+                saveButton.textContent = "Saving...";
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: "POST",
+                        body: new FormData(form),
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest"
+                        },
+                        credentials: "same-origin"
+                    });
+
+                    const payload = await tryReadProblem(response);
+
+                    if (!response.ok) {
+                        setSaveStatus(payload?.detail || payload?.title || "Settings save failed.", false);
+                        return;
+                    }
+
+                    if (!payload?.success) {
+                        setSaveStatus("Settings save did not return a usable response.", false);
+                        return;
+                    }
+
+                    if (concurrencyTokenInput && payload.concurrencyToken) {
+                        concurrencyTokenInput.value = payload.concurrencyToken;
+                    }
+
+                    setSaveStatus(payload.message || "AI behavior settings were saved.", true);
+                } catch {
+                    setSaveStatus("Settings save failed.", false);
+                } finally {
+                    saveButton.disabled = false;
+                    saveButton.textContent = idleText;
                 }
             });
         })();
