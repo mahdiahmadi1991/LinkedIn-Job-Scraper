@@ -309,6 +309,19 @@
                 return payload;
             };
 
+            const tryReadJsonPayload = async (response) => {
+                const contentType = response.headers.get("Content-Type") || "";
+                if (!contentType.includes("application/json") && !contentType.includes("application/problem+json")) {
+                    return null;
+                }
+
+                try {
+                    return await response.json();
+                } catch {
+                    return null;
+                }
+            };
+
             const postAction = async (path, closeOnSuccess) => {
                 setBusy(true);
 
@@ -325,7 +338,23 @@
                         credentials: "same-origin"
                     });
 
-                    const payload = await response.json();
+                    const payload = await tryReadJsonPayload(response);
+
+                    if (!response.ok) {
+                        const problemMessage = payload?.detail || payload?.title || "LinkedIn session action failed.";
+                        setFeedback(problemMessage, false, true);
+
+                        try {
+                            await fetchState();
+                        } catch {
+                        }
+
+                        return {
+                            success: false,
+                            state: null
+                        };
+                    }
+
                     setFeedback(payload.message, payload.success, true);
                     applyState(payload.state);
 

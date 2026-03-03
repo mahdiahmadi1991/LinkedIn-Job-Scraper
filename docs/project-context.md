@@ -70,6 +70,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The EF design-time DbContext factory now loads `user-secrets` as well, so migration commands stay aligned with the repo's secret-free tracked config model
 - The AI settings page now exposes a read-only connection status card (key configured, model, base URL, readiness) so AI security can be observed from the UI without storing or revealing the API key
 - The AI settings page now includes a local readiness check action, and AJAX workflow failures can return `ProblemDetails` for clearer client-side error handling without changing successful response shapes
+- LinkedIn session AJAX failures now also surface as `ProblemDetails`, and the session modal treats those responses as standard error payloads while refreshing state separately
 
 ## Product Intent
 

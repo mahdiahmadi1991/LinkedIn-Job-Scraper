@@ -38,6 +38,35 @@ public sealed class LinkedInSessionControllerTests
         Assert.Equal("session-state-connected", document.RootElement.GetProperty("state").GetProperty("sessionIndicatorClass").GetString());
     }
 
+    [Fact]
+    public async Task VerifyReturnsProblemDetailsForAjaxFailures()
+    {
+        var controller = new LinkedInSessionController(
+            new FakeLinkedInBrowserLoginService(),
+            new FakeLinkedInSessionStore(),
+            new FailingLinkedInSessionVerificationService())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
+        };
+
+        controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
+
+        var result = await controller.Verify(CancellationToken.None);
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        var details = Assert.IsType<ProblemDetails>(problem.Value);
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, problem.StatusCode);
+        Assert.Equal("LinkedIn session action failed", details.Title);
+        Assert.Equal("Stored session is no longer valid.", details.Detail);
+        Assert.Equal("Stored session is no longer valid.", controller.TempData["LinkedInSessionStatusMessage"]);
+        Assert.Equal(bool.FalseString, controller.TempData["LinkedInSessionStatusSucceeded"]);
+    }
+
     private sealed class FakeLinkedInBrowserLoginService : ILinkedInBrowserLoginService
     {
         public Task<LinkedInBrowserLoginActionResult> CaptureAndSaveAsync(CancellationToken cancellationToken)
@@ -93,6 +122,17 @@ public sealed class LinkedInSessionControllerTests
         public Task<LinkedInSessionVerificationResult> VerifyCurrentAsync(CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
+        }
+    }
+
+    private sealed class FailingLinkedInSessionVerificationService : ILinkedInSessionVerificationService
+    {
+        public Task<LinkedInSessionVerificationResult> VerifyCurrentAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                LinkedInSessionVerificationResult.Failed(
+                    "Stored session is no longer valid.",
+                    StatusCodes.Status503ServiceUnavailable));
         }
     }
 }
