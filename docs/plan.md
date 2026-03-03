@@ -258,6 +258,97 @@ Acceptance criteria:
 - the verification UI message is understandable without mentioning fetched jobs
 - the chosen endpoint should not create unnecessary analytics or tracking side effects if a read-only option is available
 
+## Next Iteration Plan
+
+This section captures the next approved planning baseline after the MVP-plus usability passes.
+It is intentionally focused on technical debt and product hardening, not on expanding scope.
+
+### Delivery Rule
+
+- No implementation should begin from this section until each step is explicitly approved.
+- Each item below should be delivered as a separate reviewable step.
+
+### Step A: Test Foundation
+
+Outputs:
+
+- restore a dedicated test project for core application behavior
+- add focused tests for:
+  - dashboard query filtering and sorting
+  - job import deduplication
+  - session invalidation on expired LinkedIn responses
+- document any intentionally untested integration surfaces
+
+Acceptance criteria:
+
+- `dotnet test` runs locally and passes
+- core business logic regressions are covered without needing live LinkedIn/OpenAI calls
+- test seams are clear enough to support future changes safely
+
+### Step B: CI Baseline
+
+Outputs:
+
+- restore a minimal CI workflow for restore, build, and test
+- ensure the workflow can run without local-only secrets
+- document which checks remain manual because they depend on live external services
+
+Acceptance criteria:
+
+- pushes and PRs run the baseline workflow
+- CI validates build health and automated tests only
+- no live LinkedIn or OpenAI credentials are required in CI
+
+### Step C: Secret And Config Hardening
+
+Outputs:
+
+- remove sensitive local secrets from tracked config where practical
+- move OpenAI and SQL sensitive values to safer local-only storage paths
+- document the expected local developer setup for secrets
+
+Acceptance criteria:
+
+- committed appsettings files no longer need to carry live secrets
+- the app still runs locally after local secret setup
+- the expected secret-loading path is documented and repeatable
+
+### Step D: Operational Resilience
+
+Outputs:
+
+- add clearer logging around LinkedIn fetch paging, session expiry, and OpenAI scoring latency
+- make long-running workflow failures easier to diagnose from logs
+- review and tighten any avoidable database initialization or migration calls in request paths
+
+Acceptance criteria:
+
+- failure modes are easier to diagnose without stepping through code
+- the main workflow emits enough structured context for manual troubleshooting
+- request-path overhead is reduced where unnecessary work is still happening
+
+### Step E: Data And UX Follow-Up
+
+Outputs:
+
+- review indexing and query-shape needs after real usage
+- tune lazy-load batch sizing based on actual interaction
+- add small usability refinements only where real usage reveals friction
+
+Acceptance criteria:
+
+- the jobs page remains responsive with a larger stored dataset
+- query costs are reasonable for local SQL Server usage
+- changes are driven by observed usage, not speculative redesign
+
+### Recommended Order
+
+1. Step A: Test Foundation
+2. Step C: Secret And Config Hardening
+3. Step B: CI Baseline
+4. Step D: Operational Resilience
+5. Step E: Data And UX Follow-Up
+
 #### 2. Add UI-Configurable Search Criteria For LinkedIn Fetch
 
 Goal:
