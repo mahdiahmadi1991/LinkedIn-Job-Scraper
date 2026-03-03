@@ -218,11 +218,17 @@ This queue records the approved post-MVP implementation order so follow-up work 
 
 This queue records the current activation order for the larger deliberately deferred items.
 
-1. Standardize high-value JSON success payloads with explicit DTO contracts while preserving the current wire shape
-2. Continue JSON contract normalization for the remaining lower-value JSON endpoints
-3. Introduce shared result contracts only where a concrete controller/service seam benefits directly
-4. Add broader persistence integration coverage without making CI depend on SQL Server
-5. Revisit optional SQL Server container coverage and richer telemetry only after the steps above are stable
+1. Completed: Standardize high-value JSON success payloads with explicit DTO contracts while preserving the current wire shape
+2. Completed: Continue JSON contract normalization for the remaining lower-value JSON endpoints
+3. Completed: Introduce shared result contracts only where a concrete controller/service seam benefits directly
+4. Completed: Add broader persistence integration coverage without making CI depend on SQL Server
+5. Revisited and intentionally deferred: SQL Server container coverage and richer telemetry remain out of scope for the current phase because they do not unlock the active acceptance criteria and would add operational complexity to an otherwise CI-safe pipeline
+
+### Deferred Queue Closure
+
+- The current deferred activation queue is now closed.
+- No further items from this queue should be implemented unless a new milestone explicitly activates them.
+- The next eligible work should come from a newly approved milestone or from a risk that is not already covered by the current safeguards.
 
 ## Post-MVP Feedback Plan
 

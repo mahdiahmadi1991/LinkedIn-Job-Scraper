@@ -128,3 +128,27 @@ The following items remain intentionally deferred or only partially addressed:
 - SQL Server container CI lane
 - OpenTelemetry traces/metrics
 - deployment and hosting beyond local usage
+
+## Deferred Queue Status
+
+### Status
+
+- **Closed for the current phase**
+
+### What was completed from the activated deferred queue
+
+- high-value JSON success contracts were standardized
+- remaining diagnostics JSON success contracts were normalized
+- a limited shared result contract was introduced for the LinkedIn session seam
+- CI-safe persistence service coverage was added without introducing a SQL Server dependency in CI
+
+### What was explicitly revisited and deferred again
+
+- SQL Server container CI coverage
+- richer telemetry beyond current logging, health checks, diagnostics, and correlation
+
+### Why they remain deferred
+
+- they do not currently unblock a roadmap acceptance criterion
+- they add maintenance and execution complexity to a pipeline that is intentionally CI-safe and credential-free
+- the current logging, diagnostics, and test posture already cover the active risk profile well enough for this phase
