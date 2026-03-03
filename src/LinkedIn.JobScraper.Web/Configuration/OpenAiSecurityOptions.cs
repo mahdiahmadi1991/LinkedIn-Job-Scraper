@@ -10,6 +10,14 @@ public sealed class OpenAiSecurityOptions
 
     public string Model { get; set; } = string.Empty;
 
+    public int RequestTimeoutSeconds { get; set; } = 45;
+
+    public bool UseBackgroundMode { get; set; } = true;
+
+    public int BackgroundPollingIntervalMilliseconds { get; set; } = 1500;
+
+    public int BackgroundPollingTimeoutSeconds { get; set; } = 120;
+
     public string? ValidateForScoring()
     {
         if (string.IsNullOrWhiteSpace(ApiKey))
@@ -22,6 +30,30 @@ public sealed class OpenAiSecurityOptions
             return "OpenAI model is not configured. Set 'OpenAI:Security:Model' with dotnet user-secrets for src/LinkedIn.JobScraper.Web or provide it via environment variables.";
         }
 
+        if (RequestTimeoutSeconds <= 0)
+        {
+            return "OpenAI request timeout must be greater than zero. Set 'OpenAI:Security:RequestTimeoutSeconds' to a positive integer value.";
+        }
+
+        if (UseBackgroundMode)
+        {
+            if (BackgroundPollingIntervalMilliseconds <= 0)
+            {
+                return "OpenAI background polling interval must be greater than zero. Set 'OpenAI:Security:BackgroundPollingIntervalMilliseconds' to a positive integer value.";
+            }
+
+            if (BackgroundPollingTimeoutSeconds <= 0)
+            {
+                return "OpenAI background polling timeout must be greater than zero. Set 'OpenAI:Security:BackgroundPollingTimeoutSeconds' to a positive integer value.";
+            }
+        }
+
         return null;
     }
+
+    public TimeSpan GetRequestTimeout() => TimeSpan.FromSeconds(RequestTimeoutSeconds);
+
+    public TimeSpan GetBackgroundPollingInterval() => TimeSpan.FromMilliseconds(BackgroundPollingIntervalMilliseconds);
+
+    public TimeSpan GetBackgroundPollingTimeout() => TimeSpan.FromSeconds(BackgroundPollingTimeoutSeconds);
 }

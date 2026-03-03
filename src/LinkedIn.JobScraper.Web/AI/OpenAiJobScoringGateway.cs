@@ -1,4 +1,4 @@
-using System.Net.Http.Headers;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using LinkedIn.JobScraper.Web.Configuration;
@@ -8,18 +8,50 @@ namespace LinkedIn.JobScraper.Web.AI;
 
 public sealed class OpenAiJobScoringGateway : IJobScoringGateway
 {
+    private const string DeveloperInstruction =
+        "Score the job for fit. Return concise structured JSON only. Penalize mismatches and missing evidence. Use the provided behavioral profile and honor the requested output language for all natural-language fields.";
+
+    private const string JobScoreJsonSchema =
+        """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "score": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "label": {
+              "type": "string",
+              "enum": ["StrongMatch", "Review", "Skip"]
+            },
+            "summary": {
+              "type": "string"
+            },
+            "whyMatched": {
+              "type": "string"
+            },
+            "concerns": {
+              "type": "string"
+            }
+          },
+          "required": ["score", "label", "summary", "whyMatched", "concerns"]
+        }
+        """;
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    private readonly HttpClient _httpClient;
     private readonly ILogger<OpenAiJobScoringGateway> _logger;
+    private readonly IOpenAiResponsesClient _responsesClient;
     private readonly IOptions<OpenAiSecurityOptions> _securityOptions;
 
     public OpenAiJobScoringGateway(
-        HttpClient httpClient,
+        IOpenAiResponsesClient responsesClient,
         IOptions<OpenAiSecurityOptions> securityOptions,
         ILogger<OpenAiJobScoringGateway> logger)
     {
-        _httpClient = httpClient;
+        _responsesClient = responsesClient;
         _securityOptions = securityOptions;
         _logger = logger;
     }
@@ -45,47 +77,37 @@ public sealed class OpenAiJobScoringGateway : IJobScoringGateway
 
         try
         {
-            var requestUri = BuildResponsesUri(securityOptions.BaseUrl);
-            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, requestUri);
-            httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", securityOptions.ApiKey);
-            httpRequest.Content = new StringContent(
-                JsonSerializer.Serialize(CreateRequestBody(securityOptions.Model, request), JsonOptions),
-                Encoding.UTF8,
-                "application/json");
-
-            using var response = await _httpClient.SendAsync(
-                httpRequest,
-                HttpCompletionOption.ResponseHeadersRead,
+            var response = await _responsesClient.CreateResponseAsync(
+                CreateResponsesRequest(securityOptions, request),
+                securityOptions.GetRequestTimeout(),
                 cancellationToken);
 
-            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                Log.OpenAiScoringReturnedNonSuccessStatusCode(_logger, (int)response.StatusCode);
-                var responseErrorMessage = TryReadErrorMessage(responseBody);
-                var message = responseErrorMessage is null
-                    ? $"OpenAI scoring failed with HTTP {(int)response.StatusCode}."
-                    : $"OpenAI scoring failed with HTTP {(int)response.StatusCode}: {SensitiveDataRedaction.SanitizeForMessage(responseErrorMessage)}";
-
-                return new JobScoringGatewayResult(
-                    false,
-                    message,
-                    (int)response.StatusCode);
-            }
-
-            if (!TryExtractScoreResult(responseBody, out var result, out var errorMessage))
-            {
-                return new JobScoringGatewayResult(
-                    false,
-                    errorMessage ?? "OpenAI scoring response could not be parsed.");
-            }
-
-            return result!;
+            var finalResponse = await AwaitTerminalResponseAsync(response, securityOptions, cancellationToken);
+            return TryTranslateCompletedResponse(finalResponse, out var completedResult)
+                ? completedResult!
+                : CreateFailureResult(finalResponse);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (OpenAiResponsesTimeoutException exception)
+        {
+            Log.OpenAiScoringRequestFailed(_logger, exception);
+
+            return new JobScoringGatewayResult(
+                false,
+                $"OpenAI scoring timed out after {FormatTimeout(exception.Timeout)}.",
+                StatusCodes.Status504GatewayTimeout);
+        }
+        catch (OpenAiResponsesRequestException exception)
+        {
+            Log.OpenAiScoringReturnedNonSuccessStatusCode(_logger, exception.StatusCode);
+
+            return new JobScoringGatewayResult(
+                false,
+                $"OpenAI scoring failed with HTTP {exception.StatusCode}: {exception.Message}",
+                exception.StatusCode);
         }
         catch (Exception exception)
         {
@@ -97,83 +119,131 @@ public sealed class OpenAiJobScoringGateway : IJobScoringGateway
         }
     }
 
-    private static Uri BuildResponsesUri(string? baseUrl)
+    private static OpenAiResponsesRequest CreateResponsesRequest(
+        OpenAiSecurityOptions securityOptions,
+        JobScoringGatewayRequest request)
     {
-        var normalizedBaseUrl = string.IsNullOrWhiteSpace(baseUrl)
-            ? "https://api.openai.com/v1"
-            : baseUrl.TrimEnd('/');
-
-        return new Uri($"{normalizedBaseUrl}/responses", UriKind.Absolute);
+        return new OpenAiResponsesRequest(
+            securityOptions.Model,
+            DeveloperInstruction,
+            BuildUserPrompt(request),
+            "job_score",
+            JobScoreJsonSchema,
+            securityOptions.UseBackgroundMode);
     }
 
-    private static object CreateRequestBody(string model, JobScoringGatewayRequest request)
+    private async Task<OpenAiResponseSnapshot> AwaitTerminalResponseAsync(
+        OpenAiResponseSnapshot response,
+        OpenAiSecurityOptions securityOptions,
+        CancellationToken cancellationToken)
     {
-        var userPrompt = BuildUserPrompt(request);
-
-        return new
+        if (!securityOptions.UseBackgroundMode ||
+            response.Status is not (OpenAiResponseStatus.Queued or OpenAiResponseStatus.InProgress) ||
+            string.IsNullOrWhiteSpace(response.ResponseId))
         {
-            model,
-            input = new object[]
+            return response;
+        }
+
+        var deadline = DateTimeOffset.UtcNow + securityOptions.GetBackgroundPollingTimeout();
+        var pollInterval = securityOptions.GetBackgroundPollingInterval();
+        var responseId = response.ResponseId;
+
+        while (response.Status is OpenAiResponseStatus.Queued or OpenAiResponseStatus.InProgress)
+        {
+            var remaining = deadline - DateTimeOffset.UtcNow;
+
+            if (remaining <= TimeSpan.Zero)
             {
-                new
-                {
-                    role = "developer",
-                    content = new object[]
-                    {
-                        new
-                        {
-                            type = "input_text",
-                            text =
-                                "Score the job for fit. Return concise structured JSON only. Penalize mismatches and missing evidence. Use the provided behavioral profile and honor the requested output language for all natural-language fields."
-                        }
-                    }
-                },
-                new
-                {
-                    role = "user",
-                    content = new object[]
-                    {
-                        new
-                        {
-                            type = "input_text",
-                            text = userPrompt
-                        }
-                    }
-                }
-            },
-            text = new
-            {
-                format = new
-                {
-                    type = "json_schema",
-                    name = "job_score",
-                    strict = true,
-                    schema = new
-                    {
-                        type = "object",
-                        additionalProperties = false,
-                        properties = new
-                        {
-                            score = new
-                            {
-                                type = "integer",
-                                minimum = 0,
-                                maximum = 100
-                            },
-                            label = new
-                            {
-                                type = "string",
-                                @enum = new[] { "StrongMatch", "Review", "Skip" }
-                            },
-                            summary = new { type = "string" },
-                            whyMatched = new { type = "string" },
-                            concerns = new { type = "string" }
-                        },
-                        required = new[] { "score", "label", "summary", "whyMatched", "concerns" }
-                    }
-                }
+                throw new OpenAiResponsesTimeoutException(securityOptions.GetBackgroundPollingTimeout());
             }
+
+            var nextDelay = remaining < pollInterval
+                ? remaining
+                : pollInterval;
+
+            await Task.Delay(nextDelay, cancellationToken);
+
+            response = await _responsesClient.GetResponseAsync(
+                responseId,
+                securityOptions.GetRequestTimeout(),
+                cancellationToken);
+        }
+
+        return response;
+    }
+
+    private static bool TryTranslateCompletedResponse(
+        OpenAiResponseSnapshot response,
+        out JobScoringGatewayResult? result)
+    {
+        result = null;
+
+        if (response.Status is not (OpenAiResponseStatus.Completed or OpenAiResponseStatus.Unknown))
+        {
+            return false;
+        }
+
+        if (!TryExtractScoreResult(response.OutputText, out result, out var errorMessage))
+        {
+            result = new JobScoringGatewayResult(
+                false,
+                errorMessage ?? "OpenAI scoring response could not be parsed.");
+        }
+
+        return true;
+    }
+
+    private static JobScoringGatewayResult CreateFailureResult(OpenAiResponseSnapshot response)
+    {
+        var message = response.Status switch
+        {
+            OpenAiResponseStatus.Cancelled => "OpenAI scoring was cancelled before completion.",
+            OpenAiResponseStatus.Incomplete => CreateIncompleteMessage(response),
+            OpenAiResponseStatus.Failed => CreateFailureMessage(response),
+            OpenAiResponseStatus.Queued => "OpenAI scoring did not complete and is still queued.",
+            OpenAiResponseStatus.InProgress => "OpenAI scoring did not complete and is still in progress.",
+            _ => CreateFailureMessage(response)
         };
+
+        return new JobScoringGatewayResult(
+            false,
+            message,
+            StatusCodes.Status502BadGateway);
+    }
+
+    private static string CreateFailureMessage(OpenAiResponseSnapshot response)
+    {
+        if (string.IsNullOrWhiteSpace(response.ErrorMessage))
+        {
+            return "OpenAI scoring failed.";
+        }
+
+        return $"OpenAI scoring failed: {SensitiveDataRedaction.SanitizeForMessage(response.ErrorMessage)}";
+    }
+
+    private static string CreateIncompleteMessage(OpenAiResponseSnapshot response)
+    {
+        if (string.IsNullOrWhiteSpace(response.IncompleteReason))
+        {
+            return "OpenAI scoring was incomplete.";
+        }
+
+        return $"OpenAI scoring was incomplete: {SensitiveDataRedaction.SanitizeForMessage(response.IncompleteReason)}";
+    }
+
+    private static string FormatTimeout(TimeSpan timeout)
+    {
+        if (timeout == Timeout.InfiniteTimeSpan)
+        {
+            return "the configured timeout";
+        }
+
+        var totalSeconds = timeout.TotalSeconds;
+        var formattedValue = Math.Abs(totalSeconds % 1) < double.Epsilon
+            ? ((int)totalSeconds).ToString(CultureInfo.InvariantCulture)
+            : totalSeconds.ToString("0.#", CultureInfo.InvariantCulture);
+
+        return $"{formattedValue} second{(formattedValue == "1" ? string.Empty : "s")}";
     }
 
     private static string BuildUserPrompt(JobScoringGatewayRequest request)
@@ -208,25 +278,21 @@ public sealed class OpenAiJobScoringGateway : IJobScoringGateway
     }
 
     private static bool TryExtractScoreResult(
-        string responseBody,
+        string? outputText,
         out JobScoringGatewayResult? result,
         out string? errorMessage)
     {
         result = null;
         errorMessage = null;
 
+        if (string.IsNullOrWhiteSpace(outputText))
+        {
+            errorMessage = "OpenAI scoring response did not contain output text.";
+            return false;
+        }
+
         try
         {
-            using var document = JsonDocument.Parse(responseBody);
-            var root = document.RootElement;
-            var outputText = TryReadOutputText(root);
-
-            if (string.IsNullOrWhiteSpace(outputText))
-            {
-                errorMessage = "OpenAI scoring response did not contain output text.";
-                return false;
-            }
-
             using var payload = JsonDocument.Parse(outputText);
             var payloadRoot = payload.RootElement;
 
@@ -284,45 +350,6 @@ public sealed class OpenAiJobScoringGateway : IJobScoringGateway
         }
     }
 
-    private static string? TryReadOutputText(JsonElement root)
-    {
-        if (root.TryGetProperty("output_text", out var outputTextNode) &&
-            outputTextNode.ValueKind == JsonValueKind.String)
-        {
-            return outputTextNode.GetString();
-        }
-
-        if (!root.TryGetProperty("output", out var outputNode) ||
-            outputNode.ValueKind != JsonValueKind.Array)
-        {
-            return null;
-        }
-
-        foreach (var item in outputNode.EnumerateArray())
-        {
-            if (!item.TryGetProperty("content", out var contentNode) ||
-                contentNode.ValueKind != JsonValueKind.Array)
-            {
-                continue;
-            }
-
-            foreach (var contentItem in contentNode.EnumerateArray())
-            {
-                if (!contentItem.TryGetProperty("type", out var typeNode) ||
-                    !string.Equals(typeNode.GetString(), "output_text", StringComparison.Ordinal) ||
-                    !contentItem.TryGetProperty("text", out var textNode) ||
-                    textNode.ValueKind != JsonValueKind.String)
-                {
-                    continue;
-                }
-
-                return textNode.GetString();
-            }
-        }
-
-        return null;
-    }
-
     private static string ReadRequiredString(
         JsonElement element,
         string propertyName,
@@ -338,28 +365,6 @@ public sealed class OpenAiJobScoringGateway : IJobScoringGateway
         }
 
         return propertyNode.GetString() ?? string.Empty;
-    }
-
-    private static string? TryReadErrorMessage(string responseBody)
-    {
-        try
-        {
-            using var document = JsonDocument.Parse(responseBody);
-
-            if (!document.RootElement.TryGetProperty("error", out var errorNode) ||
-                errorNode.ValueKind != JsonValueKind.Object ||
-                !errorNode.TryGetProperty("message", out var messageNode) ||
-                messageNode.ValueKind != JsonValueKind.String)
-            {
-                return null;
-            }
-
-            return messageNode.GetString();
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
     }
 }
 

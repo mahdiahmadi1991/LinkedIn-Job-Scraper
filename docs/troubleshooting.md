@@ -110,6 +110,20 @@ What to do:
 2. Confirm the API key belongs to the intended project.
 3. Confirm that project has active billing and quota.
 
+### Symptom: OpenAI scoring times out or finishes too slowly
+
+Likely cause:
+
+- the selected model is taking longer than the current request timeout
+- background scoring is enabled and the overall polling timeout is too short for the current workload
+
+What to do:
+
+1. Increase `OpenAI:Security:RequestTimeoutSeconds` for individual create/get calls.
+2. Increase `OpenAI:Security:BackgroundPollingTimeoutSeconds` if background mode is enabled.
+3. Adjust `OpenAI:Security:BackgroundPollingIntervalMilliseconds` if you need faster or less frequent polling.
+4. Disable `OpenAI:Security:UseBackgroundMode` only if you explicitly want single-request foreground behavior.
+
 ## 4. SQL Server Problems
 
 ### Symptom: The app starts but database-backed features fail

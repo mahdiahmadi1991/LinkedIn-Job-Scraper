@@ -71,20 +71,8 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient<ILinkedInApiClient, LinkedInApiClient>()
             .ConfigurePrimaryHttpMessageHandler(CreateLinkedInHttpHandler);
 
-        services.AddHttpClient<IJobScoringGateway, OpenAiJobScoringGateway>(
-            static (serviceProvider, client) =>
-            {
-                var options = serviceProvider
-                    .GetRequiredService<IOptions<OpenAiSecurityOptions>>()
-                    .Value;
-
-                var baseUrl = string.IsNullOrWhiteSpace(options.BaseUrl)
-                    ? "https://api.openai.com/v1"
-                    : options.BaseUrl.TrimEnd('/');
-
-                client.BaseAddress = new Uri(baseUrl);
-                client.Timeout = TimeSpan.FromSeconds(45);
-            });
+        services.AddTransient<IOpenAiResponsesClient, OpenAiSdkResponsesClient>();
+        services.AddTransient<IJobScoringGateway, OpenAiJobScoringGateway>();
 
         services.AddTransient<LinkedInFeasibilityProbe>();
 

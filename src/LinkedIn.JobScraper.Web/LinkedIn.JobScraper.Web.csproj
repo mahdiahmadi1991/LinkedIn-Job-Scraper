@@ -12,6 +12,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.3" />
     <PackageReference Include="Microsoft.Playwright" Version="1.58.0" />
+    <PackageReference Include="OpenAI" Version="2.9.1" />
   </ItemGroup>
 
 </Project>
