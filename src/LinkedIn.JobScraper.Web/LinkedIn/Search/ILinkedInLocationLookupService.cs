@@ -1,6 +1,8 @@
 using System.Text.Json;
+using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.LinkedIn.Api;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
+using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.LinkedIn.Search;
 
@@ -12,16 +14,19 @@ public interface ILinkedInLocationLookupService
 public sealed class LinkedInLocationLookupService : ILinkedInLocationLookupService
 {
     private readonly ILinkedInApiClient _linkedInApiClient;
+    private readonly LinkedInRequestOptions _linkedInRequestOptions;
     private readonly ILogger<LinkedInLocationLookupService> _logger;
     private readonly ILinkedInSessionStore _sessionStore;
 
     public LinkedInLocationLookupService(
         ILinkedInApiClient linkedInApiClient,
         ILinkedInSessionStore sessionStore,
+        IOptions<LinkedInRequestOptions> linkedInRequestOptions,
         ILogger<LinkedInLocationLookupService> logger)
     {
         _linkedInApiClient = linkedInApiClient;
         _sessionStore = sessionStore;
+        _linkedInRequestOptions = linkedInRequestOptions.Value;
         _logger = logger;
     }
 
@@ -40,8 +45,10 @@ public sealed class LinkedInLocationLookupService : ILinkedInLocationLookupServi
         }
 
         var response = await _linkedInApiClient.GetAsync(
-            LinkedInRequestDefaults.BuildGeoTypeaheadUri(query.Trim()),
-            BuildHeaders(sessionSnapshot),
+            LinkedInRequestDefaults.BuildGeoTypeaheadUri(
+                query.Trim(),
+                _linkedInRequestOptions.GraphQlQueryId),
+            BuildHeaders(sessionSnapshot, query.Trim()),
             cancellationToken);
 
         if (response.StatusCode != StatusCodes.Status200OK)
@@ -70,14 +77,17 @@ public sealed class LinkedInLocationLookupService : ILinkedInLocationLookupServi
         }
     }
 
-    private static Dictionary<string, string> BuildHeaders(LinkedInSessionSnapshot sessionSnapshot)
+    private static Dictionary<string, string> BuildHeaders(LinkedInSessionSnapshot sessionSnapshot, string query)
     {
         var headers = new Dictionary<string, string>(sessionSnapshot.Headers, StringComparer.OrdinalIgnoreCase)
         {
             ["Accept"] = "application/vnd.linkedin.normalized+json+2.1",
-            ["Referer"] =
-                "https://www.linkedin.com/jobs/search/?origin=JOB_SEARCH_PAGE_LOCATION_AUTOCOMPLETE&refresh=true",
-            ["x-li-pem-metadata"] = LinkedInRequestDefaults.GeoTypeaheadPemMetadata
+            ["Referer"] = LinkedInRequestDefaults.BuildSearchReferer(
+                query,
+                locationGeoId: null,
+                easyApply: false,
+                jobTypeCodes: [],
+                workplaceTypeCodes: [])
         };
 
         return headers;

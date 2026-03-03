@@ -1,24 +1,28 @@
 using System.Net;
 using System.Text.Json;
+using LinkedIn.JobScraper.Web.Configuration;
+using LinkedIn.JobScraper.Web.LinkedIn;
 using LinkedIn.JobScraper.Web.LinkedIn.Api;
+using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.LinkedIn.Session;
 
 public sealed class LinkedInSessionVerificationService : ILinkedInSessionVerificationService
 {
-    private const string GeoTypeaheadQueryId = "voyagerSearchDashReusableTypeahead.4c7caa85341b17b470153ad3d1a29caf";
-
     private readonly ILinkedInApiClient _linkedInApiClient;
+    private readonly LinkedInRequestOptions _linkedInRequestOptions;
     private readonly ILogger<LinkedInSessionVerificationService> _logger;
     private readonly ILinkedInSessionStore _sessionStore;
 
     public LinkedInSessionVerificationService(
         ILinkedInApiClient linkedInApiClient,
         ILinkedInSessionStore sessionStore,
+        IOptions<LinkedInRequestOptions> linkedInRequestOptions,
         ILogger<LinkedInSessionVerificationService> logger)
     {
         _linkedInApiClient = linkedInApiClient;
         _sessionStore = sessionStore;
+        _linkedInRequestOptions = linkedInRequestOptions.Value;
         _logger = logger;
     }
 
@@ -32,7 +36,7 @@ public sealed class LinkedInSessionVerificationService : ILinkedInSessionVerific
                 "No stored LinkedIn session is available yet.");
         }
 
-        var requestUri = BuildVerificationUri();
+        var requestUri = BuildVerificationUri(_linkedInRequestOptions.GraphQlQueryId);
         var headers = BuildHeaders(sessionSnapshot);
         var response = await _linkedInApiClient.GetAsync(requestUri, headers, cancellationToken);
 
@@ -84,12 +88,9 @@ public sealed class LinkedInSessionVerificationService : ILinkedInSessionVerific
         }
     }
 
-    private static Uri BuildVerificationUri()
+    private static Uri BuildVerificationUri(string? graphQlQueryId)
     {
-        const string variables =
-            "(keywords:Cyprus,query:(typeaheadFilterQuery:(geoSearchTypes:List(POSTCODE_1,POSTCODE_2,POPULATED_PLACE,ADMIN_DIVISION_1,ADMIN_DIVISION_2,COUNTRY_REGION,MARKET_AREA,COUNTRY_CLUSTER)),typeaheadUseCase:JOBS),type:GEO)";
-        var rawUri = $"https://www.linkedin.com/voyager/api/graphql?variables={variables}&queryId={GeoTypeaheadQueryId}";
-        return new Uri(rawUri, UriKind.Absolute);
+        return LinkedInRequestDefaults.BuildGeoTypeaheadUri("Cyprus", graphQlQueryId);
     }
 
     private static Dictionary<string, string> BuildHeaders(LinkedInSessionSnapshot sessionSnapshot)
@@ -97,9 +98,12 @@ public sealed class LinkedInSessionVerificationService : ILinkedInSessionVerific
         var headers = new Dictionary<string, string>(sessionSnapshot.Headers, StringComparer.OrdinalIgnoreCase)
         {
             ["Accept"] = "application/vnd.linkedin.normalized+json+2.1",
-            ["x-li-pem-metadata"] = "Voyager - Search Single Typeahead=jobs-geo",
-            ["Referer"] =
-                "https://www.linkedin.com/jobs/search/?keywords=C%23%20.Net&origin=JOB_SEARCH_PAGE_LOCATION_AUTOCOMPLETE&refresh=true"
+            ["Referer"] = LinkedInRequestDefaults.BuildSearchReferer(
+                "Cyprus",
+                locationGeoId: null,
+                easyApply: false,
+                jobTypeCodes: [],
+                workplaceTypeCodes: [])
         };
 
         return headers;

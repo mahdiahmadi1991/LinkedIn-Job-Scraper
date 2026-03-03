@@ -21,13 +21,32 @@ public sealed class LinkedInRequestDefaultsTests
         Assert.Equal("/voyager/api/voyagerJobsDashJobCards", uri.AbsolutePath);
         Assert.Contains("count=25", uri.Query, StringComparison.Ordinal);
         Assert.Contains("start=50", uri.Query, StringComparison.Ordinal);
+        Assert.Contains("sortBy:List(DD)", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
+        Assert.DoesNotContain("distance:List(25.0)", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
         Assert.Contains("applyWithLinkedin:List(true)", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
         Assert.Contains("jobType:List(F,C)", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
         Assert.Contains("workplaceType:List(1,3)", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
     }
 
     [Fact]
-    public void BuildSearchRefererFallsBackToDefaultGeoAndIncludesEasyApply()
+    public void BuildSearchUriOmitsOptionalFiltersWhenNoOverridesAreSaved()
+    {
+        var uri = LinkedInRequestDefaults.BuildSearchUri(
+            "backend engineer",
+            null,
+            easyApply: false,
+            jobTypeCodes: [],
+            workplaceTypeCodes: []);
+
+        Assert.Contains("sortBy:List(DD)", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
+        Assert.DoesNotContain("distance:List(25.0)", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
+        Assert.DoesNotContain("locationUnion:", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
+        Assert.DoesNotContain("jobType:List(", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
+        Assert.DoesNotContain("workplaceType:List(", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildSearchRefererOmitsFallbackGeoAndStaticParameters()
     {
         var referer = LinkedInRequestDefaults.BuildSearchReferer(
             "backend engineer",
@@ -36,8 +55,44 @@ public sealed class LinkedInRequestDefaultsTests
             jobTypeCodes: [],
             workplaceTypeCodes: []);
 
-        Assert.Contains("geoId=106394980", referer, StringComparison.Ordinal);
         Assert.Contains("f_AL=true", referer, StringComparison.Ordinal);
         Assert.Contains("keywords=backend%20engineer", referer, StringComparison.Ordinal);
+        Assert.Contains("origin=JOB_SEARCH_PAGE_JOB_FILTER", referer, StringComparison.Ordinal);
+        Assert.DoesNotContain("geoId=", referer, StringComparison.Ordinal);
+        Assert.DoesNotContain("distance=", referer, StringComparison.Ordinal);
+        Assert.DoesNotContain("refresh=", referer, StringComparison.Ordinal);
+        Assert.DoesNotContain("sortBy=", referer, StringComparison.Ordinal);
+        Assert.DoesNotContain("f_JT=", referer, StringComparison.Ordinal);
+        Assert.DoesNotContain("f_WT=", referer, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildJobDetailUriOmitsQueryIdAndBuildJobDetailRefererOmitsCurrentJobId()
+    {
+        var uri = LinkedInRequestDefaults.BuildJobDetailUri(
+            "4379963196",
+            "voyagerJobsDashJobPostings.891aed7916d7453a37e4bbf5f1f60de4");
+        var referer = LinkedInRequestDefaults.BuildJobDetailReferer("C# .NET", null);
+
+        Assert.Contains("variables=", uri.Query, StringComparison.Ordinal);
+        Assert.Contains("queryId=voyagerJobsDashJobPostings.891aed7916d7453a37e4bbf5f1f60de4", uri.Query, StringComparison.Ordinal);
+        Assert.Contains("keywords=C%23%20.NET", referer, StringComparison.Ordinal);
+        Assert.Contains("origin=JOB_SEARCH_PAGE_JOB_FILTER", referer, StringComparison.Ordinal);
+        Assert.DoesNotContain("currentJobId=", referer, StringComparison.Ordinal);
+        Assert.DoesNotContain("geoId=", referer, StringComparison.Ordinal);
+        Assert.DoesNotContain("distance=", referer, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildGeoTypeaheadUriOmitsQueryIdAndTypeaheadFilter()
+    {
+        var uri = LinkedInRequestDefaults.BuildGeoTypeaheadUri(
+            "Cyprus",
+            "voyagerJobsDashJobPostings.891aed7916d7453a37e4bbf5f1f60de4");
+
+        Assert.Contains("variables=", uri.Query, StringComparison.Ordinal);
+        Assert.Contains("queryId=voyagerJobsDashJobPostings.891aed7916d7453a37e4bbf5f1f60de4", uri.Query, StringComparison.Ordinal);
+        Assert.DoesNotContain("typeaheadFilterQuery", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
+        Assert.Contains("typeaheadUseCase:JOBS", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
     }
 }

@@ -32,6 +32,12 @@ public static class ServiceCollectionExtensions
         services.AddOptions<LinkedInFetchDiagnosticsOptions>()
             .Bind(configuration.GetSection(LinkedInFetchDiagnosticsOptions.SectionName));
 
+        services.AddOptions<LinkedInFetchLimitsOptions>()
+            .Bind(configuration.GetSection(LinkedInFetchLimitsOptions.SectionName));
+
+        services.AddOptions<LinkedInRequestOptions>()
+            .Bind(configuration.GetSection(LinkedInRequestOptions.SectionName));
+
         services.AddOptions<LinkedInBrowserAutomationOptions>()
             .Bind(configuration.GetSection(LinkedInBrowserAutomationOptions.SectionName));
 

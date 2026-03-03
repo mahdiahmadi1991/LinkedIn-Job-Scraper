@@ -1,4 +1,5 @@
 using LinkedIn.JobScraper.Web.LinkedIn.Api;
+using LinkedIn.JobScraper.Web.LinkedIn;
 using LinkedIn.JobScraper.Web.LinkedIn.Search;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using LinkedIn.JobScraper.Web.Configuration;
@@ -20,6 +21,7 @@ public sealed class LinkedInJobSearchServiceTests
             sessionStore,
             new FakeLinkedInSearchSettingsService(),
             Options.Create(new LinkedInFetchDiagnosticsOptions()),
+            Options.Create(new LinkedInFetchLimitsOptions()),
             NullLogger<LinkedInJobSearchService>.Instance);
 
         var result = await service.FetchCurrentSearchAsync(CancellationToken.None);
@@ -46,6 +48,7 @@ public sealed class LinkedInJobSearchServiceTests
             sessionStore,
             new FakeLinkedInSearchSettingsService(),
             Options.Create(new LinkedInFetchDiagnosticsOptions()),
+            Options.Create(new LinkedInFetchLimitsOptions()),
             NullLogger<LinkedInJobSearchService>.Instance);
 
         var result = await service.FetchCurrentSearchAsync(CancellationToken.None);
@@ -59,13 +62,81 @@ public sealed class LinkedInJobSearchServiceTests
         Assert.Contains("expired", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task FetchCurrentSearchAsyncUsesDefaultFetchCapsWhenOverridesAreNotConfigured()
+    {
+        var apiClient = new FakeLinkedInApiClient(
+            CreateSuccessfulSearchPage(pageIndex: 0, returnedCount: 100, totalCount: 1300),
+            CreateSuccessfulSearchPage(pageIndex: 1, returnedCount: 25, totalCount: 1300));
+        var sessionStore = new FakeLinkedInSessionStore(
+            new LinkedInSessionSnapshot(
+                new Dictionary<string, string> { ["Cookie"] = "li_at=test" },
+                DateTimeOffset.UtcNow,
+                "Test"));
+        var service = new LinkedInJobSearchService(
+            apiClient,
+            sessionStore,
+            new FakeLinkedInSearchSettingsService(),
+            Options.Create(new LinkedInFetchDiagnosticsOptions()),
+            Options.Create(new LinkedInFetchLimitsOptions()),
+            NullLogger<LinkedInJobSearchService>.Instance);
+
+        var result = await service.FetchCurrentSearchAsync(CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(2, result.PagesFetched);
+        Assert.Equal(LinkedInRequestDefaults.DefaultSearchJobCap, result.ReturnedCount);
+        Assert.Equal(LinkedInRequestDefaults.DefaultSearchJobCap, result.Jobs.Count);
+        Assert.Equal(1300, result.TotalCount);
+        Assert.Equal(2, apiClient.CallCount);
+    }
+
+    [Fact]
+    public async Task FetchCurrentSearchAsyncUsesConfiguredFetchCapsWhenProvided()
+    {
+        const int searchPageCap = 6;
+        const int searchJobCap = 150;
+
+        var apiClient = new FakeLinkedInApiClient(
+            CreateSuccessfulSearchPage(pageIndex: 0, returnedCount: 100, totalCount: 1300),
+            CreateSuccessfulSearchPage(pageIndex: 1, returnedCount: 50, totalCount: 1300));
+        var sessionStore = new FakeLinkedInSessionStore(
+            new LinkedInSessionSnapshot(
+                new Dictionary<string, string> { ["Cookie"] = "li_at=test" },
+                DateTimeOffset.UtcNow,
+                "Test"));
+        var service = new LinkedInJobSearchService(
+            apiClient,
+            sessionStore,
+            new FakeLinkedInSearchSettingsService(),
+            Options.Create(new LinkedInFetchDiagnosticsOptions()),
+            Options.Create(
+                new LinkedInFetchLimitsOptions
+                {
+                    SearchPageCap = searchPageCap,
+                    SearchJobCap = searchJobCap
+                }),
+            NullLogger<LinkedInJobSearchService>.Instance);
+
+        var result = await service.FetchCurrentSearchAsync(CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(2, result.PagesFetched);
+        Assert.Equal(searchJobCap, result.ReturnedCount);
+        Assert.Equal(searchJobCap, result.Jobs.Count);
+        Assert.Equal(1300, result.TotalCount);
+        Assert.Equal(2, apiClient.CallCount);
+    }
+
     private sealed class FakeLinkedInApiClient : ILinkedInApiClient
     {
-        private readonly LinkedInApiResponse _response;
+        private readonly LinkedInApiResponse[] _responses;
 
-        public FakeLinkedInApiClient(LinkedInApiResponse response)
+        public FakeLinkedInApiClient(params LinkedInApiResponse[] responses)
         {
-            _response = response;
+            _responses = responses;
         }
 
         public int CallCount { get; private set; }
@@ -76,7 +147,8 @@ public sealed class LinkedInJobSearchServiceTests
             CancellationToken cancellationToken)
         {
             CallCount++;
-            return Task.FromResult(_response);
+            var responseIndex = Math.Min(CallCount - 1, _responses.Length - 1);
+            return Task.FromResult(_responses[responseIndex]);
         }
     }
 
@@ -133,5 +205,49 @@ public sealed class LinkedInJobSearchServiceTests
         {
             throw new NotSupportedException();
         }
+    }
+
+    private static LinkedInApiResponse CreateSuccessfulSearchPage(int pageIndex, int returnedCount, int totalCount)
+    {
+        var elements = string.Join(
+            ",",
+            Enumerable.Range(0, returnedCount)
+                .Select(
+                    offset =>
+                    {
+                        var jobNumber = (pageIndex * LinkedInRequestDefaults.DefaultSearchPageSize) + offset + 1;
+                        return $"{{\"jobCardUnion\":{{\"*jobPostingCard\":\"urn:li:fsd_jobCard:{jobNumber}\"}}}}";
+                    }));
+
+        var included = string.Join(
+            ",",
+            Enumerable.Range(0, returnedCount)
+                .Select(
+                    offset =>
+                    {
+                        var jobNumber = (pageIndex * LinkedInRequestDefaults.DefaultSearchPageSize) + offset + 1;
+
+                        return
+                            "{" +
+                            "\"$type\":\"com.linkedin.voyager.dash.jobs.JobPostingCard\"," +
+                            $"\"entityUrn\":\"urn:li:fsd_jobCard:{jobNumber}\"," +
+                            $"\"*jobPosting\":\"urn:li:fsd_jobPosting:{jobNumber}\"," +
+                            $"\"title\":{{\"text\":\"Job {jobNumber}\"}}," +
+                            $"\"primaryDescription\":{{\"text\":\"Company {jobNumber}\"}}," +
+                            $"\"secondaryDescription\":{{\"text\":\"Location {jobNumber}\"}}," +
+                            "\"footerItems\":[{\"type\":\"LISTED_DATE\",\"timeAt\":1735689600000}]" +
+                            "}";
+                    }));
+
+        var body =
+            "{" +
+            "\"data\":{" +
+            $"\"elements\":[{elements}]," +
+            $"\"paging\":{{\"total\":{totalCount}}}" +
+            "}," +
+            $"\"included\":[{included}]" +
+            "}";
+
+        return new LinkedInApiResponse(200, true, body);
     }
 }

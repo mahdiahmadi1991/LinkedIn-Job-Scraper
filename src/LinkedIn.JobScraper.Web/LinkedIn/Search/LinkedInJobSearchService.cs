@@ -10,11 +10,10 @@ namespace LinkedIn.JobScraper.Web.LinkedIn.Search;
 public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
 {
     private const string JobPostingCardType = "com.linkedin.voyager.dash.jobs.JobPostingCard";
-    private const int SearchPageCap = LinkedInRequestDefaults.DefaultSearchPageCap;
-    private const int SearchJobCap = LinkedInRequestDefaults.DefaultSearchJobCap;
     private static readonly TimeSpan SearchPageDelay = TimeSpan.FromMilliseconds(
         LinkedInRequestDefaults.DefaultSearchPageDelayMilliseconds);
 
+    private readonly LinkedInFetchLimitsOptions _fetchLimitsOptions;
     private readonly ILinkedInApiClient _linkedInApiClient;
     private readonly LinkedInFetchDiagnosticsOptions _fetchDiagnosticsOptions;
     private readonly ILogger<LinkedInJobSearchService> _logger;
@@ -26,12 +25,14 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
         ILinkedInSessionStore sessionStore,
         ILinkedInSearchSettingsService linkedInSearchSettingsService,
         IOptions<LinkedInFetchDiagnosticsOptions> fetchDiagnosticsOptions,
+        IOptions<LinkedInFetchLimitsOptions> fetchLimitsOptions,
         ILogger<LinkedInJobSearchService> logger)
     {
         _linkedInApiClient = linkedInApiClient;
         _sessionStore = sessionStore;
         _linkedInSearchSettingsService = linkedInSearchSettingsService;
         _fetchDiagnosticsOptions = fetchDiagnosticsOptions.Value;
+        _fetchLimitsOptions = fetchLimitsOptions.Value;
         _logger = logger;
     }
 
@@ -39,6 +40,8 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
     {
         var diagnosticsEnabled = _fetchDiagnosticsOptions.Enabled;
         var canLogDiagnostics = diagnosticsEnabled && _logger.IsEnabled(LogLevel.Information);
+        var searchPageCap = _fetchLimitsOptions.GetSearchPageCap();
+        var searchJobCap = _fetchLimitsOptions.GetSearchJobCap();
         var sessionSnapshot = await _sessionStore.GetCurrentAsync(cancellationToken);
 
         if (sessionSnapshot is null)
@@ -50,7 +53,7 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
 
         var searchSettings = await _linkedInSearchSettingsService.GetActiveAsync(cancellationToken);
         var headers = MergeHeaders(sessionSnapshot, searchSettings);
-        var aggregatedJobs = new List<LinkedInJobSearchItem>(SearchJobCap);
+        var aggregatedJobs = new List<LinkedInJobSearchItem>(searchJobCap);
         var seenJobIds = new HashSet<string>(StringComparer.Ordinal);
         var totalAvailableCount = 0;
         var pagesFetched = 0;
@@ -67,8 +70,8 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
             Log.LinkedInFetchDiagnosticsStarted(
                 _logger,
                 sessionSnapshot.Source,
-                SearchPageCap,
-                SearchJobCap,
+                searchPageCap,
+                searchJobCap,
                 sanitizedKeywords,
                 searchSettings.LocationGeoId ?? "(default)",
                 searchSettings.EasyApply,
@@ -76,9 +79,9 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
                 workplaceTypesSummary);
         }
 
-        for (var pageIndex = 0; pageIndex < SearchPageCap && aggregatedJobs.Count < SearchJobCap; pageIndex++)
+        for (var pageIndex = 0; pageIndex < searchPageCap && aggregatedJobs.Count < searchJobCap; pageIndex++)
         {
-            var remainingCapacity = SearchJobCap - aggregatedJobs.Count;
+            var remainingCapacity = searchJobCap - aggregatedJobs.Count;
             var requestedCount = Math.Min(LinkedInRequestDefaults.DefaultSearchPageSize, remainingCapacity);
             var start = pageIndex * LinkedInRequestDefaults.DefaultSearchPageSize;
 
@@ -241,7 +244,7 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
 
             if (pageResult.ReturnedCount == 0 ||
                 pageResult.ReturnedCount < requestedCount ||
-                aggregatedJobs.Count >= SearchJobCap)
+                aggregatedJobs.Count >= searchJobCap)
             {
                 if (canLogDiagnostics)
                 {
@@ -505,8 +508,7 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
                 searchSettings.LocationGeoId,
                 searchSettings.EasyApply,
                 searchSettings.JobTypeCodes,
-                searchSettings.WorkplaceTypeCodes),
-            ["x-li-pem-metadata"] = LinkedInRequestDefaults.SearchPemMetadata
+                searchSettings.WorkplaceTypeCodes)
         };
 
         return merged;
