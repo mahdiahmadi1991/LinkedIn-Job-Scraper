@@ -11,73 +11,83 @@
     };
 }
 
-<div class="d-flex flex-column gap-4">
-    <section class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start gap-3">
-        <div>
-            <div class="mb-2">
+<div class="job-details-page page-shell">
+    <section class="details-hero p-4 p-xl-5 d-flex flex-column flex-lg-row justify-content-between align-items-lg-start gap-4">
+        <div class="flex-grow-1">
+            <div class="section-label mb-2">Opportunity Review</div>
+            <div class="mb-3">
                 <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back to Jobs</a>
             </div>
-            <h1 class="h2 mb-1">@Model.Title</h1>
-            <p class="text-muted mb-0">
-                @(Model.CompanyName ?? "Unknown company")
+            <h1 class="details-title h2">@Model.Title</h1>
+            <div class="details-meta-stack">
+                <span class="job-meta-pill">@(Model.CompanyName ?? "Unknown company")</span>
                 @if (!string.IsNullOrWhiteSpace(Model.LocationName))
                 {
-                    <span> | @Model.LocationName</span>
+                    <span class="job-meta-pill">@Model.LocationName</span>
                 }
                 @if (!string.IsNullOrWhiteSpace(Model.EmploymentStatus))
                 {
-                    <span> | @Model.EmploymentStatus</span>
+                    <span class="job-meta-pill">@Model.EmploymentStatus</span>
                 }
-            </p>
+            </div>
         </div>
-        <div class="d-flex flex-column gap-2 align-items-lg-end">
+        <div class="details-score-card d-flex flex-column gap-2 align-items-lg-end">
             <span class="badge rounded-pill @fitBadgeClass fs-6">@(Model.AiLabel ?? "Pending")</span>
             @if (Model.AiScore.HasValue)
             {
-                <div class="fw-semibold">@Model.AiScore / 100</div>
+                <div class="details-fit-score">@Model.AiScore<span class="fit-score-muted">/100</span></div>
             }
             else
             {
-                <div class="text-muted small">Not scored yet</div>
+                <div class="fit-score-muted">Not scored yet</div>
             }
             @if (!string.IsNullOrWhiteSpace(Model.CompanyApplyUrl))
             {
-                <a class="btn btn-primary" href="@Model.CompanyApplyUrl" target="_blank" rel="noreferrer">Open Apply</a>
+                <a class="btn btn-primary w-100" href="@Model.CompanyApplyUrl" target="_blank" rel="noreferrer">Open Apply</a>
             }
         </div>
     </section>
 
     <section class="row g-4">
         <div class="col-12 col-xl-4">
-            <div class="card h-100">
+            <div class="card h-100 details-panel">
                 <div class="card-body">
-                    <h2 class="h5">Timeline</h2>
-                    <dl class="mb-0">
-                        <dt class="small text-muted text-uppercase">Listed</dt>
-                        <dd class="mb-3">
-                            @(Model.ListedAtUtc.HasValue
-                                ? Model.ListedAtUtc.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
-                                : "Unknown")
-                        </dd>
-                        <dt class="small text-muted text-uppercase">First Seen</dt>
-                        <dd class="mb-3">@Model.FirstDiscoveredAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</dd>
-                        <dt class="small text-muted text-uppercase">Last Seen</dt>
-                        <dd class="mb-3">@Model.LastSeenAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</dd>
-                        <dt class="small text-muted text-uppercase">Workflow Status</dt>
-                        <dd class="mb-0">@Model.CurrentStatus</dd>
-                    </dl>
+                    <div class="section-label mb-3">Timeline</div>
+                    <div class="details-timeline">
+                        <div class="details-timeline-item">
+                            <div class="details-timeline-label">Listed</div>
+                            <div class="details-timeline-value">
+                                @(Model.ListedAtUtc.HasValue
+                                    ? Model.ListedAtUtc.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
+                                    : "Unknown")
+                            </div>
+                        </div>
+                        <div class="details-timeline-item">
+                            <div class="details-timeline-label">First Seen</div>
+                            <div class="details-timeline-value">@Model.FirstDiscoveredAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</div>
+                        </div>
+                        <div class="details-timeline-item">
+                            <div class="details-timeline-label">Last Seen</div>
+                            <div class="details-timeline-value">@Model.LastSeenAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</div>
+                        </div>
+                        <div class="details-timeline-item">
+                            <div class="details-timeline-label">Workflow Status</div>
+                            <div class="details-timeline-value">@Model.CurrentStatus</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div class="col-12 col-xl-8">
-            <div class="card h-100">
+            <div class="card h-100 details-panel">
                 <div class="card-body d-flex flex-column gap-3">
                     <div>
+                        <div class="section-label mb-2">AI Review</div>
                         <h2 class="h5">AI Review</h2>
                         @if (!string.IsNullOrWhiteSpace(Model.AiSummary))
                         {
-                            <p class="mb-2">@Model.AiSummary</p>
+                            <p class="mb-2 job-summary">@Model.AiSummary</p>
                         }
                         else
                         {
@@ -87,16 +97,16 @@
 
                     @if (!string.IsNullOrWhiteSpace(Model.AiWhyMatched))
                     {
-                        <div>
-                            <div class="small text-success fw-semibold text-uppercase">Why Matched</div>
+                        <div class="details-review-block match">
+                            <div class="small text-success fw-semibold text-uppercase mb-1">Why Matched</div>
                             <div>@Model.AiWhyMatched</div>
                         </div>
                     }
 
                     @if (!string.IsNullOrWhiteSpace(Model.AiConcerns))
                     {
-                        <div>
-                            <div class="small text-warning-emphasis fw-semibold text-uppercase">Concerns</div>
+                        <div class="details-review-block concern">
+                            <div class="small text-warning-emphasis fw-semibold text-uppercase mb-1">Concerns</div>
                             <div>@Model.AiConcerns</div>
                         </div>
                     }
@@ -105,8 +115,9 @@
         </div>
     </section>
 
-    <section class="card">
+    <section class="card details-panel">
         <div class="card-body">
+            <div class="section-label mb-2">Source Content</div>
             <h2 class="h5">Job Description</h2>
             @if (string.IsNullOrWhiteSpace(Model.Description))
             {
@@ -114,7 +125,7 @@
             }
             else
             {
-                <div class="text-body-secondary" style="white-space: pre-wrap;">@Model.Description</div>
+                <div class="details-description">@Model.Description</div>
             }
         </div>
     </section>

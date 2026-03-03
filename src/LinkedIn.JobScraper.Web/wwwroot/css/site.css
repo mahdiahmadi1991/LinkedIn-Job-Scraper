@@ -291,6 +291,98 @@ a:hover {
   overflow: hidden;
 }
 
+.job-details-page .details-hero {
+  border: 1px solid rgba(10, 102, 194, 0.08);
+  border-radius: 1.25rem;
+  background:
+    linear-gradient(140deg, rgba(255, 255, 255, 0.98), rgba(238, 246, 255, 0.92)),
+    linear-gradient(90deg, rgba(10, 102, 194, 0.06), transparent);
+  box-shadow: 0 22px 42px -30px rgba(17, 55, 94, 0.34);
+}
+
+.job-details-page .details-title {
+  margin-bottom: 0.45rem;
+}
+
+.details-score-card {
+  min-width: 11rem;
+  padding: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 254, 0.96));
+}
+
+.details-fit-score {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.details-meta-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.details-panel {
+  overflow: hidden;
+}
+
+.details-panel .card-body {
+  padding: 1.2rem;
+}
+
+.details-timeline {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.details-timeline-item {
+  display: grid;
+  gap: 0.28rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid rgba(220, 230, 241, 0.72);
+}
+
+.details-timeline-item:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.details-timeline-label {
+  color: var(--app-ink-500);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.details-timeline-value {
+  color: var(--app-ink-900);
+  font-weight: 600;
+}
+
+.details-review-block {
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #fff, #f7fbff);
+}
+
+.details-review-block.match {
+  border-color: rgba(17, 122, 55, 0.18);
+}
+
+.details-review-block.concern {
+  border-color: rgba(154, 103, 0, 0.18);
+}
+
+.details-description {
+  color: var(--app-ink-700);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
 .jobs-page .summary-tile,
 .jobs-page .progress-tile,
 .jobs-page .stat-tile {
