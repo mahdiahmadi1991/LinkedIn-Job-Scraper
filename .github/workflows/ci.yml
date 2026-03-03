@@ -30,7 +30,21 @@ jobs:
         run: dotnet build LinkedIn.JobScraper.sln --configuration Release --no-restore -warnaserror
 
       - name: Test
-        run: dotnet test LinkedIn.JobScraper.sln --configuration Release --no-build
+        run: >
+          dotnet test LinkedIn.JobScraper.sln
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory ./artifacts/test-results
+          --collect:"XPlat Code Coverage"
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: artifacts/test-results
+          if-no-files-found: error
 
   dependency-review:
     if: github.event_name == 'pull_request'
