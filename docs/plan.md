@@ -204,6 +204,16 @@ Run Step 1 before any broader implementation. If the session-replay spike fails,
 - stronger secret protection
 - background processing
 
+## Current Prioritized Execution Queue
+
+This queue records the approved post-MVP implementation order so follow-up work remains consistent and reviewable.
+
+1. Complete `ProblemDetails` for the remaining important JSON endpoints, starting with `DiagnosticsController`
+2. Expand CI-safe fake-backed orchestration and controller tests where they reduce active integration risk
+3. Review indexes and query shape for dashboard and batch-heavy paths
+4. Reduce session-storage risk further through payload minimization and, if justified, local encryption-at-rest
+5. Continue portfolio polish only where it materially improves maintainability or reviewer comprehension
+
 ## Post-MVP Feedback Plan
 
 This section captures the first round of manual-test feedback after the MVP baseline was completed.

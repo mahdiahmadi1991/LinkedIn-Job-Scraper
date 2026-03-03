@@ -95,7 +95,10 @@ public class DiagnosticsController : Controller
 
         if (!result.Success)
         {
-            return StatusCode(result.StatusCode ?? StatusCodes.Status502BadGateway, result);
+            return Problem(
+                title: "LinkedIn diagnostics probe failed",
+                detail: result.Message,
+                statusCode: result.StatusCode ?? StatusCodes.Status502BadGateway);
         }
 
         return Json(result);
@@ -108,7 +111,10 @@ public class DiagnosticsController : Controller
 
         if (!result.Success)
         {
-            return StatusCode(result.StatusCode, result);
+            return Problem(
+                title: "LinkedIn import diagnostics failed",
+                detail: result.Message,
+                statusCode: result.StatusCode);
         }
 
         return Json(result);
@@ -123,7 +129,10 @@ public class DiagnosticsController : Controller
 
         if (!result.Success)
         {
-            return StatusCode(result.StatusCode, result);
+            return Problem(
+                title: "LinkedIn enrichment diagnostics failed",
+                detail: result.Message,
+                statusCode: result.StatusCode);
         }
 
         return Json(result);
@@ -138,7 +147,10 @@ public class DiagnosticsController : Controller
 
         if (!result.Success)
         {
-            return StatusCode(result.StatusCode, result);
+            return Problem(
+                title: "AI scoring diagnostics failed",
+                detail: result.Message,
+                statusCode: result.StatusCode);
         }
 
         return Json(result);
