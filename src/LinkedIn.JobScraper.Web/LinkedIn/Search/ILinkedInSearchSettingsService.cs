@@ -13,9 +13,6 @@ public interface ILinkedInSearchSettingsService
 
 public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsService, IDisposable
 {
-    private static readonly string[] DefaultWorkplaceTypeCodes = ["1", "2", "3"];
-    private static readonly string[] DefaultJobTypeCodes = ["F", "P", "C", "T", "I", "O"];
-
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly SemaphoreSlim _initializationGate = new(1, 1);
     private volatile bool _databaseEnsured;
@@ -50,14 +47,14 @@ public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsServi
             entry.Property(static current => current.RowVersion).OriginalValue = originalRowVersion;
         }
 
-        record.ProfileName = string.IsNullOrWhiteSpace(settings.ProfileName) ? "Default" : settings.ProfileName.Trim();
+        record.ProfileName = settings.ProfileName.Trim();
         record.Keywords = settings.Keywords.Trim();
         record.LocationInput = NormalizeNullable(settings.LocationInput);
         record.LocationDisplayName = NormalizeNullable(settings.LocationDisplayName);
         record.LocationGeoId = NormalizeNullable(settings.LocationGeoId);
         record.EasyApply = settings.EasyApply;
-        record.WorkplaceTypeCodesCsv = ToCsv(settings.WorkplaceTypeCodes, DefaultWorkplaceTypeCodes);
-        record.JobTypeCodesCsv = ToCsv(settings.JobTypeCodes, DefaultJobTypeCodes);
+        record.WorkplaceTypeCodesCsv = ToCsv(settings.WorkplaceTypeCodes);
+        record.JobTypeCodesCsv = ToCsv(settings.JobTypeCodes);
         record.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
         try
@@ -86,14 +83,14 @@ public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsServi
         {
             record = new LinkedInSearchSettingsRecord
             {
-                ProfileName = "Default",
-                Keywords = "C# .Net",
-                LocationInput = "Limassol, Cyprus",
-                LocationDisplayName = "Limassol, Cyprus",
-                LocationGeoId = "106394980",
-                EasyApply = true,
-                WorkplaceTypeCodesCsv = ToCsv(DefaultWorkplaceTypeCodes, DefaultWorkplaceTypeCodes),
-                JobTypeCodesCsv = ToCsv(DefaultJobTypeCodes, DefaultJobTypeCodes),
+                ProfileName = string.Empty,
+                Keywords = string.Empty,
+                LocationInput = null,
+                LocationDisplayName = null,
+                LocationGeoId = null,
+                EasyApply = false,
+                WorkplaceTypeCodesCsv = string.Empty,
+                JobTypeCodesCsv = string.Empty,
                 UpdatedAtUtc = DateTimeOffset.UtcNow
             };
 
@@ -113,8 +110,8 @@ public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsServi
             record.LocationDisplayName,
             record.LocationGeoId,
             record.EasyApply,
-            SplitCsv(record.WorkplaceTypeCodesCsv, DefaultWorkplaceTypeCodes),
-            SplitCsv(record.JobTypeCodesCsv, DefaultJobTypeCodes),
+            SplitCsv(record.WorkplaceTypeCodesCsv),
+            SplitCsv(record.JobTypeCodesCsv),
             ConcurrencyTokenCodec.Encode(record.RowVersion));
     }
 
@@ -123,7 +120,7 @@ public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsServi
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
-    private static string ToCsv(IEnumerable<string> values, IReadOnlyCollection<string> fallback)
+    private static string ToCsv(IEnumerable<string> values)
     {
         var normalized = values
             .Where(static value => !string.IsNullOrWhiteSpace(value))
@@ -131,16 +128,14 @@ public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsServi
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        return string.Join(',', normalized.Length == 0 ? fallback : normalized);
+        return string.Join(',', normalized);
     }
 
-    private static string[] SplitCsv(string csv, IReadOnlyCollection<string> fallback)
+    private static string[] SplitCsv(string csv)
     {
-        var values = csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        return csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-
-        return values.Length == 0 ? [.. fallback] : values;
     }
 
     private async Task EnsureDatabaseAsync(CancellationToken cancellationToken)

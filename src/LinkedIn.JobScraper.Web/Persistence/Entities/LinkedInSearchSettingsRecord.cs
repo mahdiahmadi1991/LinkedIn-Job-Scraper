@@ -4,7 +4,7 @@ public sealed class LinkedInSearchSettingsRecord
 {
     public int Id { get; set; }
 
-    public string ProfileName { get; set; } = "Default";
+    public string ProfileName { get; set; } = string.Empty;
 
     public string Keywords { get; set; } = string.Empty;
 

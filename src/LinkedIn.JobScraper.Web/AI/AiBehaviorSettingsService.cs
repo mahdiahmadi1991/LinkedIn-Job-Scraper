@@ -70,13 +70,10 @@ public sealed class AiBehaviorSettingsService : IAiBehaviorSettingsService
         {
             record = new AiBehaviorSettingsRecord
             {
-                ProfileName = "Default",
-                BehavioralInstructions =
-                    "Prefer practical fit for the user's current C# and .NET career path. Favor roles that are realistically actionable now.",
-                PrioritySignals =
-                    "C#, .NET, ASP.NET Core, backend engineering, clear scope, remote-friendly roles, direct apply path, concrete requirements.",
-                ExclusionSignals =
-                    "Strong stack mismatch, unclear responsibilities, vague descriptions, low evidence of fit, or roles far outside established experience.",
+                ProfileName = string.Empty,
+                BehavioralInstructions = string.Empty,
+                PrioritySignals = string.Empty,
+                ExclusionSignals = string.Empty,
                 OutputLanguageCode = AiOutputLanguage.English,
                 UpdatedAtUtc = DateTimeOffset.UtcNow
             };

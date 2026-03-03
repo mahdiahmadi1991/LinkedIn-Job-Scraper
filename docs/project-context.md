@@ -93,6 +93,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - `Fetch & Score` workflow progress now carries the active HTTP correlation id in each SignalR progress payload, so request-scoped logs and live progress events can be tied together without changing workflow behavior
 - A minimal redaction policy now sanitizes sensitive token-like text in exception-derived operational messages and diagnostics surfaces, reducing the chance of cookies, API keys, or bearer-like strings being echoed back to users or nearby logs
 - The latest architecture-and-quality remediation execution queue is now closed: its CI and documentation follow-up items were rechecked after implementation and no further gap-only pass was justified for that phase
+- Inline page scripts are being moved out of Razor views into versioned static files, and first-run settings forms no longer pre-populate workflow filters or AI guidance text
 
 ## Product Intent
 

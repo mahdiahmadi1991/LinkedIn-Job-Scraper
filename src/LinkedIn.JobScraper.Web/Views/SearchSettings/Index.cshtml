@@ -2,10 +2,11 @@
 
 @{
     ViewData["Title"] = "Search Settings";
-    var alertSeverity = Model.StatusSucceeded ? "success" : "warning";
 }
 
-<div class="page-shell">
+<div class="page-shell"
+     data-page-status-message="@Model.StatusMessage"
+     data-page-status-success="@Model.StatusSucceeded.ToString().ToLowerInvariant()">
     <section class="page-hero">
         <div class="section-label mb-2">Fetch Definition</div>
         <h1 class="hero-title h2">LinkedIn Search Settings</h1>
@@ -13,12 +14,6 @@
             Configure the exact LinkedIn search that powers <strong>Fetch &amp; Score</strong>. These settings define which jobs get pulled into the dashboard.
         </p>
     </section>
-
-    <div class="alert alert-@alertSeverity mb-0 @((string.IsNullOrWhiteSpace(Model.StatusMessage) ? "d-none" : string.Empty))"
-         role="alert"
-         data-search-settings-status>
-        @Model.StatusMessage
-    </div>
 
     <section class="row g-4">
         <div class="col-12 col-xl-8">
@@ -50,6 +45,7 @@
                                             class="btn btn-outline-primary"
                                             formaction="@Url.Action("SearchLocation")"
                                             formmethod="post"
+                                            data-loading-text="Finding locations..."
                                             data-search-settings-location-button>
                                         Find Locations
                                     </button>
@@ -136,7 +132,7 @@
                         </div>
 
                         <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary" data-search-settings-save-button>Save Search Settings</button>
+                            <button type="submit" class="btn btn-primary" data-search-settings-save-button data-loading-text="Saving settings...">Save Search Settings</button>
                             <a asp-action="Index" class="btn btn-outline-secondary">Reset</a>
                         </div>
                     </form>
@@ -169,128 +165,5 @@
 
 @section Scripts
 {
-    <script>
-        (() => {
-            const form = document.getElementById("search-settings-form");
-            if (!form) {
-                return;
-            }
-
-            const statusAlert = form.closest(".page-shell")?.querySelector("[data-search-settings-status]");
-            const saveButton = form.querySelector("[data-search-settings-save-button]");
-            const concurrencyTokenInput = form.querySelector('input[name="ConcurrencyToken"]');
-            const geoIdInput = form.querySelector('input[name="LocationGeoId"]');
-            const displayNameInput = form.querySelector('input[name="LocationDisplayName"]');
-            const locationInput = form.querySelector('input[name="LocationInput"]');
-            const suggestionButtons = form.querySelectorAll("[data-location-select]");
-
-            if (!statusAlert || !saveButton) {
-                return;
-            }
-
-            const setStatus = (message, success) => {
-                statusAlert.textContent = message;
-                statusAlert.classList.remove("d-none", "alert-success", "alert-warning");
-                statusAlert.classList.add(success ? "alert-success" : "alert-warning");
-            };
-
-            const tryReadProblem = async (response) => {
-                const contentType = response.headers.get("Content-Type") || "";
-                if (!contentType.includes("application/problem+json") && !contentType.includes("application/json")) {
-                    return null;
-                }
-
-                try {
-                    return await response.json();
-                } catch {
-                    return null;
-                }
-            };
-
-            locationInput?.addEventListener("input", () => {
-                if (geoIdInput) {
-                    geoIdInput.value = "";
-                }
-
-                if (displayNameInput) {
-                    displayNameInput.value = "";
-                }
-            });
-
-            suggestionButtons.forEach((button) => {
-                button.addEventListener("click", () => {
-                    const geoId = button.getAttribute("data-geo-id");
-                    const displayName = button.getAttribute("data-display-name");
-
-                    if (geoIdInput) {
-                        geoIdInput.value = geoId ?? "";
-                    }
-
-                    if (displayNameInput) {
-                        displayNameInput.value = displayName ?? "";
-                    }
-
-                    if (locationInput && displayName) {
-                        locationInput.value = displayName;
-                    }
-
-                    suggestionButtons.forEach((currentButton) => {
-                        currentButton.classList.remove("btn-primary");
-                        currentButton.classList.remove("btn-outline-primary");
-                        currentButton.classList.add("btn-outline-secondary");
-                    });
-
-                    button.classList.remove("btn-outline-secondary");
-                    button.classList.add("btn-primary");
-                });
-            });
-
-            form.addEventListener("submit", async (event) => {
-                const submitter = event.submitter;
-                if (submitter && submitter.hasAttribute("data-search-settings-location-button")) {
-                    return;
-                }
-
-                event.preventDefault();
-
-                const idleText = saveButton.textContent;
-                saveButton.disabled = true;
-                saveButton.textContent = "Saving...";
-
-                try {
-                    const response = await fetch(form.action, {
-                        method: "POST",
-                        body: new FormData(form),
-                        headers: {
-                            "X-Requested-With": "XMLHttpRequest"
-                        },
-                        credentials: "same-origin"
-                    });
-
-                    const payload = await tryReadProblem(response);
-
-                    if (!response.ok) {
-                        setStatus(payload?.detail || payload?.title || "Settings save failed.", false);
-                        return;
-                    }
-
-                    if (!payload?.success) {
-                        setStatus("Settings save did not return a usable response.", false);
-                        return;
-                    }
-
-                    if (concurrencyTokenInput && payload.concurrencyToken) {
-                        concurrencyTokenInput.value = payload.concurrencyToken;
-                    }
-
-                    setStatus(payload.message || "Search settings were saved.", true);
-                } catch {
-                    setStatus("Settings save failed.", false);
-                } finally {
-                    saveButton.disabled = false;
-                    saveButton.textContent = idleText;
-                }
-            });
-        })();
-    </script>
+    <script src="~/js/search-settings-page.js" asp-append-version="true"></script>
 }

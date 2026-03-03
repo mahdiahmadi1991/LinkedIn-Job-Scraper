@@ -32,7 +32,7 @@ public sealed class LinkedInSearchSettingsViewModelAdapterTests
     }
 
     [Fact]
-    public void GetValidationErrorsReturnsExpectedMessages()
+    public void GetValidationErrorsAllowsEmptyOptionalCheckboxSelections()
     {
         var model = new LinkedInSearchSettingsPageViewModel
         {
@@ -44,8 +44,8 @@ public sealed class LinkedInSearchSettingsViewModelAdapterTests
 
         var errors = LinkedInSearchSettingsViewModelAdapter.GetValidationErrors(model);
 
-        Assert.Contains(errors, error => error.Key == nameof(model.WorkplaceTypeCodes));
-        Assert.Contains(errors, error => error.Key == nameof(model.JobTypeCodes));
+        Assert.DoesNotContain(errors, error => error.Key == nameof(model.WorkplaceTypeCodes));
+        Assert.DoesNotContain(errors, error => error.Key == nameof(model.JobTypeCodes));
         Assert.Contains(errors, error => error.Key == nameof(model.LocationInput) &&
             error.Message.Contains("Choose a LinkedIn location result", StringComparison.Ordinal));
     }

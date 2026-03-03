@@ -8,7 +8,7 @@ public sealed class LinkedInSearchSettingsPageViewModel
 
     [Required]
     [Display(Name = "Profile Name")]
-    public string ProfileName { get; set; } = "Default";
+    public string ProfileName { get; set; } = string.Empty;
 
     [Required]
     [Display(Name = "Search By Title, Skill, Or Company")]

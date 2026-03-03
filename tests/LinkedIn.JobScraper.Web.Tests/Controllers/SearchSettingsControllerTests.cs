@@ -58,6 +58,7 @@ public sealed class SearchSettingsControllerTests
             {
                 ProfileName = "Default",
                 Keywords = "C# .Net",
+                LocationInput = "Cyprus",
                 WorkplaceTypeCodes = [],
                 JobTypeCodes = []
             },

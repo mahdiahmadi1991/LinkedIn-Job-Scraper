@@ -16,6 +16,72 @@ Items that were once deferred but are now in place (CI-safe tests, CI workflow, 
 - Add production-grade deployment and hosting concerns only if the app moves beyond the current local-only posture.
 - Add background processing only if the LinkedIn ingestion model or UX requires it later.
 
+## Detailed Deferred Feature Concepts
+
+### Unified Strategy Profiles (Search + AI)
+
+This is a deliberately deferred product feature, not an immediate refactor.
+
+Intent:
+
+- Replace today's separate "AI Settings" and "Search Settings" mental model with a single reusable profile concept.
+- Give `ProfileName` a real functional role instead of leaving it as mostly metadata.
+- Let the user run `Fetch & Score` against a selected profile and keep provenance for which profile found a job.
+
+Target UX:
+
+- A profile becomes the top-level unit of search strategy.
+- One profile owns:
+  - LinkedIn search filters
+  - AI behavior / scoring settings
+- The jobs dashboard gets a profile selector near the main `Fetch & Score` action.
+- Fetching runs against the selected profile.
+- Jobs can later be filtered or reviewed by the profile that discovered them.
+
+Recommended data model direction:
+
+- Keep `Job` as a global deduplicated entity.
+- Do **not** duplicate the same LinkedIn job per profile.
+- Introduce a separate association concept such as:
+  - `Profile`
+  - `JobProfileLink` or `JobProfileMatch`
+- The association should carry profile-specific provenance like:
+  - `ProfileId`
+  - `JobId`
+  - `FirstSeenAtUtc`
+  - `LastSeenAtUtc`
+  - optional future profile-specific score snapshot
+
+Why this direction is preferred:
+
+- It preserves the current global dedupe model around LinkedIn job identity.
+- It avoids duplicate job rows for the same LinkedIn posting.
+- It makes it possible to answer "which profile found this job?" without corrupting the base job model.
+- It leaves room for future multi-profile comparisons without exploding storage.
+
+Known design risks:
+
+- It is a non-trivial schema change because current settings are modeled as effectively singleton active records.
+- Dashboard semantics become more complex:
+  - whether to show jobs for one selected profile or all profiles
+  - how to present jobs matched by multiple profiles
+- The fetch workflow stops being implicitly global and becomes profile-scoped.
+- Existing imports, enrichment, and scoring paths would need provenance-aware updates.
+
+Recommended implementation order when this feature is activated:
+
+1. Introduce a `Profile` concept first, without changing fetch behavior.
+2. Move current singleton AI settings and search settings under a single active default profile.
+3. Add a job-to-profile link table and backfill provenance for new fetches only.
+4. Add profile selection to the dashboard and make `Fetch & Score` profile-scoped.
+5. Only after that, consider profile-based filtering or profile-specific comparison UX.
+
+What should not happen in a rushed implementation:
+
+- Do not store one duplicate `Job` record per profile.
+- Do not couple profile switching directly to LinkedIn session state.
+- Do not merge settings screens before the underlying persistence model can actually support profile ownership cleanly.
+
 ## Explicitly Not Debt Right Now
 
 - Reintroducing automated tests

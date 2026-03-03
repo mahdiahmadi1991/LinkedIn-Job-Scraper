@@ -36,16 +36,6 @@ public static class LinkedInSearchSettingsViewModelAdapter
     {
         var errors = new List<(string Key, string Message)>();
 
-        if (viewModel.WorkplaceTypeCodes.Count == 0)
-        {
-            errors.Add((nameof(viewModel.WorkplaceTypeCodes), "Select at least one workplace type."));
-        }
-
-        if (viewModel.JobTypeCodes.Count == 0)
-        {
-            errors.Add((nameof(viewModel.JobTypeCodes), "Select at least one job type."));
-        }
-
         if (!string.IsNullOrWhiteSpace(viewModel.LocationInput) &&
             string.IsNullOrWhiteSpace(viewModel.LocationGeoId))
         {

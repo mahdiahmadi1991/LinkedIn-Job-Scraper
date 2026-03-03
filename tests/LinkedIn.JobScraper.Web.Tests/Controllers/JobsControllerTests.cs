@@ -195,7 +195,7 @@ public sealed class JobsControllerTests
 
         public JobsWorkflowProgressBatch GetBatch(string workflowId, long afterSequence)
         {
-            return new JobsWorkflowProgressBatch([], 1, false);
+            return new JobsWorkflowProgressBatch([], 1, false, false);
         }
 
         public CancellationToken RegisterWorkflow(string workflowId, CancellationToken outerCancellationToken)

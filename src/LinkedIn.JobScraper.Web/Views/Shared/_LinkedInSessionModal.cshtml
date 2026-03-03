@@ -1,6 +1,16 @@
 @model LinkedIn.JobScraper.Web.Models.LinkedInSessionPageViewModel
 
-<div class="modal fade" id="linkedInSessionModal" tabindex="-1" aria-labelledby="linkedInSessionModalLabel" aria-hidden="true" data-linked-in-session-modal>
+<div class="modal fade"
+     id="linkedInSessionModal"
+     tabindex="-1"
+     aria-labelledby="linkedInSessionModalLabel"
+     aria-hidden="true"
+     data-linked-in-session-modal
+     data-session-state-url="@Url.Action("State", "LinkedInSession")"
+     data-session-launch-url="@Url.Action("Launch", "LinkedInSession")"
+     data-session-capture-url="@Url.Action("Capture", "LinkedInSession")"
+     data-session-verify-url="@Url.Action("Verify", "LinkedInSession")"
+     data-session-revoke-url="@Url.Action("Revoke", "LinkedInSession")">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content session-modal-shell">
             <div class="modal-header border-0 pb-0">
@@ -16,9 +26,6 @@
                 </div>
 
                 <div class="session-modal-status-stack">
-                    <div class="session-status-note @(string.IsNullOrWhiteSpace(Model.StatusMessage) ? "d-none" : string.Empty)" data-session-feedback-note>
-                        @Model.StatusMessage
-                    </div>
                     <div class="session-status-note subtle @(string.IsNullOrWhiteSpace(Model.AutoCaptureStatusMessage) ? "d-none" : string.Empty)" data-session-auto-capture-note>
                         @Model.AutoCaptureStatusMessage
                     </div>
@@ -60,16 +67,18 @@
                 <form id="linkedInSessionAntiForgeryForm">@Html.AntiForgeryToken()</form>
 
                 <div class="stacked-actions">
-                    <button type="button" class="btn btn-primary" data-session-launch>@Model.PrimaryActionLabel</button>
+                    <button type="button" class="btn btn-primary" data-session-launch data-loading-text="Opening browser...">@Model.PrimaryActionLabel</button>
                     <button
                         type="button"
                         class="btn btn-outline-primary @(Model.ShowManualCaptureAction ? string.Empty : "d-none")"
+                        data-loading-text="Capturing session..."
                         data-session-capture>
                         Capture Manually
                     </button>
                     <button
                         type="button"
                         class="btn btn-outline-secondary @(!Model.StoredSessionAvailable || Model.AutoCaptureActive ? "d-none" : string.Empty)"
+                        data-loading-text="Revoking session..."
                         data-session-revoke>
                         Revoke Session
                     </button>

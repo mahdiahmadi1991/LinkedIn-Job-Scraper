@@ -2,21 +2,16 @@
 
 @{
     ViewData["Title"] = "AI Settings";
-    var alertSeverity = Model.StatusSucceeded ? "success" : "warning";
 }
 
-<div class="page-shell">
+<div class="page-shell"
+     data-page-status-message="@Model.StatusMessage"
+     data-page-status-success="@Model.StatusSucceeded.ToString().ToLowerInvariant()">
     <section class="page-hero">
         <div class="section-label mb-2">Scoring Behavior</div>
         <h1 class="hero-title h2">AI Settings</h1>
         <p class="hero-lead">Adjust the behavioral profile used when scoring LinkedIn jobs. API keys stay in configuration, but scoring preferences live here.</p>
     </section>
-
-    <div class="alert alert-@alertSeverity mb-0 @((string.IsNullOrWhiteSpace(Model.StatusMessage) ? "d-none" : string.Empty))"
-         role="alert"
-         data-ai-settings-status>
-        @Model.StatusMessage
-    </div>
 
     <section class="row g-4">
         <div class="col-12 col-xl-8">
@@ -54,7 +49,7 @@
                             <span asp-validation-for="OutputLanguageCode" class="text-danger small"></span>
                         </div>
                         <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary" data-ai-settings-save-button>Save Behavior Settings</button>
+                            <button type="submit" class="btn btn-primary" data-ai-settings-save-button data-loading-text="Saving settings...">Save Behavior Settings</button>
                             <a asp-action="Index" class="btn btn-outline-secondary">Reset</a>
                         </div>
                     </form>
@@ -81,7 +76,11 @@
                         </div>
                     </div>
                     <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" data-ai-connection-check>
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                data-ai-connection-check
+                                data-loading-text="Checking readiness..."
+                                data-ai-connection-url="@Url.Action("ConnectionStatus", "AiSettings")">
                             Check Current Readiness
                         </button>
                     </div>
@@ -108,125 +107,5 @@
 </div>
 
 @section Scripts {
-    <script>
-        (() => {
-            const button = document.querySelector("[data-ai-connection-check]");
-            const form = document.querySelector("[data-ai-settings-form]");
-            const saveButton = document.querySelector("[data-ai-settings-save-button]");
-            const statusAlert = document.querySelector("[data-ai-settings-status]");
-            const statusNote = document.querySelector("[data-ai-connection-status-note]");
-            const apiKeyValue = document.querySelector("[data-ai-connection-api-key-value]");
-            const modelValue = document.querySelector("[data-ai-connection-model-value]");
-            const baseUrlValue = document.querySelector("[data-ai-connection-base-url-value]");
-            const concurrencyTokenInput = document.querySelector('input[name="ConcurrencyToken"]');
-
-            if (!button || !statusNote || !apiKeyValue || !modelValue || !baseUrlValue || !form || !saveButton || !statusAlert) {
-                return;
-            }
-
-            const setStatus = (message, ready) => {
-                statusNote.textContent = message;
-                statusNote.classList.remove("success", "danger");
-                statusNote.classList.add(ready ? "success" : "danger");
-            };
-
-            const tryReadProblem = async (response) => {
-                const contentType = response.headers.get("Content-Type") || "";
-                if (!contentType.includes("application/problem+json") && !contentType.includes("application/json")) {
-                    return null;
-                }
-
-                try {
-                    return await response.json();
-                } catch {
-                    return null;
-                }
-            };
-
-            const setSaveStatus = (message, success) => {
-                statusAlert.textContent = message;
-                statusAlert.classList.remove("d-none", "alert-success", "alert-warning");
-                statusAlert.classList.add(success ? "alert-success" : "alert-warning");
-            };
-
-            button.addEventListener("click", async () => {
-                const idleText = button.textContent;
-                button.disabled = true;
-                button.textContent = "Checking...";
-
-                try {
-                    const response = await fetch("@Url.Action("ConnectionStatus", "AiSettings")", {
-                        headers: {
-                            "X-Requested-With": "XMLHttpRequest"
-                        },
-                        credentials: "same-origin"
-                    });
-
-                    const payload = await tryReadProblem(response);
-
-                    if (!response.ok) {
-                        setStatus(payload?.detail || payload?.title || "AI connection check failed.", false);
-                        return;
-                    }
-
-                    if (!payload?.state) {
-                        setStatus("AI connection check did not return a usable response.", false);
-                        return;
-                    }
-
-                    setStatus(payload.message || "OpenAI connection settings are configured and ready for scoring.", !!payload.state.ready);
-                    apiKeyValue.textContent = payload.state.apiKeyConfigured ? "Configured" : "Not configured";
-                    modelValue.textContent = payload.state.model || "Not configured";
-                    baseUrlValue.textContent = payload.state.baseUrl || "https://api.openai.com/v1";
-                } catch {
-                    setStatus("AI connection check failed.", false);
-                } finally {
-                    button.disabled = false;
-                    button.textContent = idleText;
-                }
-            });
-
-            form.addEventListener("submit", async (event) => {
-                event.preventDefault();
-
-                const idleText = saveButton.textContent;
-                saveButton.disabled = true;
-                saveButton.textContent = "Saving...";
-
-                try {
-                    const response = await fetch(form.action, {
-                        method: "POST",
-                        body: new FormData(form),
-                        headers: {
-                            "X-Requested-With": "XMLHttpRequest"
-                        },
-                        credentials: "same-origin"
-                    });
-
-                    const payload = await tryReadProblem(response);
-
-                    if (!response.ok) {
-                        setSaveStatus(payload?.detail || payload?.title || "Settings save failed.", false);
-                        return;
-                    }
-
-                    if (!payload?.success) {
-                        setSaveStatus("Settings save did not return a usable response.", false);
-                        return;
-                    }
-
-                    if (concurrencyTokenInput && payload.concurrencyToken) {
-                        concurrencyTokenInput.value = payload.concurrencyToken;
-                    }
-
-                    setSaveStatus(payload.message || "AI behavior settings were saved.", true);
-                } catch {
-                    setSaveStatus("Settings save failed.", false);
-                } finally {
-                    saveButton.disabled = false;
-                    saveButton.textContent = idleText;
-                }
-            });
-        })();
-    </script>
+    <script src="~/js/ai-settings-page.js" asp-append-version="true"></script>
 }

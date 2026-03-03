@@ -76,7 +76,8 @@ public sealed record JobsWorkflowProgressEvent(
 public sealed record JobsWorkflowProgressBatch(
     IReadOnlyList<JobsWorkflowProgressEvent> Events,
     long NextSequence,
-    bool CancellationRequested);
+    bool CancellationRequested,
+    bool WorkflowFound);
 
 public sealed class InMemoryJobsWorkflowStateStore : IJobsWorkflowStateStore
 {
@@ -105,7 +106,7 @@ public sealed class InMemoryJobsWorkflowStateStore : IJobsWorkflowStateStore
     {
         if (!_workflows.TryGetValue(workflowId, out var state))
         {
-            return new JobsWorkflowProgressBatch([], 1, false);
+            return new JobsWorkflowProgressBatch([], 1, false, false);
         }
 
         return state.GetBatch(afterSequence);
@@ -181,7 +182,7 @@ public sealed class InMemoryJobsWorkflowStateStore : IJobsWorkflowStateStore
                     .Where(item => item.Sequence > afterSequence)
                     .ToArray();
 
-                return new JobsWorkflowProgressBatch(events, _nextSequence, CancellationRequested);
+                return new JobsWorkflowProgressBatch(events, _nextSequence, CancellationRequested, true);
             }
         }
     }

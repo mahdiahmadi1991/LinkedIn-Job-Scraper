@@ -8,7 +8,7 @@ namespace LinkedIn.JobScraper.Web.Tests.AI;
 public sealed class AiBehaviorSettingsServiceTests
 {
     [Fact]
-    public async Task GetActiveAsyncCreatesAndReturnsDefaultProfile()
+    public async Task GetActiveAsyncCreatesAndReturnsBlankProfile()
     {
         var databaseName = Guid.NewGuid().ToString("N");
         var options = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
@@ -19,7 +19,10 @@ public sealed class AiBehaviorSettingsServiceTests
 
         var profile = await service.GetActiveAsync(CancellationToken.None);
 
-        Assert.Equal("Default", profile.ProfileName);
+        Assert.Equal(string.Empty, profile.ProfileName);
+        Assert.Equal(string.Empty, profile.BehavioralInstructions);
+        Assert.Equal(string.Empty, profile.PrioritySignals);
+        Assert.Equal(string.Empty, profile.ExclusionSignals);
         Assert.Equal(AiOutputLanguage.English, profile.OutputLanguageCode);
 
         await using var dbContext = new LinkedInJobScraperDbContext(options);

@@ -4,7 +4,7 @@ public sealed class AiBehaviorSettingsRecord
 {
     public int Id { get; set; }
 
-    public string ProfileName { get; set; } = "Default";
+    public string ProfileName { get; set; } = string.Empty;
 
     public string BehavioralInstructions { get; set; } = string.Empty;
 
