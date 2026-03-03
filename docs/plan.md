@@ -230,6 +230,14 @@ This queue records the current activation order for the larger deliberately defe
 - No further items from this queue should be implemented unless a new milestone explicitly activates them.
 - The next eligible work should come from a newly approved milestone or from a risk that is not already covered by the current safeguards.
 
+## New Phase Activation Queue
+
+This queue records the next approved phase after the deferred activation queue was closed.
+
+1. Add portfolio-friendly visual architecture and data-flow diagrams for faster reviewer onboarding
+2. Consider additional ADRs only when they capture a real architectural tradeoff that is not already documented
+3. Revisit larger infrastructure additions such as SQL container coverage or richer telemetry only under a newly approved milestone
+
 ## Post-MVP Feedback Plan
 
 This section captures the first round of manual-test feedback after the MVP baseline was completed.

@@ -81,6 +81,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - A limited shared `OperationResult` contract now exists for the LinkedIn session seam, reducing duplicated `success/message` handling between browser-login and session-verification flows without introducing a global result abstraction
 - CI-safe persistence integration coverage now exercises the real EF Core-backed settings services with an in-memory provider, and `LinkedInSearchSettingsService` falls back to `EnsureCreated` for non-relational providers so tests do not depend on SQL Server
 - The currently activated deferred backlog queue is now closed: SQL Server container coverage and richer telemetry were revisited, but remain intentionally deferred because they do not unlock the active milestones and would add unnecessary complexity to the current CI-safe posture
+- A new phase is now focused on reviewer clarity rather than runtime changes: the next active work starts with visual architecture and data-flow diagrams to improve onboarding without changing application behavior
 
 ## Product Intent
 

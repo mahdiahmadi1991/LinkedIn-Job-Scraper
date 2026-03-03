@@ -55,7 +55,27 @@ Open this when you need:
 
 This is the fastest way to understand how the solution is meant to stay organized.
 
-### 5. `docs/adr-001-local-safety-and-session-strategy.md`
+### 5. `docs/architecture-diagram.md`
+
+Open this when you need:
+
+- a visual architecture map
+- a quick module-level mental model
+- a portfolio-friendly overview of runtime boundaries
+
+This is the fastest visual summary of how the system is structured.
+
+### 6. `docs/data-flow-diagram.md`
+
+Open this when you need:
+
+- the highest-value runtime flows
+- a compact visual explanation of session capture and fetch-and-score
+- a quick handoff artifact for reviewers
+
+This is the fastest visual summary of how the main user workflows move through the system.
+
+### 7. `docs/adr-001-local-safety-and-session-strategy.md`
 
 Open this when you need:
 
@@ -67,7 +87,7 @@ This is the clearest short-form record of the project's core operating constrain
 
 ## Operational Support
 
-### 6. `docs/troubleshooting.md`
+### 8. `docs/troubleshooting.md`
 
 Open this when you need:
 
@@ -78,7 +98,7 @@ Open this when you need:
 
 This is the best first stop when something works locally and then suddenly stops working.
 
-### 7. `docs/feasibility-notes.md`
+### 9. `docs/feasibility-notes.md`
 
 Open this when you need:
 
@@ -89,7 +109,7 @@ This is historical context and should not drive current architecture more than t
 
 ## Historical / Supporting Planning Docs
 
-### 8. `docs/plan.md`
+### 10. `docs/plan.md`
 
 Open this when you need:
 
@@ -98,7 +118,7 @@ Open this when you need:
 
 This is useful as history, but `docs/PLAN_REVISED.md` is the more important current planning source.
 
-### 9. `docs/technical-debt.md`
+### 11. `docs/technical-debt.md`
 
 Open this when you need:
 
@@ -116,8 +136,10 @@ This is useful for deciding whether a new change is a true priority or just clea
 2. `docs/project-context.md`
 3. `docs/ai-onboarding-report.md`
 4. `docs/architecture-overview.md`
-5. `docs/adr-001-local-safety-and-session-strategy.md`
-6. `README.md`
+5. `docs/architecture-diagram.md`
+6. `docs/data-flow-diagram.md`
+7. `docs/adr-001-local-safety-and-session-strategy.md`
+8. `README.md`
 
 ### For debugging a broken local environment
 
