@@ -1,4 +1,5 @@
 using LinkedIn.JobScraper.Web.LinkedIn.Search;
+using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -75,6 +76,15 @@ public sealed class SearchSettingsController : Controller
         {
             viewModel.StatusMessage = "Review the highlighted search settings and try again.";
             viewModel.StatusSucceeded = false;
+
+            if (IsAjaxRequest())
+            {
+                return Problem(
+                    title: "Search settings validation failed",
+                    detail: viewModel.StatusMessage,
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
             return View("Index", viewModel);
         }
 
@@ -99,12 +109,30 @@ public sealed class SearchSettingsController : Controller
         {
             viewModel.StatusMessage = exception.Message;
             viewModel.StatusSucceeded = false;
+
+            if (IsAjaxRequest())
+            {
+                return Problem(
+                    title: "Search settings save failed",
+                    detail: viewModel.StatusMessage,
+                    statusCode: StatusCodes.Status409Conflict);
+            }
+
             return View("Index", viewModel);
         }
 
         TempData["SearchSettingsStatusMessage"] =
             $"Saved LinkedIn fetch settings for '{savedSettings.ProfileName}'.";
         TempData["SearchSettingsStatusSucceeded"] = bool.TrueString;
+
+        if (IsAjaxRequest())
+        {
+            return Json(
+                new SettingsSaveResponse(
+                    true,
+                    TempData["SearchSettingsStatusMessage"] as string ?? "Search settings were saved.",
+                    Url.Action(nameof(Index)) ?? "/SearchSettings"));
+        }
 
         return RedirectToAction(nameof(Index));
     }
@@ -168,5 +196,13 @@ public sealed class SearchSettingsController : Controller
                 nameof(viewModel.LocationInput),
                 "Choose a LinkedIn location result before saving.");
         }
+    }
+
+    private bool IsAjaxRequest()
+    {
+        return string.Equals(
+            Request.Headers.XRequestedWith.ToString(),
+            "XMLHttpRequest",
+            StringComparison.OrdinalIgnoreCase);
     }
 }

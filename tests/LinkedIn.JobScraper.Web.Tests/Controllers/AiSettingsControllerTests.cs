@@ -76,6 +76,74 @@ public sealed class AiSettingsControllerTests
     }
 
     [Fact]
+    public async Task SaveReturnsProblemDetailsForAjaxValidationFailure()
+    {
+        var controller = new AiSettingsController(
+            new FakeAiBehaviorSettingsService(),
+            Options.Create(new OpenAiSecurityOptions
+            {
+                ApiKey = "test-key",
+                Model = "gpt-5-mini"
+            }))
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
+        };
+
+        controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
+        controller.ModelState.AddModelError(nameof(AiSettingsPageViewModel.ProfileName), "Required");
+
+        var result = await controller.Save(new AiSettingsPageViewModel(), CancellationToken.None);
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        var details = Assert.IsType<ProblemDetails>(problem.Value);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
+        Assert.Equal("AI settings validation failed", details.Title);
+    }
+
+    [Fact]
+    public async Task SaveReturnsJsonForAjaxSuccess()
+    {
+        var controller = new AiSettingsController(
+            new SavingAiBehaviorSettingsService(),
+            Options.Create(new OpenAiSecurityOptions
+            {
+                ApiKey = "test-key",
+                Model = "gpt-5-mini"
+            }))
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
+        };
+
+        controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
+
+        var result = await controller.Save(
+            new AiSettingsPageViewModel
+            {
+                ProfileName = "Default",
+                BehavioralInstructions = "Test",
+                PrioritySignals = "Test",
+                ExclusionSignals = "Test",
+                OutputLanguageCode = "en"
+            },
+            CancellationToken.None);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var payload = Assert.IsType<SettingsSaveResponse>(json.Value);
+
+        Assert.True(payload.Success);
+        Assert.Equal("/AiSettings", payload.RedirectUrl);
+    }
+
+    [Fact]
     public void ConnectionStatusReturnsProblemDetailsWhenConfigurationIsIncomplete()
     {
         var controller = new AiSettingsController(
@@ -147,6 +215,26 @@ public sealed class AiSettingsControllerTests
         public Task<AiBehaviorProfile> SaveAsync(AiBehaviorProfile profile, CancellationToken cancellationToken)
         {
             throw new InvalidOperationException("AI behavior settings were updated by another operation. Reload the page and try again.");
+        }
+    }
+
+    private sealed class SavingAiBehaviorSettingsService : IAiBehaviorSettingsService
+    {
+        public Task<AiBehaviorProfile> GetActiveAsync(CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<AiBehaviorProfile> SaveAsync(AiBehaviorProfile profile, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                new AiBehaviorProfile(
+                    profile.ProfileName,
+                    profile.BehavioralInstructions,
+                    profile.PrioritySignals,
+                    profile.ExclusionSignals,
+                    profile.OutputLanguageCode,
+                    "token-saved"));
         }
     }
 }

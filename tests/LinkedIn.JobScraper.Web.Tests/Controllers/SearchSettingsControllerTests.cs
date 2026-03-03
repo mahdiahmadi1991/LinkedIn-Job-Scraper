@@ -1,7 +1,11 @@
 using LinkedIn.JobScraper.Web.Controllers;
+using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.LinkedIn.Search;
 using LinkedIn.JobScraper.Web.Models;
+using LinkedIn.JobScraper.Web.Tests.Infrastructure;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 
 namespace LinkedIn.JobScraper.Web.Tests.Controllers;
 
@@ -33,6 +37,73 @@ public sealed class SearchSettingsControllerTests
         Assert.Contains("updated by another operation", model.StatusMessage, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task SaveReturnsProblemDetailsForAjaxValidationFailure()
+    {
+        var controller = new SearchSettingsController(
+            new ConcurrencyFailureLinkedInSearchSettingsService(),
+            new FakeLinkedInLocationLookupService())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
+        };
+
+        controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
+
+        var result = await controller.Save(
+            new LinkedInSearchSettingsPageViewModel
+            {
+                ProfileName = "Default",
+                Keywords = "C# .Net",
+                WorkplaceTypeCodes = [],
+                JobTypeCodes = []
+            },
+            CancellationToken.None);
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        var details = Assert.IsType<ProblemDetails>(problem.Value);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
+        Assert.Equal("Search settings validation failed", details.Title);
+        Assert.Equal("Review the highlighted search settings and try again.", details.Detail);
+    }
+
+    [Fact]
+    public async Task SaveReturnsJsonForAjaxSuccess()
+    {
+        var controller = new SearchSettingsController(
+            new SavingLinkedInSearchSettingsService(),
+            new FakeLinkedInLocationLookupService())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
+        };
+
+        controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
+
+        var result = await controller.Save(
+            new LinkedInSearchSettingsPageViewModel
+            {
+                ProfileName = "Default",
+                Keywords = "C# .Net",
+                WorkplaceTypeCodes = ["1"],
+                JobTypeCodes = ["F"]
+            },
+            CancellationToken.None);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var payload = Assert.IsType<SettingsSaveResponse>(json.Value);
+
+        Assert.True(payload.Success);
+        Assert.Equal("/SearchSettings", payload.RedirectUrl);
+    }
+
     private sealed class ConcurrencyFailureLinkedInSearchSettingsService : ILinkedInSearchSettingsService
     {
         public Task<LinkedInSearchSettings> GetActiveAsync(CancellationToken cancellationToken)
@@ -51,6 +122,29 @@ public sealed class SearchSettingsControllerTests
         public Task<LinkedInLocationLookupResult> SearchAsync(string locationQuery, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
+        }
+    }
+
+    private sealed class SavingLinkedInSearchSettingsService : ILinkedInSearchSettingsService
+    {
+        public Task<LinkedInSearchSettings> GetActiveAsync(CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<LinkedInSearchSettings> SaveAsync(LinkedInSearchSettings settings, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                new LinkedInSearchSettings(
+                    settings.ProfileName,
+                    settings.Keywords,
+                    settings.LocationInput,
+                    settings.LocationDisplayName,
+                    settings.LocationGeoId,
+                    settings.EasyApply,
+                    settings.WorkplaceTypeCodes,
+                    settings.JobTypeCodes,
+                    "token-saved"));
         }
     }
 }

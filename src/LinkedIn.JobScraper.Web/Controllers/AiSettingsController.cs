@@ -57,6 +57,15 @@ public sealed class AiSettingsController : Controller
             PopulateConnectionStatus(viewModel);
             viewModel.StatusMessage = "All AI behavior fields are required.";
             viewModel.StatusSucceeded = false;
+
+            if (IsAjaxRequest())
+            {
+                return Problem(
+                    title: "AI settings validation failed",
+                    detail: viewModel.StatusMessage,
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
             return View("Index", viewModel);
         }
 
@@ -79,6 +88,15 @@ public sealed class AiSettingsController : Controller
             PopulateConnectionStatus(viewModel);
             viewModel.StatusMessage = exception.Message;
             viewModel.StatusSucceeded = false;
+
+            if (IsAjaxRequest())
+            {
+                return Problem(
+                    title: "AI settings save failed",
+                    detail: viewModel.StatusMessage,
+                    statusCode: StatusCodes.Status409Conflict);
+            }
+
             return View("Index", viewModel);
         }
 
@@ -87,6 +105,15 @@ public sealed class AiSettingsController : Controller
         TempData["AiSettingsStatusMessage"] =
             $"Saved AI behavior profile '{savedProfile.ProfileName}' with {AiOutputLanguage.GetDisplayName(savedProfile.OutputLanguageCode)} output.";
         TempData["AiSettingsStatusSucceeded"] = bool.TrueString;
+
+        if (IsAjaxRequest())
+        {
+            return Json(
+                new SettingsSaveResponse(
+                    true,
+                    TempData["AiSettingsStatusMessage"] as string ?? "AI behavior settings were saved.",
+                    Url.Action(nameof(Index)) ?? "/AiSettings"));
+        }
 
         return RedirectToAction(nameof(Index));
     }
@@ -147,4 +174,12 @@ public sealed class AiSettingsController : Controller
         string BaseUrl,
         bool Ready,
         string Message);
+
+    private bool IsAjaxRequest()
+    {
+        return string.Equals(
+            Request.Headers.XRequestedWith.ToString(),
+            "XMLHttpRequest",
+            StringComparison.OrdinalIgnoreCase);
+    }
 }

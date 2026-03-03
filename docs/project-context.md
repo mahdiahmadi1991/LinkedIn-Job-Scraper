@@ -84,6 +84,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - A new phase is now focused on reviewer clarity rather than runtime changes: the next active work starts with visual architecture and data-flow diagrams to improve onboarding without changing application behavior
 - ADR 002 now records why the repository's automated validation stays CI-safe and isolated from live SQL Server, LinkedIn, and OpenAI dependencies, so that this test strategy is documented as an intentional architectural choice
 - The settings forms now round-trip `RowVersion` as a hidden concurrency token, so optimistic concurrency for AI settings and LinkedIn search settings is enforced across the full UI submit path instead of only inside the EF save boundary
+- The settings save endpoints now also support AJAX callers cleanly: validation and concurrency failures return `ProblemDetails`, while successful saves return a small typed JSON success payload with a redirect target, without changing normal MVC form behavior
 
 ## Product Intent
 
