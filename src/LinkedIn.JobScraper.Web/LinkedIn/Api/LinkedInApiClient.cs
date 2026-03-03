@@ -39,9 +39,7 @@ public sealed class LinkedInApiClient : ILinkedInApiClient
         requestMessage.Version = HttpVersion.Version20;
         requestMessage.VersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
         var diagnosticsEnabled = _fetchDiagnosticsOptions.Enabled;
-        var requestPathAndQuery = SensitiveDataRedaction.SanitizeForMessage(
-            requestUri.PathAndQuery,
-            maxLength: 1200);
+        string? requestPathAndQuery = null;
 
         foreach (var header in headers)
         {
@@ -53,10 +51,13 @@ public sealed class LinkedInApiClient : ILinkedInApiClient
             requestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value);
         }
 
-        if (diagnosticsEnabled)
+        if (diagnosticsEnabled && _logger.IsEnabled(LogLevel.Information))
         {
-            _logger.LogInformation(
-                "LinkedIn API GET started. RequestPathAndQuery={RequestPathAndQuery}, HeaderCount={HeaderCount}",
+            requestPathAndQuery = SensitiveDataRedaction.SanitizeForMessage(
+                requestUri.PathAndQuery,
+                maxLength: 1200);
+            Log.LinkedInApiGetStarted(
+                _logger,
                 requestPathAndQuery,
                 headers.Count);
         }
@@ -69,10 +70,13 @@ public sealed class LinkedInApiClient : ILinkedInApiClient
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         stopwatch.Stop();
 
-        if (diagnosticsEnabled)
+        if (diagnosticsEnabled && _logger.IsEnabled(LogLevel.Information))
         {
-            _logger.LogInformation(
-                "LinkedIn API GET completed. RequestPathAndQuery={RequestPathAndQuery}, StatusCode={StatusCode}, Success={Success}, BodyLength={BodyLength}, ElapsedMilliseconds={ElapsedMilliseconds}",
+            requestPathAndQuery ??= SensitiveDataRedaction.SanitizeForMessage(
+                requestUri.PathAndQuery,
+                maxLength: 1200);
+            Log.LinkedInApiGetCompleted(
+                _logger,
                 requestPathAndQuery,
                 (int)response.StatusCode,
                 response.IsSuccessStatusCode,
@@ -81,15 +85,43 @@ public sealed class LinkedInApiClient : ILinkedInApiClient
 
             if (_fetchDiagnosticsOptions.LogResponseBodies)
             {
-                _logger.LogInformation(
-                    "LinkedIn API GET response body sample. RequestPathAndQuery={RequestPathAndQuery}, BodySample={BodySample}",
+                var bodySample = SensitiveDataRedaction.SanitizeForMessage(
+                    body,
+                    _fetchDiagnosticsOptions.GetResponseBodyMaxLength());
+                Log.LinkedInApiResponseBodySample(
+                    _logger,
                     requestPathAndQuery,
-                    SensitiveDataRedaction.SanitizeForMessage(
-                        body,
-                        _fetchDiagnosticsOptions.GetResponseBodyMaxLength()));
+                    bodySample);
             }
         }
 
         return new LinkedInApiResponse((int)response.StatusCode, response.IsSuccessStatusCode, body);
     }
+}
+
+internal static partial class Log
+{
+    [LoggerMessage(
+        EventId = 3101,
+        Level = LogLevel.Information,
+        Message = "LinkedIn API GET started. RequestPathAndQuery={RequestPathAndQuery}, HeaderCount={HeaderCount}")]
+    public static partial void LinkedInApiGetStarted(ILogger logger, string requestPathAndQuery, int headerCount);
+
+    [LoggerMessage(
+        EventId = 3102,
+        Level = LogLevel.Information,
+        Message = "LinkedIn API GET completed. RequestPathAndQuery={RequestPathAndQuery}, StatusCode={StatusCode}, Success={Success}, BodyLength={BodyLength}, ElapsedMilliseconds={ElapsedMilliseconds}")]
+    public static partial void LinkedInApiGetCompleted(
+        ILogger logger,
+        string requestPathAndQuery,
+        int statusCode,
+        bool success,
+        int bodyLength,
+        long elapsedMilliseconds);
+
+    [LoggerMessage(
+        EventId = 3103,
+        Level = LogLevel.Information,
+        Message = "LinkedIn API GET response body sample. RequestPathAndQuery={RequestPathAndQuery}, BodySample={BodySample}")]
+    public static partial void LinkedInApiResponseBodySample(ILogger logger, string requestPathAndQuery, string bodySample);
 }

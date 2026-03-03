@@ -32,6 +32,7 @@ public sealed class JobImportService : IJobImportService
         JobStageProgressCallback? progressCallback = null)
     {
         var diagnosticsEnabled = _fetchDiagnosticsOptions.Enabled;
+        var canLogDiagnostics = diagnosticsEnabled && _logger.IsEnabled(LogLevel.Information);
         var searchResult = await _linkedInJobSearchService.FetchCurrentSearchAsync(cancellationToken);
 
         if (!searchResult.Success)
@@ -75,10 +76,10 @@ public sealed class JobImportService : IJobImportService
         var originalAutoDetectChanges = dbContext.ChangeTracker.AutoDetectChangesEnabled;
         dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
 
-        if (diagnosticsEnabled)
+        if (canLogDiagnostics)
         {
-            _logger.LogInformation(
-                "Job import diagnostics started. SearchReturnedCount={SearchReturnedCount}, DistinctLinkedInJobIds={DistinctLinkedInJobIds}, ExistingMatchCount={ExistingMatchCount}",
+            Log.JobImportDiagnosticsStarted(
+                _logger,
                 searchResult.Jobs.Count,
                 jobIds.Length,
                 existingJobs.Count);
@@ -122,13 +123,14 @@ public sealed class JobImportService : IJobImportService
                     skippedCount++;
                     progressMessage = $"Reconciled {processedCount + 1} of {searchResult.Jobs.Count}: refreshed '{job.Title}'.";
 
-                    if (diagnosticsEnabled)
+                    if (canLogDiagnostics)
                     {
-                        _logger.LogInformation(
-                            "Job import diagnostics reconciled existing job. Sequence={Sequence}, LinkedInJobId={LinkedInJobId}, Title={Title}, Action=Refreshed",
+                        var sanitizedTitle = SensitiveDataRedaction.SanitizeForMessage(job.Title, 256);
+                        Log.JobImportDiagnosticsReconciledExistingJob(
+                            _logger,
                             processedCount + 1,
                             job.LinkedInJobId,
-                            SensitiveDataRedaction.SanitizeForMessage(job.Title, 256));
+                            sanitizedTitle);
                     }
                 }
                 else
@@ -152,13 +154,14 @@ public sealed class JobImportService : IJobImportService
                     importedCount++;
                     progressMessage = $"Reconciled {processedCount + 1} of {searchResult.Jobs.Count}: added '{job.Title}'.";
 
-                    if (diagnosticsEnabled)
+                    if (canLogDiagnostics)
                     {
-                        _logger.LogInformation(
-                            "Job import diagnostics reconciled new job. Sequence={Sequence}, LinkedInJobId={LinkedInJobId}, Title={Title}, Action=Inserted",
+                        var sanitizedTitle = SensitiveDataRedaction.SanitizeForMessage(job.Title, 256);
+                        Log.JobImportDiagnosticsReconciledNewJob(
+                            _logger,
                             processedCount + 1,
                             job.LinkedInJobId,
-                            SensitiveDataRedaction.SanitizeForMessage(job.Title, 256));
+                            sanitizedTitle);
                     }
                 }
 
@@ -182,10 +185,10 @@ public sealed class JobImportService : IJobImportService
                 dbContext.Jobs.AddRange(insertedRecords);
             }
 
-            if (diagnosticsEnabled)
+            if (canLogDiagnostics)
             {
-                _logger.LogInformation(
-                    "Job import diagnostics persisting reconciliation results. ProcessedCount={ProcessedCount}, ImportedCount={ImportedCount}, RefreshedCount={RefreshedCount}, InsertBatchCount={InsertBatchCount}",
+                Log.JobImportDiagnosticsPersistingReconciliationResults(
+                    _logger,
                     processedCount,
                     importedCount,
                     updatedExistingCount,
@@ -209,10 +212,10 @@ public sealed class JobImportService : IJobImportService
             await dbContext.SaveChangesAsync(cancellationToken);
             saveStopwatch.Stop();
 
-            if (diagnosticsEnabled)
+            if (canLogDiagnostics)
             {
-                _logger.LogInformation(
-                    "Job import diagnostics completed persistence. ProcessedCount={ProcessedCount}, ImportedCount={ImportedCount}, RefreshedCount={RefreshedCount}, SkippedCount={SkippedCount}, SaveElapsedMilliseconds={SaveElapsedMilliseconds}",
+                Log.JobImportDiagnosticsCompletedPersistence(
+                    _logger,
                     processedCount,
                     importedCount,
                     updatedExistingCount,
@@ -234,4 +237,60 @@ public sealed class JobImportService : IJobImportService
             skippedCount,
             searchResult.Message);
     }
+}
+
+internal static partial class Log
+{
+    [LoggerMessage(
+        EventId = 2101,
+        Level = LogLevel.Information,
+        Message = "Job import diagnostics started. SearchReturnedCount={SearchReturnedCount}, DistinctLinkedInJobIds={DistinctLinkedInJobIds}, ExistingMatchCount={ExistingMatchCount}")]
+    public static partial void JobImportDiagnosticsStarted(
+        ILogger logger,
+        int searchReturnedCount,
+        int distinctLinkedInJobIds,
+        int existingMatchCount);
+
+    [LoggerMessage(
+        EventId = 2102,
+        Level = LogLevel.Information,
+        Message = "Job import diagnostics reconciled existing job. Sequence={Sequence}, LinkedInJobId={LinkedInJobId}, Title={Title}, Action=Refreshed")]
+    public static partial void JobImportDiagnosticsReconciledExistingJob(
+        ILogger logger,
+        int sequence,
+        string linkedInJobId,
+        string title);
+
+    [LoggerMessage(
+        EventId = 2103,
+        Level = LogLevel.Information,
+        Message = "Job import diagnostics reconciled new job. Sequence={Sequence}, LinkedInJobId={LinkedInJobId}, Title={Title}, Action=Inserted")]
+    public static partial void JobImportDiagnosticsReconciledNewJob(
+        ILogger logger,
+        int sequence,
+        string linkedInJobId,
+        string title);
+
+    [LoggerMessage(
+        EventId = 2104,
+        Level = LogLevel.Information,
+        Message = "Job import diagnostics persisting reconciliation results. ProcessedCount={ProcessedCount}, ImportedCount={ImportedCount}, RefreshedCount={RefreshedCount}, InsertBatchCount={InsertBatchCount}")]
+    public static partial void JobImportDiagnosticsPersistingReconciliationResults(
+        ILogger logger,
+        int processedCount,
+        int importedCount,
+        int refreshedCount,
+        int insertBatchCount);
+
+    [LoggerMessage(
+        EventId = 2105,
+        Level = LogLevel.Information,
+        Message = "Job import diagnostics completed persistence. ProcessedCount={ProcessedCount}, ImportedCount={ImportedCount}, RefreshedCount={RefreshedCount}, SkippedCount={SkippedCount}, SaveElapsedMilliseconds={SaveElapsedMilliseconds}")]
+    public static partial void JobImportDiagnosticsCompletedPersistence(
+        ILogger logger,
+        int processedCount,
+        int importedCount,
+        int refreshedCount,
+        int skippedCount,
+        long saveElapsedMilliseconds);
 }

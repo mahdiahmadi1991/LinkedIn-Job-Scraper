@@ -38,6 +38,7 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
     public async Task<LinkedInJobSearchFetchResult> FetchCurrentSearchAsync(CancellationToken cancellationToken)
     {
         var diagnosticsEnabled = _fetchDiagnosticsOptions.Enabled;
+        var canLogDiagnostics = diagnosticsEnabled && _logger.IsEnabled(LogLevel.Information);
         var sessionSnapshot = await _sessionStore.GetCurrentAsync(cancellationToken);
 
         if (sessionSnapshot is null)
@@ -54,18 +55,25 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
         var totalAvailableCount = 0;
         var pagesFetched = 0;
 
-        if (diagnosticsEnabled)
+        if (canLogDiagnostics)
         {
-            _logger.LogInformation(
-                "LinkedIn fetch diagnostics started. SessionSource={SessionSource}, SearchPageCap={SearchPageCap}, SearchJobCap={SearchJobCap}, Keywords={Keywords}, LocationGeoId={LocationGeoId}, EasyApply={EasyApply}, JobTypes={JobTypes}, WorkplaceTypes={WorkplaceTypes}",
+            var sanitizedKeywords = SensitiveDataRedaction.SanitizeForMessage(searchSettings.Keywords, 256);
+            var jobTypesSummary = searchSettings.JobTypeCodes.Count == 0
+                ? "(default)"
+                : string.Join(',', searchSettings.JobTypeCodes);
+            var workplaceTypesSummary = searchSettings.WorkplaceTypeCodes.Count == 0
+                ? "(default)"
+                : string.Join(',', searchSettings.WorkplaceTypeCodes);
+            Log.LinkedInFetchDiagnosticsStarted(
+                _logger,
                 sessionSnapshot.Source,
                 SearchPageCap,
                 SearchJobCap,
-                SensitiveDataRedaction.SanitizeForMessage(searchSettings.Keywords, 256),
+                sanitizedKeywords,
                 searchSettings.LocationGeoId ?? "(default)",
                 searchSettings.EasyApply,
-                searchSettings.JobTypeCodes.Count == 0 ? "(default)" : string.Join(',', searchSettings.JobTypeCodes),
-                searchSettings.WorkplaceTypeCodes.Count == 0 ? "(default)" : string.Join(',', searchSettings.WorkplaceTypeCodes));
+                jobTypesSummary,
+                workplaceTypesSummary);
         }
 
         for (var pageIndex = 0; pageIndex < SearchPageCap && aggregatedJobs.Count < SearchJobCap; pageIndex++)
@@ -76,10 +84,10 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
 
             if (totalAvailableCount > 0 && start >= totalAvailableCount)
             {
-                if (diagnosticsEnabled)
+                if (canLogDiagnostics)
                 {
-                    _logger.LogInformation(
-                        "LinkedIn fetch diagnostics stopped before page request. Reason=ReachedTotalCount, PageIndex={PageIndex}, Start={Start}, TotalAvailableCount={TotalAvailableCount}, AggregatedCount={AggregatedCount}",
+                    Log.LinkedInFetchDiagnosticsStoppedBeforePage(
+                        _logger,
                         pageIndex,
                         start,
                         totalAvailableCount,
@@ -89,10 +97,10 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
                 break;
             }
 
-            if (diagnosticsEnabled)
+            if (canLogDiagnostics)
             {
-                _logger.LogInformation(
-                    "LinkedIn fetch diagnostics requesting page. PageIndex={PageIndex}, Start={Start}, RequestedCount={RequestedCount}, RemainingCapacity={RemainingCapacity}, AggregatedCount={AggregatedCount}",
+                Log.LinkedInFetchDiagnosticsRequestingPage(
+                    _logger,
                     pageIndex,
                     start,
                     requestedCount,
@@ -114,10 +122,10 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
 
             if (response.StatusCode != (int)HttpStatusCode.OK)
             {
-                if (diagnosticsEnabled)
+                if (canLogDiagnostics)
                 {
-                    _logger.LogInformation(
-                        "LinkedIn fetch diagnostics received non-success page response. PageIndex={PageIndex}, StatusCode={StatusCode}, PagesFetched={PagesFetched}, AggregatedCount={AggregatedCount}",
+                    Log.LinkedInFetchDiagnosticsReceivedNonSuccessPageResponse(
+                        _logger,
                         pageIndex,
                         response.StatusCode,
                         pagesFetched,
@@ -171,10 +179,10 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
             }
             catch (JsonException exception)
             {
-                if (diagnosticsEnabled)
+                if (canLogDiagnostics)
                 {
-                    _logger.LogInformation(
-                        "LinkedIn fetch diagnostics failed to parse page JSON. PageIndex={PageIndex}, PagesFetched={PagesFetched}, AggregatedCount={AggregatedCount}, BodyLength={BodyLength}",
+                    Log.LinkedInFetchDiagnosticsFailedToParsePageJson(
+                        _logger,
                         pageIndex,
                         pagesFetched,
                         aggregatedJobs.Count,
@@ -218,10 +226,10 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
             var addedCount = aggregatedJobs.Count - aggregatedCountBeforeMerge;
             var duplicateCount = Math.Max(0, pageResult.Jobs.Count - addedCount);
 
-            if (diagnosticsEnabled)
+            if (canLogDiagnostics)
             {
-                _logger.LogInformation(
-                    "LinkedIn fetch diagnostics parsed page. PageIndex={PageIndex}, ReturnedCardCount={ReturnedCardCount}, ParsedJobCount={ParsedJobCount}, AddedCount={AddedCount}, DuplicateCount={DuplicateCount}, AggregatedCount={AggregatedCount}, TotalAvailableCount={TotalAvailableCount}",
+                Log.LinkedInFetchDiagnosticsParsedPage(
+                    _logger,
                     pageIndex,
                     pageResult.ReturnedCount,
                     pageResult.Jobs.Count,
@@ -235,7 +243,7 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
                 pageResult.ReturnedCount < requestedCount ||
                 aggregatedJobs.Count >= SearchJobCap)
             {
-                if (diagnosticsEnabled)
+                if (canLogDiagnostics)
                 {
                     var stopReason = pageResult.ReturnedCount == 0
                         ? "EmptyPage"
@@ -243,8 +251,8 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
                             ? "ShortPage"
                             : "ReachedJobCap";
 
-                    _logger.LogInformation(
-                        "LinkedIn fetch diagnostics stopped after page. Reason={StopReason}, PageIndex={PageIndex}, ReturnedCardCount={ReturnedCardCount}, RequestedCount={RequestedCount}, AggregatedCount={AggregatedCount}",
+                    Log.LinkedInFetchDiagnosticsStoppedAfterPage(
+                        _logger,
                         stopReason,
                         pageIndex,
                         pageResult.ReturnedCount,
@@ -258,10 +266,10 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
             if (totalAvailableCount > 0 &&
                 ((pageIndex + 1) * LinkedInRequestDefaults.DefaultSearchPageSize) >= totalAvailableCount)
             {
-                if (diagnosticsEnabled)
+                if (canLogDiagnostics)
                 {
-                    _logger.LogInformation(
-                        "LinkedIn fetch diagnostics stopped after page. Reason=ReachedTotalCount, PageIndex={PageIndex}, NextStart={NextStart}, TotalAvailableCount={TotalAvailableCount}, AggregatedCount={AggregatedCount}",
+                    Log.LinkedInFetchDiagnosticsReachedTotalAfterPage(
+                        _logger,
                         pageIndex,
                         (pageIndex + 1) * LinkedInRequestDefaults.DefaultSearchPageSize,
                         totalAvailableCount,
@@ -271,10 +279,10 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
                 break;
             }
 
-            if (diagnosticsEnabled)
+            if (canLogDiagnostics)
             {
-                _logger.LogInformation(
-                    "LinkedIn fetch diagnostics delaying before next page. DelayMilliseconds={DelayMilliseconds}, NextPageIndex={NextPageIndex}",
+                Log.LinkedInFetchDiagnosticsDelayingBeforeNextPage(
+                    _logger,
                     (int)SearchPageDelay.TotalMilliseconds,
                     pageIndex + 1);
             }
@@ -282,10 +290,10 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
             await Task.Delay(SearchPageDelay, cancellationToken);
         }
 
-        if (diagnosticsEnabled)
+        if (canLogDiagnostics)
         {
-            _logger.LogInformation(
-                "LinkedIn fetch diagnostics completed. PagesFetched={PagesFetched}, AggregatedCount={AggregatedCount}, TotalAvailableCount={TotalAvailableCount}",
+            Log.LinkedInFetchDiagnosticsCompleted(
+                _logger,
                 pagesFetched,
                 aggregatedJobs.Count,
                 totalAvailableCount);
@@ -523,4 +531,120 @@ internal static partial class Log
         Level = LogLevel.Error,
         Message = "Failed to parse LinkedIn job search response JSON.")]
     public static partial void LinkedInSearchFailedToParseJson(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        EventId = 3003,
+        Level = LogLevel.Information,
+        Message = "LinkedIn fetch diagnostics started. SessionSource={SessionSource}, SearchPageCap={SearchPageCap}, SearchJobCap={SearchJobCap}, Keywords={Keywords}, LocationGeoId={LocationGeoId}, EasyApply={EasyApply}, JobTypes={JobTypes}, WorkplaceTypes={WorkplaceTypes}")]
+    public static partial void LinkedInFetchDiagnosticsStarted(
+        ILogger logger,
+        string sessionSource,
+        int searchPageCap,
+        int searchJobCap,
+        string keywords,
+        string locationGeoId,
+        bool easyApply,
+        string jobTypes,
+        string workplaceTypes);
+
+    [LoggerMessage(
+        EventId = 3004,
+        Level = LogLevel.Information,
+        Message = "LinkedIn fetch diagnostics stopped before page request. Reason=ReachedTotalCount, PageIndex={PageIndex}, Start={Start}, TotalAvailableCount={TotalAvailableCount}, AggregatedCount={AggregatedCount}")]
+    public static partial void LinkedInFetchDiagnosticsStoppedBeforePage(
+        ILogger logger,
+        int pageIndex,
+        int start,
+        int totalAvailableCount,
+        int aggregatedCount);
+
+    [LoggerMessage(
+        EventId = 3005,
+        Level = LogLevel.Information,
+        Message = "LinkedIn fetch diagnostics requesting page. PageIndex={PageIndex}, Start={Start}, RequestedCount={RequestedCount}, RemainingCapacity={RemainingCapacity}, AggregatedCount={AggregatedCount}")]
+    public static partial void LinkedInFetchDiagnosticsRequestingPage(
+        ILogger logger,
+        int pageIndex,
+        int start,
+        int requestedCount,
+        int remainingCapacity,
+        int aggregatedCount);
+
+    [LoggerMessage(
+        EventId = 3006,
+        Level = LogLevel.Information,
+        Message = "LinkedIn fetch diagnostics received non-success page response. PageIndex={PageIndex}, StatusCode={StatusCode}, PagesFetched={PagesFetched}, AggregatedCount={AggregatedCount}")]
+    public static partial void LinkedInFetchDiagnosticsReceivedNonSuccessPageResponse(
+        ILogger logger,
+        int pageIndex,
+        int statusCode,
+        int pagesFetched,
+        int aggregatedCount);
+
+    [LoggerMessage(
+        EventId = 3007,
+        Level = LogLevel.Information,
+        Message = "LinkedIn fetch diagnostics failed to parse page JSON. PageIndex={PageIndex}, PagesFetched={PagesFetched}, AggregatedCount={AggregatedCount}, BodyLength={BodyLength}")]
+    public static partial void LinkedInFetchDiagnosticsFailedToParsePageJson(
+        ILogger logger,
+        int pageIndex,
+        int pagesFetched,
+        int aggregatedCount,
+        int bodyLength);
+
+    [LoggerMessage(
+        EventId = 3008,
+        Level = LogLevel.Information,
+        Message = "LinkedIn fetch diagnostics parsed page. PageIndex={PageIndex}, ReturnedCardCount={ReturnedCardCount}, ParsedJobCount={ParsedJobCount}, AddedCount={AddedCount}, DuplicateCount={DuplicateCount}, AggregatedCount={AggregatedCount}, TotalAvailableCount={TotalAvailableCount}")]
+    public static partial void LinkedInFetchDiagnosticsParsedPage(
+        ILogger logger,
+        int pageIndex,
+        int returnedCardCount,
+        int parsedJobCount,
+        int addedCount,
+        int duplicateCount,
+        int aggregatedCount,
+        int totalAvailableCount);
+
+    [LoggerMessage(
+        EventId = 3009,
+        Level = LogLevel.Information,
+        Message = "LinkedIn fetch diagnostics stopped after page. Reason={StopReason}, PageIndex={PageIndex}, ReturnedCardCount={ReturnedCardCount}, RequestedCount={RequestedCount}, AggregatedCount={AggregatedCount}")]
+    public static partial void LinkedInFetchDiagnosticsStoppedAfterPage(
+        ILogger logger,
+        string stopReason,
+        int pageIndex,
+        int returnedCardCount,
+        int requestedCount,
+        int aggregatedCount);
+
+    [LoggerMessage(
+        EventId = 3010,
+        Level = LogLevel.Information,
+        Message = "LinkedIn fetch diagnostics stopped after page. Reason=ReachedTotalCount, PageIndex={PageIndex}, NextStart={NextStart}, TotalAvailableCount={TotalAvailableCount}, AggregatedCount={AggregatedCount}")]
+    public static partial void LinkedInFetchDiagnosticsReachedTotalAfterPage(
+        ILogger logger,
+        int pageIndex,
+        int nextStart,
+        int totalAvailableCount,
+        int aggregatedCount);
+
+    [LoggerMessage(
+        EventId = 3011,
+        Level = LogLevel.Information,
+        Message = "LinkedIn fetch diagnostics delaying before next page. DelayMilliseconds={DelayMilliseconds}, NextPageIndex={NextPageIndex}")]
+    public static partial void LinkedInFetchDiagnosticsDelayingBeforeNextPage(
+        ILogger logger,
+        int delayMilliseconds,
+        int nextPageIndex);
+
+    [LoggerMessage(
+        EventId = 3012,
+        Level = LogLevel.Information,
+        Message = "LinkedIn fetch diagnostics completed. PagesFetched={PagesFetched}, AggregatedCount={AggregatedCount}, TotalAvailableCount={TotalAvailableCount}")]
+    public static partial void LinkedInFetchDiagnosticsCompleted(
+        ILogger logger,
+        int pagesFetched,
+        int aggregatedCount,
+        int totalAvailableCount);
 }
