@@ -91,6 +91,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - `SearchSettingsController` is now thinner: its non-trivial normalization, validation, and read-model-to-view-model mapping for LinkedIn search settings have moved into a dedicated `LinkedIn.Search` adapter helper without changing behavior
 - `AiSettingsController` is now thinner as well: profile-to-view-model mapping and OpenAI connection-state shaping now live in a dedicated `AI` adapter helper, while controller actions remain orchestration-only
 - `Fetch & Score` workflow progress now carries the active HTTP correlation id in each SignalR progress payload, so request-scoped logs and live progress events can be tied together without changing workflow behavior
+- A minimal redaction policy now sanitizes sensitive token-like text in exception-derived operational messages and diagnostics surfaces, reducing the chance of cookies, API keys, or bearer-like strings being echoed back to users or nearby logs
 
 ## Product Intent
 

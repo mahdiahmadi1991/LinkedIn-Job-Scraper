@@ -66,7 +66,7 @@ public sealed class OpenAiJobScoringGateway : IJobScoringGateway
                 var responseErrorMessage = TryReadErrorMessage(responseBody);
                 var message = responseErrorMessage is null
                     ? $"OpenAI scoring failed with HTTP {(int)response.StatusCode}."
-                    : $"OpenAI scoring failed with HTTP {(int)response.StatusCode}: {responseErrorMessage}";
+                    : $"OpenAI scoring failed with HTTP {(int)response.StatusCode}: {SensitiveDataRedaction.SanitizeForMessage(responseErrorMessage)}";
 
                 return new JobScoringGatewayResult(
                     false,
@@ -93,7 +93,7 @@ public sealed class OpenAiJobScoringGateway : IJobScoringGateway
 
             return new JobScoringGatewayResult(
                 false,
-                $"OpenAI scoring failed: {exception.Message}");
+                $"OpenAI scoring failed: {SensitiveDataRedaction.SanitizeForMessage(exception.Message)}");
         }
     }
 

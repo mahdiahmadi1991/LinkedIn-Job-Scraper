@@ -95,7 +95,7 @@ public class LinkedInSessionController : Controller
             return await BuildActionResponseAsync(
                 new OperationResult(
                     false,
-                    $"The stored LinkedIn session could not be revoked: {exception.Message}"),
+                    $"The stored LinkedIn session could not be revoked: {SensitiveDataRedaction.SanitizeForMessage(exception.Message)}"),
                 cancellationToken,
                 StatusCodes.Status500InternalServerError);
         }
@@ -129,7 +129,7 @@ public class LinkedInSessionController : Controller
         {
             if (string.IsNullOrWhiteSpace(viewModel.StatusMessage))
             {
-                viewModel.StatusMessage = $"Stored session state is currently unavailable: {exception.Message}";
+                viewModel.StatusMessage = $"Stored session state is currently unavailable: {SensitiveDataRedaction.SanitizeForMessage(exception.Message)}";
             }
 
             viewModel.StatusSucceeded = false;
@@ -186,7 +186,7 @@ public class LinkedInSessionController : Controller
             return await BuildActionResponseAsync(
                 new OperationResult(
                     false,
-                    $"{failurePrefix}: {exception.Message}"),
+                    $"{failurePrefix}: {SensitiveDataRedaction.SanitizeForMessage(exception.Message)}"),
                 cancellationToken,
                 StatusCodes.Status500InternalServerError);
         }

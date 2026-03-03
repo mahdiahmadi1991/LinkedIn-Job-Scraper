@@ -50,7 +50,7 @@ public class DiagnosticsController : Controller
         }
         catch (Exception exception)
         {
-            sessionReadError = exception.Message;
+            sessionReadError = SensitiveDataRedaction.SanitizeForMessage(exception.Message);
         }
 
         var sqlServerOptions = _sqlServerOptions.Value;
@@ -85,7 +85,7 @@ public class DiagnosticsController : Controller
         catch (Exception exception)
         {
             result = LinkedInFeasibilityResult.Failed(
-                $"Feasibility probe failed: {exception.Message}",
+                $"Feasibility probe failed: {SensitiveDataRedaction.SanitizeForMessage(exception.Message)}",
                 StatusCodes.Status503ServiceUnavailable);
         }
 

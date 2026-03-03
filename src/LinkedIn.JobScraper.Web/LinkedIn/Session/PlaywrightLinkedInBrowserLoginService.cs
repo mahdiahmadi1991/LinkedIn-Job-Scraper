@@ -72,7 +72,7 @@ public sealed class PlaywrightLinkedInBrowserLoginService :
 
             return new LinkedInBrowserLoginActionResult(
                 false,
-                $"Failed to capture the LinkedIn session: {exception.Message}");
+                $"Failed to capture the LinkedIn session: {SensitiveDataRedaction.SanitizeForMessage(exception.Message)}");
         }
         finally
         {
@@ -136,7 +136,7 @@ public sealed class PlaywrightLinkedInBrowserLoginService :
 
             return new LinkedInBrowserLoginActionResult(
                 false,
-                $"Failed to launch the controlled browser: {exception.Message}");
+                $"Failed to launch the controlled browser: {SensitiveDataRedaction.SanitizeForMessage(exception.Message)}");
         }
         finally
         {
@@ -213,7 +213,7 @@ public sealed class PlaywrightLinkedInBrowserLoginService :
                 {
                     Log.AutomaticLinkedInSessionCaptureFailed(_logger, exception);
                     _autoCaptureStatusMessage =
-                        $"Auto-capture failed unexpectedly: {exception.Message}. You can still use Capture Session manually.";
+                        $"Auto-capture failed unexpectedly: {SensitiveDataRedaction.SanitizeForMessage(exception.Message)}. You can still use Capture Session manually.";
                 }
                 finally
                 {
