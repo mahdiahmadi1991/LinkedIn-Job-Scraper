@@ -132,7 +132,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
             job.ListedAtUtc,
             job.FirstDiscoveredAtUtc,
             job.LastSeenAtUtc,
-            job.CurrentStatus,
+            ToViewStatus(job.CurrentStatus),
             job.Description,
             job.CompanyApplyUrl,
             job.AiScore,
@@ -365,7 +365,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
 
     public async Task<JobStatusChangeResult> UpdateStatusAsync(
         Guid jobId,
-        JobWorkflowStatus status,
+        JobWorkflowState status,
         CancellationToken cancellationToken)
     {
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -379,13 +379,15 @@ public sealed class JobsDashboardService : IJobsDashboardService
             return new JobStatusChangeResult(false, "Job was not found.", "danger");
         }
 
-        job.CurrentStatus = status;
+        var entityStatus = ToEntityStatus(status);
+
+        job.CurrentStatus = entityStatus;
 
         dbContext.JobStatusHistory.Add(
             new JobStatusHistoryRecord
             {
                 JobRecordId = job.Id,
-                Status = status,
+                Status = entityStatus,
                 ChangedAtUtc = DateTimeOffset.UtcNow
             });
 
@@ -433,7 +435,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
 
         if (query.FilterStatus.HasValue)
         {
-            var status = query.FilterStatus.Value;
+            var status = ToEntityStatus(query.FilterStatus.Value);
             queryable = queryable.Where(job => job.CurrentStatus == status);
         }
 
@@ -505,7 +507,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                     job.EmploymentStatus,
                     job.ListedAtUtc,
                     job.LastSeenAtUtc,
-                    job.CurrentStatus,
+                    ToViewStatus(job.CurrentStatus),
                     job.AiScore,
                     job.AiLabel,
                     job.AiSummary,
@@ -535,5 +537,31 @@ public sealed class JobsDashboardService : IJobsDashboardService
             .FirstOrDefaultAsync(cancellationToken);
 
         return AiOutputLanguage.Normalize(outputLanguageCode);
+    }
+
+    private static JobWorkflowState ToViewStatus(Persistence.Entities.JobWorkflowStatus status)
+    {
+        return status switch
+        {
+            Persistence.Entities.JobWorkflowStatus.New => JobWorkflowState.New,
+            Persistence.Entities.JobWorkflowStatus.Shortlisted => JobWorkflowState.Shortlisted,
+            Persistence.Entities.JobWorkflowStatus.Applied => JobWorkflowState.Applied,
+            Persistence.Entities.JobWorkflowStatus.Ignored => JobWorkflowState.Ignored,
+            Persistence.Entities.JobWorkflowStatus.Archived => JobWorkflowState.Archived,
+            _ => JobWorkflowState.New
+        };
+    }
+
+    private static Persistence.Entities.JobWorkflowStatus ToEntityStatus(JobWorkflowState status)
+    {
+        return status switch
+        {
+            JobWorkflowState.New => Persistence.Entities.JobWorkflowStatus.New,
+            JobWorkflowState.Shortlisted => Persistence.Entities.JobWorkflowStatus.Shortlisted,
+            JobWorkflowState.Applied => Persistence.Entities.JobWorkflowStatus.Applied,
+            JobWorkflowState.Ignored => Persistence.Entities.JobWorkflowStatus.Ignored,
+            JobWorkflowState.Archived => Persistence.Entities.JobWorkflowStatus.Archived,
+            _ => Persistence.Entities.JobWorkflowStatus.New
+        };
     }
 }

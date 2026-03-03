@@ -87,6 +87,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The settings save endpoints now also support AJAX callers cleanly: validation and concurrency failures return `ProblemDetails`, while successful saves return a small typed JSON success payload with a redirect target, without changing normal MVC form behavior
 - The AI settings page now uses that AJAX save path as a progressive enhancement: a successful background save updates the hidden concurrency token and shows inline feedback without forcing a full page reload
 - The LinkedIn search settings page now follows the same progressive-enhancement pattern for the main save action, while preserving the separate full form submit path for location lookup
+- The Web layer no longer references the persistence `JobWorkflowStatus` enum directly in jobs controllers and views; a web-facing `JobWorkflowState` now carries that concern while mapping stays inside the `Jobs` module
 
 ## Product Intent
 

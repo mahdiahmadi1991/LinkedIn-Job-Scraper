@@ -1,5 +1,4 @@
 @using LinkedIn.JobScraper.Web.Jobs
-@using LinkedIn.JobScraper.Web.Persistence.Entities
 @model JobsRowsChunk
 
 @foreach (var job in Model.Jobs)
@@ -72,7 +71,7 @@
                 <input type="hidden" name="SortBy" value="@Model.Query.GetNormalizedSortBy()" />
                 <div class="workflow-status-pill">@job.CurrentStatus</div>
                 <select class="form-select form-select-sm" name="status">
-                    @foreach (var status in Enum.GetValues<JobWorkflowStatus>())
+                    @foreach (var status in Enum.GetValues<JobWorkflowState>())
                     {
                         <option value="@status" selected="@(status == job.CurrentStatus ? "selected" : null)">
                             @status

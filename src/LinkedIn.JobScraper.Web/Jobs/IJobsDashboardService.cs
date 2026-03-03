@@ -1,5 +1,4 @@
 using LinkedIn.JobScraper.Web.AI;
-using LinkedIn.JobScraper.Web.Persistence.Entities;
 
 namespace LinkedIn.JobScraper.Web.Jobs;
 
@@ -24,7 +23,7 @@ public interface IJobsDashboardService
 
     Task<JobStatusChangeResult> UpdateStatusAsync(
         Guid jobId,
-        JobWorkflowStatus status,
+        JobWorkflowState status,
         CancellationToken cancellationToken);
 }
 
@@ -61,7 +60,7 @@ public sealed record JobDetailsSnapshot(
     DateTimeOffset? ListedAtUtc,
     DateTimeOffset FirstDiscoveredAtUtc,
     DateTimeOffset LastSeenAtUtc,
-    JobWorkflowStatus CurrentStatus,
+    JobWorkflowState CurrentStatus,
     string? Description,
     string? CompanyApplyUrl,
     int? AiScore,
@@ -76,7 +75,7 @@ public sealed class JobsDashboardQuery
 {
     public string? Search { get; set; }
 
-    public JobWorkflowStatus? FilterStatus { get; set; }
+    public JobWorkflowState? FilterStatus { get; set; }
 
     public string? AiLabel { get; set; }
 
@@ -107,7 +106,7 @@ public sealed record JobDashboardRow(
     string? EmploymentStatus,
     DateTimeOffset? ListedAtUtc,
     DateTimeOffset LastSeenAtUtc,
-    JobWorkflowStatus CurrentStatus,
+    JobWorkflowState CurrentStatus,
     int? AiScore,
     string? AiLabel,
     string? AiSummary,

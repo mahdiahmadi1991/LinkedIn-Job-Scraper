@@ -1,5 +1,4 @@
 @using LinkedIn.JobScraper.Web.Jobs
-@using LinkedIn.JobScraper.Web.Persistence.Entities
 @model JobsDashboardSnapshot
 
 @{
@@ -171,7 +170,7 @@
                     <label class="form-label" for="FilterStatus">Status</label>
                     <select class="form-select" id="FilterStatus" name="FilterStatus">
                         <option value="">All</option>
-                        @foreach (var status in Enum.GetValues<JobWorkflowStatus>())
+                        @foreach (var status in Enum.GetValues<JobWorkflowState>())
                         {
                             <option value="@status" selected="@(query.FilterStatus == status ? "selected" : null)">@status</option>
                         }

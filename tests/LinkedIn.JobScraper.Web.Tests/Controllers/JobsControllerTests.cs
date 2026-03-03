@@ -2,7 +2,6 @@ using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Controllers;
 using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.Jobs;
-using LinkedIn.JobScraper.Web.Persistence.Entities;
 using LinkedIn.JobScraper.Web.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -128,7 +127,7 @@ public sealed class JobsControllerTests
                     scoring));
         }
 
-        public Task<JobStatusChangeResult> UpdateStatusAsync(Guid jobId, JobWorkflowStatus status, CancellationToken cancellationToken)
+        public Task<JobStatusChangeResult> UpdateStatusAsync(Guid jobId, JobWorkflowState status, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
         }
@@ -165,7 +164,7 @@ public sealed class JobsControllerTests
                     null));
         }
 
-        public Task<JobStatusChangeResult> UpdateStatusAsync(Guid jobId, JobWorkflowStatus status, CancellationToken cancellationToken)
+        public Task<JobStatusChangeResult> UpdateStatusAsync(Guid jobId, JobWorkflowState status, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
         }

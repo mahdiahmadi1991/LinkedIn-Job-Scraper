@@ -1,5 +1,4 @@
 using LinkedIn.JobScraper.Web.Jobs;
-using LinkedIn.JobScraper.Web.Persistence.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using LinkedIn.JobScraper.Web.Configuration;
@@ -91,7 +90,7 @@ public class JobsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateStatus(
         Guid jobId,
-        JobWorkflowStatus status,
+        JobWorkflowState status,
         [FromForm] JobsDashboardQuery query,
         CancellationToken cancellationToken)
     {
