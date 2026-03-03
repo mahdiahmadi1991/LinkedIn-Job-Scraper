@@ -23,6 +23,10 @@ public interface IJobsDashboardService
         string? correlationId,
         CancellationToken cancellationToken);
 
+    Task<JobScoreActionResult> ScoreJobAsync(
+        Guid jobId,
+        CancellationToken cancellationToken);
+
     Task<JobStatusChangeResult> UpdateStatusAsync(
         Guid jobId,
         JobWorkflowState status,
@@ -65,6 +69,7 @@ public sealed record JobDetailsSnapshot(
     JobWorkflowState CurrentStatus,
     string? Description,
     string? CompanyApplyUrl,
+    DateTimeOffset? ScoredAtUtc,
     int? AiScore,
     string? AiLabel,
     string? AiSummary,
@@ -109,6 +114,7 @@ public sealed record JobDashboardRow(
     DateTimeOffset? ListedAtUtc,
     DateTimeOffset LastSeenAtUtc,
     JobWorkflowState CurrentStatus,
+    DateTimeOffset? ScoredAtUtc,
     int? AiScore,
     string? AiLabel,
     string? AiSummary,
@@ -122,9 +128,28 @@ public sealed record FetchAndScoreWorkflowResult(
     string Severity,
     JobImportResult ImportResult,
     JobEnrichmentResult? EnrichmentResult,
-    JobBatchScoringResult? ScoringResult);
+    JobBatchScoringResult? ScoringResult,
+    string? ActiveWorkflowId = null);
 
 public sealed record JobStatusChangeResult(
     bool Success,
     string Message,
     string Severity);
+
+public sealed record JobScoreActionResult(
+    bool Success,
+    string Message,
+    string Severity,
+    int StatusCode,
+    JobScoreSnapshot? Job);
+
+public sealed record JobScoreSnapshot(
+    Guid Id,
+    DateTimeOffset ScoredAtUtc,
+    int AiScore,
+    string AiLabel,
+    string? AiSummary,
+    string? AiWhyMatched,
+    string? AiConcerns,
+    string AiOutputLanguageCode,
+    string AiOutputDirection);

@@ -11,7 +11,7 @@
     };
 }
 
-<div class="job-details-page page-shell">
+<div class="job-details-page page-shell" data-job-ui-root data-job-id="@Model.Id">
     <section class="details-hero p-4 p-xl-5 d-flex flex-column flex-lg-row justify-content-between align-items-lg-start gap-4">
         <div class="flex-grow-1">
             <div class="section-label mb-2">Opportunity Review</div>
@@ -46,15 +46,9 @@
             </div>
         </div>
         <div class="details-score-card d-flex flex-column gap-2 align-items-lg-end">
-            <span class="badge rounded-pill @fitBadgeClass fs-6">@(Model.AiLabel ?? "Pending")</span>
-            @if (Model.AiScore.HasValue)
-            {
-                <div class="details-fit-score">@Model.AiScore<span class="fit-score-muted">/100</span></div>
-            }
-            else
-            {
-                <div class="fit-score-muted">Not scored yet</div>
-            }
+            <span class="badge rounded-pill @fitBadgeClass fs-6" data-job-label-badge>@(Model.AiLabel ?? "Pending")</span>
+            <div class="details-fit-score @(Model.AiScore.HasValue ? null : "d-none")" data-job-score-shell><span data-job-score-number>@(Model.AiScore?.ToString() ?? string.Empty)</span><span class="fit-score-muted">/100</span></div>
+            <div class="fit-score-muted @(Model.AiScore.HasValue ? "d-none" : null)" data-job-score-empty>Not scored yet</div>
             @if (!string.IsNullOrWhiteSpace(Model.CompanyApplyUrl))
             {
                 <a class="btn btn-primary w-100" href="@Model.CompanyApplyUrl" target="_blank" rel="noreferrer">Open Apply</a>
@@ -88,6 +82,14 @@
                             <div class="details-timeline-label">Workflow Status</div>
                             <div class="details-timeline-value">@Model.CurrentStatus</div>
                         </div>
+                        <div class="details-timeline-item">
+                            <div class="details-timeline-label">Scored</div>
+                            <div class="details-timeline-value" data-job-scored-at-value>
+                                @(Model.ScoredAtUtc.HasValue
+                                    ? Model.ScoredAtUtc.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
+                                    : "Not yet")
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -100,6 +102,23 @@
                         <p class="text-muted mb-0">Use this view to decide whether to open the source application flow or keep the role in manual review.</p>
                     </div>
                     <div class="details-action-stack">
+                        <form asp-action="ScoreJob" method="post" class="d-grid" data-score-job-form data-job-id="@Model.Id">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="jobId" value="@Model.Id" />
+                            <button type="submit"
+                                    class="btn btn-outline-primary"
+                                    data-score-job-button
+                                    data-idle-text="Score This Job"
+                                    data-busy-text="Scoring..."
+                                    data-done-text="Scored"
+                                    data-score-complete="@(Model.AiScore.HasValue && Model.ScoredAtUtc.HasValue ? "true" : "false")"
+                                    @(Model.AiScore.HasValue && Model.ScoredAtUtc.HasValue ? "disabled" : null)>
+                                <span class="d-none button-loading-shell" data-score-spinner>
+                                    <span class="button-loading-spinner" aria-hidden="true"></span>
+                                </span>
+                                <span data-score-button-text>@(Model.AiScore.HasValue && Model.ScoredAtUtc.HasValue ? "Scored" : "Score This Job")</span>
+                            </button>
+                        </form>
                         @if (!string.IsNullOrWhiteSpace(Model.CompanyApplyUrl))
                         {
                             <a class="btn btn-primary" href="@Model.CompanyApplyUrl" target="_blank" rel="noreferrer">Open Apply</a>
@@ -116,31 +135,22 @@
                     <div>
                         <div class="section-label mb-2">AI Review</div>
                         <h2 class="h5">AI Review</h2>
-                        @if (!string.IsNullOrWhiteSpace(Model.AiSummary))
-                        {
-                            <p class="mb-2 job-summary" dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@Model.AiSummary</p>
-                        }
-                        else
-                        {
-                            <p class="text-muted mb-2">This job has not been scored yet.</p>
-                        }
+                        <p class="mb-2 job-summary @(string.IsNullOrWhiteSpace(Model.AiSummary) ? "d-none" : null)"
+                           data-job-ai-summary-text
+                           dir="@Model.AiOutputDirection"
+                           lang="@Model.AiOutputLanguageCode">@Model.AiSummary</p>
+                        <p class="text-muted mb-2 @(string.IsNullOrWhiteSpace(Model.AiSummary) ? null : "d-none")" data-job-ai-summary-empty>This job has not been scored yet.</p>
                     </div>
 
-                    @if (!string.IsNullOrWhiteSpace(Model.AiWhyMatched))
-                    {
-                        <div class="details-review-block match">
-                            <div class="small text-success fw-semibold text-uppercase mb-1">Why Matched</div>
-                            <div dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@Model.AiWhyMatched</div>
-                        </div>
-                    }
+                    <div class="details-review-block match @(string.IsNullOrWhiteSpace(Model.AiWhyMatched) ? "d-none" : null)" data-job-why-section>
+                        <div class="small text-success fw-semibold text-uppercase mb-1">Why Matched</div>
+                        <div data-job-why-text dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@Model.AiWhyMatched</div>
+                    </div>
 
-                    @if (!string.IsNullOrWhiteSpace(Model.AiConcerns))
-                    {
-                        <div class="details-review-block concern">
-                            <div class="small text-warning-emphasis fw-semibold text-uppercase mb-1">Concerns</div>
-                            <div dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@Model.AiConcerns</div>
-                        </div>
-                    }
+                    <div class="details-review-block concern @(string.IsNullOrWhiteSpace(Model.AiConcerns) ? "d-none" : null)" data-job-concerns-section>
+                        <div class="small text-warning-emphasis fw-semibold text-uppercase mb-1">Concerns</div>
+                        <div data-job-concerns-text dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@Model.AiConcerns</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -162,3 +172,8 @@
         </div>
     </section>
 </div>
+
+@section Scripts
+{
+    <script src="~/js/jobs-page.js" asp-append-version="true"></script>
+}

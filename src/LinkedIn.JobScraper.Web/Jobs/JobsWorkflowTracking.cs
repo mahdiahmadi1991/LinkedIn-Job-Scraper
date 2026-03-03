@@ -17,11 +17,13 @@ public interface IJobsWorkflowProgressNotifier
 
 public interface IJobsWorkflowStateStore
 {
-    CancellationToken RegisterWorkflow(string workflowId, CancellationToken outerCancellationToken);
+    JobsWorkflowRegistrationResult RegisterWorkflow(string workflowId, CancellationToken outerCancellationToken);
 
     bool RequestCancellation(string workflowId);
 
     void Append(JobsWorkflowProgressUpdate update);
+
+    void ReleaseWorkflow(string workflowId);
 
     JobsWorkflowProgressBatch GetBatch(string workflowId, long afterSequence);
 }
@@ -79,16 +81,32 @@ public sealed record JobsWorkflowProgressBatch(
     bool CancellationRequested,
     bool WorkflowFound);
 
+public sealed record JobsWorkflowRegistrationResult(
+    bool Accepted,
+    string? ActiveWorkflowId,
+    CancellationToken CancellationToken);
+
 public sealed class InMemoryJobsWorkflowStateStore : IJobsWorkflowStateStore
 {
     private readonly ConcurrentDictionary<string, WorkflowState> _workflows = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _registrationSync = new();
+    private string? _activeWorkflowId;
 
-    public CancellationToken RegisterWorkflow(string workflowId, CancellationToken outerCancellationToken)
+    public JobsWorkflowRegistrationResult RegisterWorkflow(string workflowId, CancellationToken outerCancellationToken)
     {
-        var state = new WorkflowState();
-        state.ReplaceCancellationSource(outerCancellationToken);
-        _workflows.AddOrUpdate(workflowId, state, (_, _) => state);
-        return state.Token;
+        lock (_registrationSync)
+        {
+            if (!string.IsNullOrWhiteSpace(_activeWorkflowId))
+            {
+                return new JobsWorkflowRegistrationResult(false, _activeWorkflowId, CancellationToken.None);
+            }
+
+            var state = new WorkflowState();
+            state.ReplaceCancellationSource(outerCancellationToken);
+            _workflows.AddOrUpdate(workflowId, state, (_, _) => state);
+            _activeWorkflowId = workflowId;
+            return new JobsWorkflowRegistrationResult(true, null, state.Token);
+        }
     }
 
     public bool RequestCancellation(string workflowId)
@@ -116,6 +134,29 @@ public sealed class InMemoryJobsWorkflowStateStore : IJobsWorkflowStateStore
     {
         var state = _workflows.GetOrAdd(update.WorkflowId, static _ => new WorkflowState());
         state.Append(update);
+
+        if (IsTerminalState(update.State))
+        {
+            ReleaseWorkflow(update.WorkflowId);
+        }
+    }
+
+    public void ReleaseWorkflow(string workflowId)
+    {
+        lock (_registrationSync)
+        {
+            if (string.Equals(_activeWorkflowId, workflowId, StringComparison.OrdinalIgnoreCase))
+            {
+                _activeWorkflowId = null;
+            }
+        }
+    }
+
+    private static bool IsTerminalState(string? state)
+    {
+        return string.Equals(state, "completed", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(state, "failed", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(state, "cancelled", StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed class WorkflowState

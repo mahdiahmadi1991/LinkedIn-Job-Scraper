@@ -41,6 +41,9 @@ public static class ServiceCollectionExtensions
         services.AddOptions<LinkedInBrowserAutomationOptions>()
             .Bind(configuration.GetSection(LinkedInBrowserAutomationOptions.SectionName));
 
+        services.AddOptions<JobsWorkflowOptions>()
+            .Bind(configuration.GetSection(JobsWorkflowOptions.SectionName));
+
         services.AddHostedService<ConfigurationReadinessStartupService>();
         services.AddHostedService<AppUserSeedingStartupService>();
         services.AddAuthentication(AppAuthenticationDefaults.CookieScheme)

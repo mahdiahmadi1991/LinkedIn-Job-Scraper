@@ -83,6 +83,86 @@ public sealed class JobBatchScoringServiceTests
         Assert.Equal(0, gateway.CallCount);
     }
 
+    [Fact]
+    public async Task ScoreJobAsyncPersistsScoreAndTimestamp()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var options = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+
+        await SeedJobsAsync(options, 1);
+
+        await using var seedContext = new LinkedInJobScraperDbContext(options);
+        var jobId = await seedContext.Jobs.Select(static job => job.Id).SingleAsync();
+
+        var gateway = new CountingJobScoringGateway();
+        var service = CreateService(
+            options,
+            gateway,
+            new OpenAiSecurityOptions
+            {
+                ApiKey = "test-key",
+                Model = "gpt-5-mini",
+                MaxConcurrentScoringRequests = 2
+            });
+
+        var result = await service.ScoreJobAsync(jobId, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(80, result.Snapshot?.AiScore);
+        Assert.NotNull(result.Snapshot?.ScoredAtUtc);
+        Assert.Equal(1, gateway.CallCount);
+
+        await using var dbContext = new LinkedInJobScraperDbContext(options);
+        var persistedJob = await dbContext.Jobs.SingleAsync(job => job.Id == jobId);
+        Assert.Equal(80, persistedJob.AiScore);
+        Assert.Equal("Review", persistedJob.AiLabel);
+        Assert.NotNull(persistedJob.LastScoredAtUtc);
+    }
+
+    [Fact]
+    public async Task ScoreJobAsyncReturnsConflictWhenJobWasAlreadyScored()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var options = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+
+        await SeedJobsAsync(options, 1);
+
+        await using (var seedContext = new LinkedInJobScraperDbContext(options))
+        {
+            var job = await seedContext.Jobs.SingleAsync();
+            job.AiScore = 77;
+            job.AiLabel = "Review";
+            job.LastScoredAtUtc = DateTimeOffset.UtcNow.AddMinutes(-5);
+            await seedContext.SaveChangesAsync();
+        }
+
+        await using var lookupContext = new LinkedInJobScraperDbContext(options);
+        var jobId = await lookupContext.Jobs.Select(static job => job.Id).SingleAsync();
+
+        var gateway = new CountingJobScoringGateway();
+        var service = CreateService(
+            options,
+            gateway,
+            new OpenAiSecurityOptions
+            {
+                ApiKey = "test-key",
+                Model = "gpt-5-mini"
+            });
+
+        var result = await service.ScoreJobAsync(jobId, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(StatusCodes.Status409Conflict, result.StatusCode);
+        Assert.Contains("already scored", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, gateway.CallCount);
+        Assert.Equal(77, result.Snapshot?.AiScore);
+    }
+
     private static JobBatchScoringService CreateService(
         DbContextOptions<LinkedInJobScraperDbContext> dbContextOptions,
         IJobScoringGateway jobScoringGateway,

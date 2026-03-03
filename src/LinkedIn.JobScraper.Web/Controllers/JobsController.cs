@@ -72,7 +72,7 @@ public class JobsController : Controller
             progressConnectionId,
             effectiveWorkflowId,
             HttpContext.TraceIdentifier,
-            cancellationToken);
+            CancellationToken.None);
         TempData["JobsAlertMessage"] = result.Message;
         TempData["JobsAlertSeverity"] = result.Severity;
         WriteWorkflowSummary(result);
@@ -83,16 +83,24 @@ public class JobsController : Controller
         {
             if (!result.Success)
             {
+                if (string.Equals(result.Severity, "warning", StringComparison.OrdinalIgnoreCase))
+                {
+                    return StatusCode(
+                        StatusCodes.Status409Conflict,
+                        new FetchAndScoreAjaxResponse(
+                            false,
+                            result.Severity,
+                            result.Message,
+                            redirectUrl,
+                            result.ActiveWorkflowId));
+                }
+
                 return Problem(
-                    title: string.Equals(result.Severity, "warning", StringComparison.OrdinalIgnoreCase)
-                        ? "Fetch & Score cancelled"
-                        : "Fetch & Score failed",
+                    title: "Fetch Jobs failed",
                     detail: result.Message,
-                    statusCode: string.Equals(result.Severity, "warning", StringComparison.OrdinalIgnoreCase)
-                        ? StatusCodes.Status409Conflict
-                        : result.ImportResult.StatusCode > 0
-                            ? result.ImportResult.StatusCode
-                            : StatusCodes.Status409Conflict);
+                    statusCode: result.ImportResult.StatusCode > 0
+                        ? result.ImportResult.StatusCode
+                        : StatusCodes.Status409Conflict);
             }
 
             return Json(
@@ -100,7 +108,8 @@ public class JobsController : Controller
                     true,
                     result.Severity,
                     result.Message,
-                    redirectUrl));
+                    redirectUrl,
+                    effectiveWorkflowId));
         }
 
         return Redirect(redirectUrl);
@@ -146,7 +155,35 @@ public class JobsController : Controller
         return Json(
             new WorkflowCancellationResponse(
                 true,
-                "Cancellation requested. The current Fetch & Score run will stop as soon as the active background step yields."));
+                "Cancellation requested. The current fetch run will stop as soon as the active background step yields."));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting(SecurityRateLimitPolicies.SensitiveLocalActions)]
+    public async Task<IActionResult> ScoreJob(
+        [FromForm] Guid jobId,
+        CancellationToken cancellationToken)
+    {
+        var result = await _jobsDashboardService.ScoreJobAsync(jobId, cancellationToken);
+        var payload = new ScoreJobAjaxResponse(
+            result.Success,
+            result.Severity,
+            result.Message,
+            result.Job is null
+                ? null
+                : new JobScorePayload(
+                    result.Job.Id,
+                    result.Job.ScoredAtUtc.ToString("O"),
+                    result.Job.AiScore,
+                    result.Job.AiLabel,
+                    result.Job.AiSummary,
+                    result.Job.AiWhyMatched,
+                    result.Job.AiConcerns,
+                    result.Job.AiOutputLanguageCode,
+                    result.Job.AiOutputDirection));
+
+        return StatusCode(result.StatusCode, payload);
     }
 
     [HttpPost]

@@ -12,7 +12,7 @@
         _ => "bg-light text-dark"
     };
 
-    <tr class="job-primary-row" data-job-primary-row>
+    <tr class="job-primary-row" data-job-primary-row data-job-ui-root data-job-id="@job.Id">
         <td class="w-50">
             <div class="job-opportunity-cell">
                 <div class="job-title-row">
@@ -45,16 +45,12 @@
         </td>
         <td>
             <div class="fit-cell">
-                @if (job.AiScore.HasValue)
-                {
-                    <div class="fit-score">@job.AiScore<span class="fit-score-muted">/100</span></div>
-                }
-                else
-                {
-                    <div class="fit-score-muted">Not scored</div>
-                }
+                <div class="fit-score @(job.AiScore.HasValue ? null : "d-none")" data-job-score-shell>
+                    <span data-job-score-number>@(job.AiScore?.ToString() ?? string.Empty)</span><span class="fit-score-muted">/100</span>
+                </div>
+                <div class="fit-score-muted @(job.AiScore.HasValue ? "d-none" : null)" data-job-score-empty>Not scored</div>
 
-                <div class="badge rounded-pill @fitBadgeClass fit-label-badge">
+                <div class="badge rounded-pill @fitBadgeClass fit-label-badge" data-job-label-badge>
                     @(job.AiLabel ?? "Pending")
                 </div>
             </div>
@@ -98,6 +94,23 @@
                     </div>
                 </div>
                 <div class="activity-actions">
+                    <form asp-action="ScoreJob" method="post" class="d-inline-flex" data-score-job-form data-job-id="@job.Id">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="jobId" value="@job.Id" />
+                        <button type="submit"
+                                class="btn btn-outline-primary btn-sm"
+                                data-score-job-button
+                                data-idle-text="Score"
+                                data-busy-text="Scoring..."
+                                data-done-text="Scored"
+                                data-score-complete="@(job.AiScore.HasValue && job.ScoredAtUtc.HasValue ? "true" : "false")"
+                                @(job.AiScore.HasValue && job.ScoredAtUtc.HasValue ? "disabled" : null)>
+                            <span class="d-none button-loading-shell" data-score-spinner>
+                                <span class="button-loading-spinner" aria-hidden="true"></span>
+                            </span>
+                            <span data-score-button-text>@(job.AiScore.HasValue && job.ScoredAtUtc.HasValue ? "Scored" : "Score")</span>
+                        </button>
+                    </form>
                     <a asp-action="Details" asp-route-jobId="@job.Id" class="btn btn-outline-secondary btn-sm">
                         Open Details
                     </a>
@@ -111,48 +124,34 @@
             </div>
         </td>
     </tr>
-    <tr class="job-detail-row is-collapsed" id="@detailRowId" data-job-detail-row aria-hidden="true">
+    <tr class="job-detail-row is-collapsed" id="@detailRowId" data-job-detail-row data-job-ui-root data-job-id="@job.Id" aria-hidden="true">
         <td colspan="4">
             <div class="job-detail-panel">
                 <div class="job-detail-grid">
                     <div class="job-detail-block">
                         <div class="job-detail-label">AI Summary</div>
-                        @if (!string.IsNullOrWhiteSpace(job.AiSummary))
-                        {
-                            <div class="job-summary line-clamp-3" dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">
-                                @job.AiSummary
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="text-muted small">No AI summary yet.</div>
-                        }
+                        <div class="job-summary line-clamp-3 @(string.IsNullOrWhiteSpace(job.AiSummary) ? "d-none" : null)"
+                             data-job-ai-summary-text
+                             dir="@Model.AiOutputDirection"
+                             lang="@Model.AiOutputLanguageCode">
+                            @job.AiSummary
+                        </div>
+                        <div class="text-muted small @(string.IsNullOrWhiteSpace(job.AiSummary) ? null : "d-none")" data-job-ai-summary-empty>No AI summary yet.</div>
                     </div>
                     <div class="job-detail-block">
                         <div class="job-detail-label">Signals</div>
-                        @if (!string.IsNullOrWhiteSpace(job.AiWhyMatched) || !string.IsNullOrWhiteSpace(job.AiConcerns))
-                        {
-                            <div class="job-signal-stack compact">
-                                @if (!string.IsNullOrWhiteSpace(job.AiWhyMatched))
-                                {
-                                    <div class="job-signal-item">
-                                        <span class="job-signal-label match">Match</span>
-                                        <span class="text-body-secondary" dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@job.AiWhyMatched</span>
-                                    </div>
-                                }
-                                @if (!string.IsNullOrWhiteSpace(job.AiConcerns))
-                                {
-                                    <div class="job-signal-item">
-                                        <span class="job-signal-label concern">Concern</span>
-                                        <span class="text-body-secondary" dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@job.AiConcerns</span>
-                                    </div>
-                                }
+                        <div class="job-signal-stack compact @((string.IsNullOrWhiteSpace(job.AiWhyMatched) && string.IsNullOrWhiteSpace(job.AiConcerns)) ? "d-none" : null)"
+                             data-job-ai-signals>
+                            <div class="job-signal-item @(string.IsNullOrWhiteSpace(job.AiWhyMatched) ? "d-none" : null)" data-job-why-section>
+                                <span class="job-signal-label match">Match</span>
+                                <span class="text-body-secondary" data-job-why-text dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@job.AiWhyMatched</span>
                             </div>
-                        }
-                        else
-                        {
-                            <div class="text-muted small">No AI rationale is stored yet.</div>
-                        }
+                            <div class="job-signal-item @(string.IsNullOrWhiteSpace(job.AiConcerns) ? "d-none" : null)" data-job-concerns-section>
+                                <span class="job-signal-label concern">Concern</span>
+                                <span class="text-body-secondary" data-job-concerns-text dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@job.AiConcerns</span>
+                            </div>
+                        </div>
+                        <div class="text-muted small @((string.IsNullOrWhiteSpace(job.AiWhyMatched) && string.IsNullOrWhiteSpace(job.AiConcerns)) ? null : "d-none")" data-job-ai-signals-empty>No AI rationale is stored yet.</div>
                     </div>
                     <div class="job-detail-block">
                         <div class="job-detail-label">Quick Actions</div>

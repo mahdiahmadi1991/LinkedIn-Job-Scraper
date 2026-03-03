@@ -74,16 +74,7 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
                     new PendingScoringJob(
                         job,
                         string.IsNullOrWhiteSpace(job.Title) ? job.Id.ToString("N") : job.Title,
-                        new JobScoringGatewayRequest(
-                            job.Title,
-                            job.Description!,
-                            behaviorProfile.BehavioralInstructions,
-                            behaviorProfile.PrioritySignals,
-                            behaviorProfile.ExclusionSignals,
-                            behaviorProfile.OutputLanguageCode,
-                            job.CompanyName,
-                            job.LocationName,
-                            job.EmploymentStatus)))
+                        BuildGatewayRequest(job, behaviorProfile)))
             .ToArray();
 
         if (progressCallback is not null)
@@ -190,12 +181,10 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
                     continue;
                 }
 
-                completedScoringJob.WorkItem.Job.AiScore = completedScoringJob.Result.Score.Value;
-                completedScoringJob.WorkItem.Job.AiLabel = completedScoringJob.Result.Label;
-                completedScoringJob.WorkItem.Job.AiSummary = completedScoringJob.Result.Summary;
-                completedScoringJob.WorkItem.Job.AiWhyMatched = completedScoringJob.Result.WhyMatched;
-                completedScoringJob.WorkItem.Job.AiConcerns = completedScoringJob.Result.Concerns;
-                completedScoringJob.WorkItem.Job.LastScoredAtUtc = DateTimeOffset.UtcNow;
+                ApplyScoringResult(
+                    completedScoringJob.WorkItem.Job,
+                    completedScoringJob.Result,
+                    DateTimeOffset.UtcNow);
             }
 
             if (progressCallback is not null)
@@ -219,6 +208,86 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
         }
 
         return JobBatchScoringResult.Succeeded(maxCount, processedCount, scoredCount, failedCount);
+    }
+
+    public async Task<SingleJobScoringResult> ScoreJobAsync(
+        Guid jobId,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var job = await dbContext.Jobs.SingleOrDefaultAsync(
+            candidate => candidate.Id == jobId,
+            cancellationToken);
+
+        if (job is null)
+        {
+            return SingleJobScoringResult.Failed(
+                "Job was not found.",
+                StatusCodes.Status404NotFound);
+        }
+
+        if (job.AiScore.HasValue || job.LastScoredAtUtc.HasValue)
+        {
+            return SingleJobScoringResult.Failed(
+                "This job was already scored and cannot be scored again.",
+                StatusCodes.Status409Conflict,
+                TryCreateSnapshot(job, outputLanguageCode: null));
+        }
+
+        if (string.IsNullOrWhiteSpace(job.Description))
+        {
+            return SingleJobScoringResult.Failed(
+                "This job is not ready for AI scoring yet because the LinkedIn detail enrichment is incomplete.",
+                StatusCodes.Status409Conflict);
+        }
+
+        var behaviorProfile = await _behaviorSettingsService.GetActiveAsync(cancellationToken);
+        var result = await _jobScoringGateway.ScoreAsync(BuildGatewayRequest(job, behaviorProfile), cancellationToken);
+
+        if (!result.CanScore ||
+            !result.Score.HasValue ||
+            string.IsNullOrWhiteSpace(result.Label))
+        {
+            return SingleJobScoringResult.Failed(
+                result.Message,
+                result.StatusCode ?? StatusCodes.Status502BadGateway);
+        }
+
+        var scoredAtUtc = DateTimeOffset.UtcNow;
+        ApplyScoringResult(job, result, scoredAtUtc);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await dbContext.Entry(job).ReloadAsync(cancellationToken);
+
+            if (job.AiScore.HasValue || job.LastScoredAtUtc.HasValue)
+            {
+                return SingleJobScoringResult.Failed(
+                    "This job was already scored by another request.",
+                    StatusCodes.Status409Conflict,
+                    TryCreateSnapshot(job, behaviorProfile.OutputLanguageCode));
+            }
+
+            return SingleJobScoringResult.Failed(
+                "The job changed while AI scoring was being saved. Refresh and try again.",
+                StatusCodes.Status409Conflict);
+        }
+
+        return SingleJobScoringResult.Succeeded(
+            new SingleJobScoringSnapshot(
+                job.Id,
+                result.Score.Value,
+                result.Label,
+                result.Summary,
+                result.WhyMatched,
+                result.Concerns,
+                scoredAtUtc,
+                AiOutputLanguage.Normalize(behaviorProfile.OutputLanguageCode)));
     }
 
     private async Task<CompletedScoringJob> ScoreJobAsync(
@@ -248,6 +317,57 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
         catch
         {
         }
+    }
+
+    private static JobScoringGatewayRequest BuildGatewayRequest(
+        JobRecord job,
+        AiBehaviorProfile behaviorProfile)
+    {
+        return new JobScoringGatewayRequest(
+            job.Title,
+            job.Description!,
+            behaviorProfile.BehavioralInstructions,
+            behaviorProfile.PrioritySignals,
+            behaviorProfile.ExclusionSignals,
+            behaviorProfile.OutputLanguageCode,
+            job.CompanyName,
+            job.LocationName,
+            job.EmploymentStatus);
+    }
+
+    private static void ApplyScoringResult(
+        JobRecord job,
+        JobScoringGatewayResult result,
+        DateTimeOffset scoredAtUtc)
+    {
+        job.AiScore = result.Score!.Value;
+        job.AiLabel = result.Label;
+        job.AiSummary = result.Summary;
+        job.AiWhyMatched = result.WhyMatched;
+        job.AiConcerns = result.Concerns;
+        job.LastScoredAtUtc = scoredAtUtc;
+    }
+
+    private static SingleJobScoringSnapshot? TryCreateSnapshot(
+        JobRecord job,
+        string? outputLanguageCode)
+    {
+        if (!job.AiScore.HasValue ||
+            string.IsNullOrWhiteSpace(job.AiLabel) ||
+            !job.LastScoredAtUtc.HasValue)
+        {
+            return null;
+        }
+
+        return new SingleJobScoringSnapshot(
+            job.Id,
+            job.AiScore.Value,
+            job.AiLabel,
+            job.AiSummary,
+            job.AiWhyMatched,
+            job.AiConcerns,
+            job.LastScoredAtUtc.Value,
+            AiOutputLanguage.Normalize(outputLanguageCode));
     }
 
     private sealed record PendingScoringJob(

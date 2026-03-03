@@ -1,6 +1,8 @@
 using LinkedIn.JobScraper.Web.LinkedIn.Details;
 using LinkedIn.JobScraper.Web.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using LinkedIn.JobScraper.Web.Configuration;
 
 namespace LinkedIn.JobScraper.Web.Jobs;
 
@@ -8,19 +10,26 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
 {
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly ILinkedInJobDetailService _linkedInJobDetailService;
+    private readonly LinkedInFetchDiagnosticsOptions _fetchDiagnosticsOptions;
+    private readonly ILogger<JobEnrichmentService> _logger;
 
     public JobEnrichmentService(
         IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
-        ILinkedInJobDetailService linkedInJobDetailService)
+        ILinkedInJobDetailService linkedInJobDetailService,
+        IOptions<LinkedInFetchDiagnosticsOptions> fetchDiagnosticsOptions,
+        ILogger<JobEnrichmentService> logger)
     {
         _dbContextFactory = dbContextFactory;
         _linkedInJobDetailService = linkedInJobDetailService;
+        _fetchDiagnosticsOptions = fetchDiagnosticsOptions.Value;
+        _logger = logger;
     }
 
     public async Task<JobEnrichmentResult> EnrichIncompleteJobsAsync(
         int maxCount,
         CancellationToken cancellationToken,
-        JobStageProgressCallback? progressCallback = null)
+        JobStageProgressCallback? progressCallback = null,
+        IReadOnlySet<Guid>? excludedJobIds = null)
     {
         if (maxCount <= 0)
         {
@@ -29,19 +38,34 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
 
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var jobsToEnrich = await dbContext.Jobs
+        var excludedIds = excludedJobIds is { Count: > 0 }
+            ? excludedJobIds.ToArray()
+            : null;
+
+        var jobsQuery = dbContext.Jobs
             .Where(
                 static job =>
                     string.IsNullOrWhiteSpace(job.Description) ||
                     string.IsNullOrWhiteSpace(job.CompanyApplyUrl) ||
-                    string.IsNullOrWhiteSpace(job.EmploymentStatus))
+                    string.IsNullOrWhiteSpace(job.EmploymentStatus));
+
+        if (excludedIds is not null)
+        {
+            jobsQuery = jobsQuery.Where(job => !excludedIds.Contains(job.Id));
+        }
+
+        var jobsToEnrich = await jobsQuery
             .OrderByDescending(static job => job.LastSeenAtUtc)
             .Take(maxCount)
             .ToListAsync(cancellationToken);
 
+        var attemptedJobIds = jobsToEnrich
+            .Select(static job => job.Id)
+            .ToArray();
+
         if (jobsToEnrich.Count == 0)
         {
-            return JobEnrichmentResult.Succeeded(maxCount, 0, 0, 0, 0);
+            return JobEnrichmentResult.Succeeded(maxCount, 0, 0, 0, 0, attemptedJobIds);
         }
 
         if (progressCallback is not null)
@@ -96,6 +120,23 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
                 }
 
                 warningCount += detailResult.Warnings.Count;
+
+                if (detailResult.Warnings.Count > 0 &&
+                    _fetchDiagnosticsOptions.Enabled &&
+                    _logger.IsEnabled(LogLevel.Information))
+                {
+                    var sanitizedTitle = SensitiveDataRedaction.SanitizeForMessage(displayTitle, maxLength: 300);
+                    var formattedWarnings = FormatWarnings(detailResult.Warnings);
+
+                    Log.JobEnrichmentDiagnosticsWarnings(
+                        _logger,
+                        processedCount,
+                        jobsToEnrich.Count,
+                        job.LinkedInJobId,
+                        sanitizedTitle,
+                        detailResult.Warnings.Count,
+                        formattedWarnings);
+                }
 
                 var detail = detailResult.Job;
                 job.Title = detail.Title;
@@ -158,7 +199,8 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
                     processedCount,
                     0,
                     failedCount,
-                    warningCount);
+                    warningCount,
+                    attemptedJobIds);
             }
 
             if (progressCallback is not null)
@@ -186,6 +228,45 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
             processedCount,
             enrichedCount,
             failedCount,
-            warningCount);
+            warningCount,
+            attemptedJobIds);
     }
+
+    private static string FormatWarnings(IReadOnlyList<string> warnings)
+    {
+        if (warnings.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var builder = new System.Text.StringBuilder();
+
+        for (var index = 0; index < warnings.Count; index++)
+        {
+            if (index > 0)
+            {
+                builder.Append(" | ");
+            }
+
+            builder.Append(SensitiveDataRedaction.SanitizeForMessage(warnings[index], maxLength: 500));
+        }
+
+        return SensitiveDataRedaction.SanitizeForMessage(builder.ToString(), maxLength: 2000);
+    }
+}
+
+internal static partial class Log
+{
+    [LoggerMessage(
+        EventId = 2201,
+        Level = LogLevel.Information,
+        Message = "Job enrichment diagnostics warning details. Sequence={Sequence}, TotalQueued={TotalQueued}, LinkedInJobId={LinkedInJobId}, Title={Title}, WarningCount={WarningCount}, Warnings={Warnings}")]
+    public static partial void JobEnrichmentDiagnosticsWarnings(
+        ILogger logger,
+        int sequence,
+        int totalQueued,
+        string linkedInJobId,
+        string title,
+        int warningCount,
+        string warnings);
 }

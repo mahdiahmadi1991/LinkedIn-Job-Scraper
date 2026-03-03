@@ -8,6 +8,10 @@ public interface IJobBatchScoringService
         int maxCount,
         CancellationToken cancellationToken,
         JobStageProgressCallback? progressCallback = null);
+
+    Task<SingleJobScoringResult> ScoreJobAsync(
+        Guid jobId,
+        CancellationToken cancellationToken);
 }
 
 public sealed record JobBatchScoringResult(
@@ -42,3 +46,34 @@ public sealed record JobBatchScoringResult(
             scoredCount,
             failedCount);
 }
+
+public sealed record SingleJobScoringResult(
+    bool Success,
+    string Message,
+    int StatusCode,
+    SingleJobScoringSnapshot? Snapshot)
+{
+    public static SingleJobScoringResult Failed(
+        string message,
+        int statusCode,
+        SingleJobScoringSnapshot? snapshot = null) =>
+        new(false, message, statusCode, snapshot);
+
+    public static SingleJobScoringResult Succeeded(
+        SingleJobScoringSnapshot snapshot) =>
+        new(
+            true,
+            "AI job scoring completed.",
+            StatusCodes.Status200OK,
+            snapshot);
+}
+
+public sealed record SingleJobScoringSnapshot(
+    Guid JobId,
+    int AiScore,
+    string AiLabel,
+    string? AiSummary,
+    string? AiWhyMatched,
+    string? AiConcerns,
+    DateTimeOffset ScoredAtUtc,
+    string OutputLanguageCode);

@@ -277,7 +277,8 @@ public sealed class DiagnosticsControllerTests
         public Task<JobEnrichmentResult> EnrichIncompleteJobsAsync(
             int count,
             CancellationToken cancellationToken,
-            JobStageProgressCallback? progressCallback = null)
+            JobStageProgressCallback? progressCallback = null,
+            IReadOnlySet<Guid>? excludedJobIds = null)
         {
             throw new NotSupportedException();
         }
@@ -288,7 +289,8 @@ public sealed class DiagnosticsControllerTests
         public Task<JobEnrichmentResult> EnrichIncompleteJobsAsync(
             int count,
             CancellationToken cancellationToken,
-            JobStageProgressCallback? progressCallback = null)
+            JobStageProgressCallback? progressCallback = null,
+            IReadOnlySet<Guid>? excludedJobIds = null)
         {
             return Task.FromResult(
                 JobEnrichmentResult.Succeeded(
@@ -305,7 +307,8 @@ public sealed class DiagnosticsControllerTests
         public Task<JobEnrichmentResult> EnrichIncompleteJobsAsync(
             int count,
             CancellationToken cancellationToken,
-            JobStageProgressCallback? progressCallback = null)
+            JobStageProgressCallback? progressCallback = null,
+            IReadOnlySet<Guid>? excludedJobIds = null)
         {
             return Task.FromResult(JobEnrichmentResult.Failed("Enrichment failed.", StatusCodes.Status502BadGateway));
         }
@@ -317,6 +320,11 @@ public sealed class DiagnosticsControllerTests
             int count,
             CancellationToken cancellationToken,
             JobStageProgressCallback? progressCallback = null)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<SingleJobScoringResult> ScoreJobAsync(Guid jobId, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
         }
@@ -336,6 +344,11 @@ public sealed class DiagnosticsControllerTests
                     scoredCount: count,
                     failedCount: 0));
         }
+
+        public Task<SingleJobScoringResult> ScoreJobAsync(Guid jobId, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class FailingJobBatchScoringService : IJobBatchScoringService
@@ -346,6 +359,11 @@ public sealed class DiagnosticsControllerTests
             JobStageProgressCallback? progressCallback = null)
         {
             return Task.FromResult(JobBatchScoringResult.Failed("Scoring failed.", StatusCodes.Status503ServiceUnavailable));
+        }
+
+        public Task<SingleJobScoringResult> ScoreJobAsync(Guid jobId, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
         }
     }
 }

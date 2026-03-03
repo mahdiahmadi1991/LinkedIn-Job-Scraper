@@ -5,7 +5,8 @@ public interface IJobEnrichmentService
     Task<JobEnrichmentResult> EnrichIncompleteJobsAsync(
         int maxCount,
         CancellationToken cancellationToken,
-        JobStageProgressCallback? progressCallback = null);
+        JobStageProgressCallback? progressCallback = null,
+        IReadOnlySet<Guid>? excludedJobIds = null);
 }
 
 public sealed record JobEnrichmentResult(
@@ -16,7 +17,8 @@ public sealed record JobEnrichmentResult(
     int ProcessedCount,
     int EnrichedCount,
     int FailedCount,
-    int WarningCount)
+    int WarningCount,
+    IReadOnlyList<Guid> AttemptedJobIds)
 {
     public static JobEnrichmentResult Failed(
         string message,
@@ -25,7 +27,8 @@ public sealed record JobEnrichmentResult(
         int processedCount = 0,
         int enrichedCount = 0,
         int failedCount = 0,
-        int warningCount = 0) =>
+        int warningCount = 0,
+        IReadOnlyList<Guid>? attemptedJobIds = null) =>
         new(
             false,
             message,
@@ -34,14 +37,16 @@ public sealed record JobEnrichmentResult(
             processedCount,
             enrichedCount,
             failedCount,
-            warningCount);
+            warningCount,
+            attemptedJobIds ?? Array.Empty<Guid>());
 
     public static JobEnrichmentResult Succeeded(
         int requestedCount,
         int processedCount,
         int enrichedCount,
         int failedCount,
-        int warningCount) =>
+        int warningCount,
+        IReadOnlyList<Guid>? attemptedJobIds = null) =>
         new(
             true,
             "LinkedIn job enrichment completed.",
@@ -50,5 +55,6 @@ public sealed record JobEnrichmentResult(
             processedCount,
             enrichedCount,
             failedCount,
-            warningCount);
+            warningCount,
+            attemptedJobIds ?? Array.Empty<Guid>());
 }

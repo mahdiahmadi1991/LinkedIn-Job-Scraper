@@ -14,7 +14,7 @@
     const progressLogEmpty = document.querySelector("[data-progress-log-empty]");
     const cancelButton = document.querySelector("[data-fetch-cancel-button]");
     const stageNodes = Array.from(document.querySelectorAll("[data-progress-stage]"));
-    const stageOrder = ["fetch", "enrichment", "scoring"];
+    const stageOrder = ["fetch", "enrichment"];
     const pollUrl = form.dataset.progressPollUrl;
     const cancelUrl = form.dataset.cancelUrl;
     const antiForgeryToken = form.querySelector('input[name="__RequestVerificationToken"]')?.value ?? "";
@@ -24,7 +24,7 @@
     const showToast = window.appToast?.show ?? (() => {});
     const setButtonLoading = window.appButtons?.setLoading ?? (() => {});
     const busySpinner = form.querySelector("[data-busy-spinner]");
-    const workflowStorageKey = "jobs.activeWorkflowId";
+    const workflowStorageKey = "jobs.activeWorkflow";
     const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
     let signalRConnection = null;
     let isSubmitting = false;
@@ -34,6 +34,8 @@
     let workflowTerminalState = null;
     let workflowPollingTimer = null;
     let activeFetchPromise = null;
+    let workflowRedirectUrl = null;
+    let isPageUnloading = false;
 
     const setBusyState = () => {
         if (button) {
@@ -94,10 +96,13 @@
         workflowPollingTimer = null;
     };
 
-    const storeActiveWorkflowId = (workflowId) => {
+    const storeActiveWorkflowState = (workflowId, redirectUrl) => {
         try {
             if (workflowId) {
-                window.sessionStorage.setItem(workflowStorageKey, workflowId);
+                window.sessionStorage.setItem(workflowStorageKey, JSON.stringify({
+                    workflowId,
+                    redirectUrl: redirectUrl || window.location.href
+                }));
             }
         } catch {
         }
@@ -110,12 +115,35 @@
         }
     };
 
-    const readActiveWorkflowId = () => {
+    const readActiveWorkflowState = () => {
         try {
-            return window.sessionStorage.getItem(workflowStorageKey);
+            const rawValue = window.sessionStorage.getItem(workflowStorageKey);
+            if (!rawValue) {
+                return null;
+            }
+
+            try {
+                const parsedValue = JSON.parse(rawValue);
+                if (parsedValue && typeof parsedValue.workflowId === "string" && parsedValue.workflowId.trim()) {
+                    return {
+                        workflowId: parsedValue.workflowId.trim(),
+                        redirectUrl: typeof parsedValue.redirectUrl === "string" && parsedValue.redirectUrl.trim()
+                            ? parsedValue.redirectUrl.trim()
+                            : window.location.href
+                    };
+                }
+            } catch {
+                if (rawValue.trim()) {
+                    return {
+                        workflowId: rawValue.trim(),
+                        redirectUrl: window.location.href
+                    };
+                }
+            }
         } catch {
-            return null;
         }
+
+        return null;
     };
 
     const scrollProgressLogToLatest = (behavior = "smooth") => {
@@ -249,6 +277,9 @@
             node.classList.toggle("text-success-emphasis", !isActive && isCompleted);
         });
 
+        const shouldReloadAfterRestore = update.state === "completed" && !activeFetchPromise && workflowRedirectUrl;
+        const completionRedirectUrl = shouldReloadAfterRestore ? workflowRedirectUrl : null;
+
         if (["completed", "failed", "cancelled"].includes(update.state)) {
             workflowTerminalState = update.state;
             stopPolling();
@@ -256,6 +287,13 @@
             activeFetchPromise = null;
             clearActiveWorkflowId();
             setIdleState();
+            workflowRedirectUrl = null;
+        }
+
+        if (completionRedirectUrl) {
+            window.setTimeout(() => {
+                window.location.assign(completionRedirectUrl);
+            }, 250);
         }
     };
 
@@ -328,12 +366,13 @@
         }
     };
 
-    const beginWorkflowTracking = (workflowId) => {
+    const beginWorkflowTracking = (workflowId, redirectUrl) => {
         activeWorkflowId = workflowId;
+        workflowRedirectUrl = redirectUrl || window.location.href;
         lastSequence = 0;
         lastLoggedMessage = null;
         workflowTerminalState = null;
-        storeActiveWorkflowId(workflowId);
+        storeActiveWorkflowState(workflowId, workflowRedirectUrl);
         stopPolling();
 
         if (progressLog) {
@@ -348,6 +387,18 @@
 
         void pollWorkflowProgress();
     };
+
+    window.addEventListener("pagehide", () => {
+        isPageUnloading = true;
+    });
+
+    window.addEventListener("beforeunload", () => {
+        isPageUnloading = true;
+    });
+
+    window.addEventListener("pageshow", () => {
+        isPageUnloading = false;
+    });
 
     form.addEventListener("submit", async (event) => {
         if (isSubmitting) {
@@ -367,14 +418,14 @@
         }
 
         const workflowId = window.crypto?.randomUUID?.() ?? `workflow-${Date.now()}`;
-        beginWorkflowTracking(workflowId);
+        beginWorkflowTracking(workflowId, window.location.href);
         setBusyState();
         applyProgressUpdate({
             workflowId,
             state: "running",
             stage: "fetch",
             percent: 6,
-            message: "Starting Fetch & Score workflow and waiting for the first server event..."
+            message: "Starting the fetch workflow and waiting for the first server event..."
         });
 
         try {
@@ -394,25 +445,45 @@
             const canReadJson = contentType.includes("application/json") || contentType.includes("application/problem+json");
             const payload = canReadJson ? await response.json() : null;
 
+            if (response.status === 409 && payload?.workflowId) {
+                beginWorkflowTracking(String(payload.workflowId), payload.redirectUrl || window.location.href);
+                setBusyState();
+                applyProgressUpdate({
+                    workflowId: String(payload.workflowId),
+                    state: "running",
+                    stage: "fetch",
+                    percent: 8,
+                    message: payload?.message || "Another fetch workflow is already running. Reattaching to the active workflow..."
+                });
+
+                return;
+            }
+
             if (!response.ok || !payload || !payload.redirectUrl) {
-                const error = new Error(payload?.detail || payload?.message || payload?.title || "Fetch & Score request failed.");
+                const error = new Error(payload?.detail || payload?.message || payload?.title || "Fetch Jobs request failed.");
                 error.name = response.status === 409 && workflowTerminalState === "cancelled"
                     ? "WorkflowCancelled"
                     : "WorkflowFailed";
                 throw error;
             }
 
+            workflowRedirectUrl = payload.redirectUrl;
+
             window.setTimeout(() => {
                 window.location.assign(payload.redirectUrl);
             }, 250);
         } catch (error) {
+            if (isPageUnloading) {
+                return;
+            }
+
             if (!(error instanceof Error && error.name === "WorkflowCancelled" && workflowTerminalState === "cancelled")) {
                 applyProgressUpdate({
                     workflowId,
                     state: "failed",
                     stage: "completed",
                     percent: 100,
-                    message: error instanceof Error ? error.message : "Fetch & Score request failed."
+                    message: error instanceof Error ? error.message : "Fetch Jobs request failed."
                 });
             } else {
                 isSubmitting = false;
@@ -476,17 +547,17 @@
         showToast(pageAlertMessage, severity !== "warning" && severity !== "danger");
     }
 
-    const persistedWorkflowId = readActiveWorkflowId();
-    if (persistedWorkflowId) {
+    const persistedWorkflowState = readActiveWorkflowState();
+    if (persistedWorkflowState?.workflowId) {
         isSubmitting = true;
-        beginWorkflowTracking(persistedWorkflowId);
+        beginWorkflowTracking(persistedWorkflowState.workflowId, persistedWorkflowState.redirectUrl);
         setBusyState();
         applyProgressUpdate({
-            workflowId: persistedWorkflowId,
+            workflowId: persistedWorkflowState.workflowId,
             state: "running",
             stage: "fetch",
             percent: 6,
-            message: "Restoring workflow status after page refresh..."
+            message: "Restoring fetch workflow status after page refresh..."
         });
     }
 
@@ -640,4 +711,327 @@
     };
 
     attachLazySentinel();
+})();
+
+(() => {
+    const showToast = window.appToast?.show ?? (() => {});
+    const pendingStorageKey = "jobs.pendingScoreRequests";
+    const activeScoreRequests = new Set();
+
+    const readPendingEntries = () => {
+        try {
+            const payload = window.sessionStorage.getItem(pendingStorageKey);
+            if (!payload) {
+                return {};
+            }
+
+            const parsed = JSON.parse(payload);
+            return parsed && typeof parsed === "object" ? parsed : {};
+        } catch {
+            return {};
+        }
+    };
+
+    const writePendingEntries = (entries) => {
+        try {
+            if (Object.keys(entries).length === 0) {
+                window.sessionStorage.removeItem(pendingStorageKey);
+                return;
+            }
+
+            window.sessionStorage.setItem(pendingStorageKey, JSON.stringify(entries));
+        } catch {
+        }
+    };
+
+    const markPending = (jobId) => {
+        const entries = readPendingEntries();
+        entries[jobId] = { startedAt: Date.now() };
+        writePendingEntries(entries);
+    };
+
+    const clearPending = (jobId) => {
+        const entries = readPendingEntries();
+        delete entries[jobId];
+        writePendingEntries(entries);
+    };
+
+    const getRestorablePendingJobIds = () => {
+        const now = Date.now();
+        const entries = readPendingEntries();
+        const retainedEntries = {};
+        const jobIds = [];
+
+        for (const [jobId, metadata] of Object.entries(entries)) {
+            const startedAt = Number(metadata?.startedAt);
+            if (!Number.isFinite(startedAt) || (now - startedAt) > 5 * 60 * 1000) {
+                continue;
+            }
+
+            retainedEntries[jobId] = { startedAt };
+            jobIds.push(jobId);
+        }
+
+        writePendingEntries(retainedEntries);
+        return jobIds;
+    };
+
+    const getJobRoots = (jobId) => Array.from(document.querySelectorAll(`[data-job-ui-root][data-job-id="${jobId}"]`));
+
+    const getJobButtons = (jobId) => Array.from(document.querySelectorAll(`[data-score-job-form][data-job-id="${jobId}"] [data-score-job-button]`));
+
+    const setScoreButtonState = (button, state) => {
+        if (!(button instanceof HTMLButtonElement)) {
+            return;
+        }
+
+        const spinner = button.querySelector("[data-score-spinner]");
+        const text = button.querySelector("[data-score-button-text]");
+
+        if (state === "busy") {
+            button.disabled = true;
+            button.dataset.scoreComplete = "false";
+            spinner?.classList.remove("d-none");
+            if (text) {
+                text.textContent = button.dataset.busyText || "Scoring...";
+            }
+
+            return;
+        }
+
+        spinner?.classList.add("d-none");
+
+        if (state === "done") {
+            button.disabled = true;
+            button.dataset.scoreComplete = "true";
+            if (text) {
+                text.textContent = button.dataset.doneText || "Scored";
+            }
+
+            return;
+        }
+
+        button.disabled = false;
+        button.dataset.scoreComplete = "false";
+        if (text) {
+            text.textContent = button.dataset.idleText || "Score";
+        }
+    };
+
+    const updateLabelBadge = (badge, aiLabel) => {
+        if (!(badge instanceof HTMLElement)) {
+            return;
+        }
+
+        badge.textContent = aiLabel || "Pending";
+        badge.classList.remove(
+            "bg-success-subtle",
+            "text-success-emphasis",
+            "bg-warning-subtle",
+            "text-warning-emphasis",
+            "bg-secondary-subtle",
+            "text-secondary-emphasis",
+            "bg-light",
+            "text-dark");
+
+        if (aiLabel === "StrongMatch") {
+            badge.classList.add("bg-success-subtle", "text-success-emphasis");
+        } else if (aiLabel === "Review") {
+            badge.classList.add("bg-warning-subtle", "text-warning-emphasis");
+        } else if (aiLabel === "Skip") {
+            badge.classList.add("bg-secondary-subtle", "text-secondary-emphasis");
+        } else {
+            badge.classList.add("bg-light", "text-dark");
+        }
+    };
+
+    const updateSignalSection = (root, sectionSelector, textSelector, value) => {
+        const section = root.querySelector(sectionSelector);
+        const text = root.querySelector(textSelector);
+
+        if (!(section instanceof HTMLElement) || !(text instanceof HTMLElement)) {
+            return;
+        }
+
+        text.textContent = value || "";
+        section.classList.toggle("d-none", !value);
+    };
+
+    const formatLocalTimestamp = (isoValue) => {
+        const date = new Date(isoValue);
+        if (Number.isNaN(date.getTime())) {
+            return "Just now";
+        }
+
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+    };
+
+    const updateJobUi = (job) => {
+        if (!job?.id) {
+            return;
+        }
+
+        for (const root of getJobRoots(job.id)) {
+            const scoreShell = root.querySelector("[data-job-score-shell]");
+            const scoreNumber = root.querySelector("[data-job-score-number]");
+            const scoreEmpty = root.querySelector("[data-job-score-empty]");
+            const labelBadge = root.querySelector("[data-job-label-badge]");
+            const summaryText = root.querySelector("[data-job-ai-summary-text]");
+            const summaryEmpty = root.querySelector("[data-job-ai-summary-empty]");
+            const signalsStack = root.querySelector("[data-job-ai-signals]");
+            const signalsEmpty = root.querySelector("[data-job-ai-signals-empty]");
+            const scoredAtValue = root.querySelector("[data-job-scored-at-value]");
+
+            if (scoreShell instanceof HTMLElement) {
+                scoreShell.classList.remove("d-none");
+            }
+
+            if (scoreNumber instanceof HTMLElement) {
+                scoreNumber.textContent = String(job.aiScore);
+            }
+
+            if (scoreEmpty instanceof HTMLElement) {
+                scoreEmpty.classList.add("d-none");
+            }
+
+            updateLabelBadge(labelBadge, job.aiLabel);
+
+            if (summaryText instanceof HTMLElement) {
+                summaryText.textContent = job.aiSummary || "";
+                summaryText.classList.toggle("d-none", !job.aiSummary);
+                if (job.aiOutputDirection) {
+                    summaryText.setAttribute("dir", job.aiOutputDirection);
+                }
+                if (job.aiOutputLanguageCode) {
+                    summaryText.setAttribute("lang", job.aiOutputLanguageCode);
+                }
+            }
+
+            if (summaryEmpty instanceof HTMLElement) {
+                summaryEmpty.classList.toggle("d-none", Boolean(job.aiSummary));
+            }
+
+            updateSignalSection(root, "[data-job-why-section]", "[data-job-why-text]", job.aiWhyMatched);
+            updateSignalSection(root, "[data-job-concerns-section]", "[data-job-concerns-text]", job.aiConcerns);
+
+            const hasSignals = Boolean(job.aiWhyMatched) || Boolean(job.aiConcerns);
+            if (signalsStack instanceof HTMLElement) {
+                signalsStack.classList.toggle("d-none", !hasSignals);
+            }
+
+            if (signalsEmpty instanceof HTMLElement) {
+                signalsEmpty.classList.toggle("d-none", hasSignals);
+            }
+
+            if (scoredAtValue instanceof HTMLElement) {
+                scoredAtValue.textContent = formatLocalTimestamp(job.scoredAtUtc);
+            }
+        }
+
+        for (const button of getJobButtons(job.id)) {
+            setScoreButtonState(button, "done");
+        }
+    };
+
+    const submitScore = async (form, { restoring = false } = {}) => {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        const jobId = form.dataset.jobId || form.querySelector('input[name="jobId"]')?.value;
+        const button = form.querySelector("[data-score-job-button]");
+
+        if (!jobId || !(button instanceof HTMLButtonElement)) {
+            return;
+        }
+
+        if (button.dataset.scoreComplete === "true" || activeScoreRequests.has(jobId)) {
+            clearPending(jobId);
+            return;
+        }
+
+        activeScoreRequests.add(jobId);
+        markPending(jobId);
+
+        for (const candidate of getJobButtons(jobId)) {
+            setScoreButtonState(candidate, "busy");
+        }
+
+        try {
+            const response = await fetch(form.action, {
+                method: "POST",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: new FormData(form),
+                credentials: "same-origin"
+            });
+
+            const contentType = response.headers.get("Content-Type") || "";
+            const canReadJson = contentType.includes("application/json") || contentType.includes("application/problem+json");
+            const payload = canReadJson ? await response.json() : null;
+
+            if (!payload) {
+                throw new Error("AI scoring response could not be read.");
+            }
+
+            if (payload.job) {
+                updateJobUi(payload.job);
+            }
+
+            if (!response.ok || !payload.success) {
+                for (const candidate of getJobButtons(jobId)) {
+                    if (candidate.dataset.scoreComplete !== "true") {
+                        setScoreButtonState(candidate, "idle");
+                    }
+                }
+
+                throw new Error(payload.message || payload.detail || "AI scoring failed.");
+            }
+
+            clearPending(jobId);
+            showToast(payload.message || "AI scoring completed.", true);
+        } catch (error) {
+            clearPending(jobId);
+
+            for (const candidate of getJobButtons(jobId)) {
+                if (candidate.dataset.scoreComplete !== "true") {
+                    setScoreButtonState(candidate, "idle");
+                }
+            }
+
+            const message = error instanceof Error ? error.message : "AI scoring failed.";
+            showToast(restoring ? `Restored score request failed: ${message}` : message, false);
+        } finally {
+            activeScoreRequests.delete(jobId);
+        }
+    };
+
+    document.addEventListener("submit", (event) => {
+        const form = event.target instanceof HTMLFormElement && event.target.matches("[data-score-job-form]")
+            ? event.target
+            : null;
+
+        if (!form) {
+            return;
+        }
+
+        event.preventDefault();
+        void submitScore(form);
+    });
+
+    const restorePendingRequests = () => {
+        for (const jobId of getRestorablePendingJobIds()) {
+            const form = document.querySelector(`[data-score-job-form][data-job-id="${jobId}"]`);
+            if (form instanceof HTMLFormElement) {
+                void submitScore(form, { restoring: true });
+            }
+        }
+    };
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", restorePendingRequests, { once: true });
+    } else {
+        restorePendingRequests();
+    }
 })();
