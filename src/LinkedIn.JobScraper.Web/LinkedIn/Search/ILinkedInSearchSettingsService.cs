@@ -152,7 +152,15 @@ public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsServi
             }
 
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-            await dbContext.Database.MigrateAsync(cancellationToken);
+            if (dbContext.Database.IsRelational())
+            {
+                await dbContext.Database.MigrateAsync(cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.EnsureCreatedAsync(cancellationToken);
+            }
+
             _databaseEnsured = true;
         }
         finally
