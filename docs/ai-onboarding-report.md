@@ -536,18 +536,19 @@ The technical debt file is:
 
 Current intentionally deferred items:
 
-- restore automated tests
-- restore CI/CD
-- improve structured logging and observability
-- strengthen secret handling and production-oriented configuration separation
-- revisit static analysis once the architecture stabilizes
-- add background processing only if the ingestion model requires it
+- optional encryption-at-rest for stored LinkedIn session data
+- broader persistence integration tests beyond the CI-safe baseline
+- SQL Server container CI coverage
+- richer telemetry beyond the current logging and diagnostics baseline
+- deployment and hosting beyond local usage
+- background processing only if the ingestion model requires it
 
 ## 16. Important Documents For Future AI Sessions
 
 When onboarding another AI model, these files should be treated as primary context:
 
 - [AGENTS.md](/home/mehdi/projects/LinkedIn-Job-Scraper/AGENTS.md)
+- [PLAN_REVISED.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/PLAN_REVISED.md)
 - [plan.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/plan.md)
 - [project-context.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/project-context.md)
 - [technical-debt.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/technical-debt.md)
@@ -565,4 +566,3 @@ If a new AI assistant takes over this repository, the most important truths are:
 - do not reintroduce direct LinkedIn credential-post login as the primary strategy
 - preserve the conservative pacing and user-in-the-loop posture
 - treat the current uncommitted top-bar refactor as live working state
-

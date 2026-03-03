@@ -133,9 +133,7 @@ Use the docs in this order, depending on what you need:
 ### Planning And Review Artifacts
 
 - [plan.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/plan.md)
-  - historical delivery log and prior execution queues
-- [next-plan.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/next-plan.md)
-  - the current externally proposed remediation plan under review
+  - active operational execution ledger and queue status
 - [audit-report.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/audit-report.md)
   - point-in-time evidence snapshot
 - [technical-debt.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/technical-debt.md)

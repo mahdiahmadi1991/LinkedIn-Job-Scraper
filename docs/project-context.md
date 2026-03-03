@@ -92,7 +92,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - `AiSettingsController` is now thinner as well: profile-to-view-model mapping and OpenAI connection-state shaping now live in a dedicated `AI` adapter helper, while controller actions remain orchestration-only
 - `Fetch & Score` workflow progress now carries the active HTTP correlation id in each SignalR progress payload, so request-scoped logs and live progress events can be tied together without changing workflow behavior
 - A minimal redaction policy now sanitizes sensitive token-like text in exception-derived operational messages and diagnostics surfaces, reducing the chance of cookies, API keys, or bearer-like strings being echoed back to users or nearby logs
-- The currently activated `next-plan` execution queue is now closed: its CI and documentation follow-up items were rechecked after implementation and no further gap-only pass was justified for this phase
+- The latest architecture-and-quality remediation execution queue is now closed: its CI and documentation follow-up items were rechecked after implementation and no further gap-only pass was justified for that phase
 
 ## Product Intent
 

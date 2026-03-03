@@ -25,7 +25,8 @@
       "**/bin/**": true,
       "**/obj/**": true,
       "**/TestResults/**": true
-    }
+    },
+    "chatgpt.openOnStartup": true
   },
   "extensions": {
     "recommendations": [
