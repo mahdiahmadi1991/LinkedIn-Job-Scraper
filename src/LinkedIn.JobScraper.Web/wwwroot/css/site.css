@@ -455,6 +455,73 @@ a:hover {
   transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
 }
 
+.progress-activity-panel {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid rgba(10, 102, 194, 0.08);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(248, 251, 253, 0.96), rgba(241, 247, 252, 0.96));
+}
+
+.progress-activity-empty {
+  padding: 0.15rem 0;
+}
+
+.progress-activity-list {
+  display: grid;
+  gap: 0.7rem;
+  max-height: 13.5rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.progress-activity-item {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(220, 230, 241, 0.85);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.progress-activity-item.completed {
+  border-color: rgba(17, 122, 55, 0.16);
+}
+
+.progress-activity-item.warning {
+  border-color: rgba(154, 103, 0, 0.18);
+}
+
+.progress-activity-item.failed {
+  border-color: rgba(176, 42, 55, 0.18);
+}
+
+.progress-activity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--app-ink-500);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.progress-activity-message {
+  color: var(--app-ink-900);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.progress-activity-details {
+  color: var(--app-ink-500);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
 .jobs-page .jobs-list-panel .card-body {
   padding: 0;
 }

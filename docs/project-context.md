@@ -40,6 +40,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The batch pipeline is being tuned for larger runs by reducing dashboard count queries and suppressing repeated EF Core change detection inside import, enrichment, and scoring loops
 - Stored LinkedIn sessions are now explicitly invalidated on `401` responses so expired sessions clear themselves and the UI can steer the user back to the recapture flow
 - The jobs dashboard now lazy-loads additional job rows in client-side batches so the first render stays lighter while deeper browsing continues on demand
+- The jobs workflow panel now includes a live activity log under the progress bar so backend stage messages and counters are visible while the workflow is running
 
 ## Product Intent
 

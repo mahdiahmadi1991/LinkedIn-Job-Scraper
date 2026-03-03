@@ -98,6 +98,19 @@
                     </div>
                 </div>
             </div>
+            <div class="progress-activity-panel" data-progress-log-panel>
+                <div class="d-flex justify-content-between align-items-center gap-3">
+                    <div>
+                        <div class="small text-muted text-uppercase">Live Activity</div>
+                        <div class="fw-semibold">Background workflow report</div>
+                    </div>
+                    <span class="small text-muted">Newest events appear first</span>
+                </div>
+                <div class="progress-activity-empty small text-muted" data-progress-log-empty>
+                    Waiting for the first workflow event...
+                </div>
+                <div class="progress-activity-list d-none" data-progress-log></div>
+            </div>
         </div>
     </section>
 
@@ -284,10 +297,13 @@
             const progressPanel = document.querySelector("[data-fetch-progress]");
             const progressBar = document.querySelector("[data-progress-bar]");
             const progressStatus = document.querySelector("[data-progress-status]");
+            const progressLog = document.querySelector("[data-progress-log]");
+            const progressLogEmpty = document.querySelector("[data-progress-log-empty]");
             const stageNodes = Array.from(document.querySelectorAll("[data-progress-stage]"));
             const stageOrder = ["fetch", "enrichment", "scoring"];
             let signalRConnection = null;
             let isSubmitting = false;
+            let lastLoggedMessage = null;
 
             const setBusyState = () => {
                 if (button) {
@@ -321,6 +337,71 @@
                 }
             };
 
+            const appendProgressLog = (update) => {
+                if (!progressLog || !update || !update.message) {
+                    return;
+                }
+
+                if (lastLoggedMessage === update.message) {
+                    return;
+                }
+
+                lastLoggedMessage = update.message;
+
+                if (progressLogEmpty) {
+                    progressLogEmpty.classList.add("d-none");
+                }
+
+                progressLog.classList.remove("d-none");
+
+                const item = document.createElement("div");
+                item.className = "progress-activity-item";
+
+                const state = String(update.state || "running");
+                if (state === "completed") {
+                    item.classList.add("completed");
+                } else if (state === "warning") {
+                    item.classList.add("warning");
+                } else if (state === "failed") {
+                    item.classList.add("failed");
+                }
+
+                const timeLabel = new Intl.DateTimeFormat([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit"
+                }).format(new Date());
+
+                const detailParts = [];
+                if (Number.isFinite(Number(update.requestedCount)) && Number(update.requestedCount) > 0) {
+                    detailParts.push(`Requested: ${update.requestedCount}`);
+                }
+                if (Number.isFinite(Number(update.processedCount)) && Number(update.processedCount) > 0) {
+                    detailParts.push(`Processed: ${update.processedCount}`);
+                }
+                if (Number.isFinite(Number(update.succeededCount)) && Number(update.succeededCount) > 0) {
+                    detailParts.push(`Succeeded: ${update.succeededCount}`);
+                }
+                if (Number.isFinite(Number(update.failedCount)) && Number(update.failedCount) > 0) {
+                    detailParts.push(`Failed: ${update.failedCount}`);
+                }
+
+                const detailsMarkup = detailParts.length > 0
+                    ? `<div class="progress-activity-details">${detailParts.join(" · ")}</div>`
+                    : "";
+
+                item.innerHTML = `
+                    <div class="progress-activity-meta">
+                        <span class="progress-activity-time">${timeLabel}</span>
+                        <span class="progress-activity-state">${state}</span>
+                    </div>
+                    <div class="progress-activity-message">${update.message}</div>
+                    ${detailsMarkup}
+                `;
+
+                progressLog.prepend(item);
+            };
+
             const applyProgressUpdate = (update) => {
                 if (!update) {
                     return;
@@ -333,6 +414,8 @@
                 if (progressStatus && update.message) {
                     progressStatus.textContent = update.message;
                 }
+
+                appendProgressLog(update);
 
                 if (progressBar) {
                     const percent = Math.max(0, Math.min(100, Number(update.percent) || 0));

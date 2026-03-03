@@ -131,7 +131,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 "running",
                 "fetch",
                 10,
-                "Fetching job pages from LinkedIn..."),
+                "Starting LinkedIn fetch with the stored session..."),
             cancellationToken);
 
         var importResult = await _jobImportService.ImportCurrentSearchAsync(cancellationToken);
@@ -166,7 +166,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 "running",
                 "fetch",
                 38,
-                $"Fetch completed. {importResult.FetchedCount} jobs collected across {importResult.PagesFetched} page(s).",
+                $"Fetch completed. {importResult.FetchedCount} jobs collected across {importResult.PagesFetched} page(s): {importResult.ImportedCount} new, {importResult.UpdatedExistingCount} refreshed, {importResult.SkippedCount} already known.",
                 importResult.TotalAvailableCount,
                 importResult.FetchedCount,
                 importResult.ImportedCount + importResult.UpdatedExistingCount,
@@ -184,7 +184,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 "running",
                 "enrichment",
                 52,
-                $"Enriching up to {enrichmentBatchSize} jobs with detail data...",
+                $"Preparing enrichment batch. Up to {enrichmentBatchSize} jobs will request LinkedIn detail payloads.",
                 enrichmentBatchSize,
                 0,
                 0,
@@ -202,7 +202,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 "enrichment",
                 72,
                 enrichmentResult.Success
-                    ? $"Enrichment completed. {enrichmentResult.EnrichedCount} jobs updated."
+                    ? $"Enrichment completed. {enrichmentResult.EnrichedCount} of {enrichmentResult.ProcessedCount} processed jobs were updated. Warnings: {enrichmentResult.WarningCount}. Failed: {enrichmentResult.FailedCount}."
                     : $"Enrichment issue: {enrichmentResult.Message}",
                 enrichmentResult.RequestedCount,
                 enrichmentResult.ProcessedCount,
@@ -223,7 +223,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 "running",
                 "scoring",
                 84,
-                $"Scoring up to {scoringBatchSize} jobs with AI...",
+                $"Preparing AI scoring batch. Up to {scoringBatchSize} jobs will be sent to OpenAI for evaluation.",
                 scoringBatchSize,
                 0,
                 0,
