@@ -76,6 +76,41 @@ public sealed class AppUserAuthenticationServiceTests
     }
 
     [Fact]
+    public async Task AuthenticateAsyncReturnsFailureForExpiredUser()
+    {
+        var dbContextOptions = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+
+        await using (var seedContext = new LinkedInJobScraperDbContext(dbContextOptions))
+        {
+            var passwordHasher = new AppUserPasswordHasher();
+            seedContext.AppUsers.Add(
+                new AppUserRecord
+                {
+                    UserName = "owner",
+                    DisplayName = "Local Owner",
+                    PasswordHash = passwordHasher.HashPassword("Passw0rd!"),
+                    ExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(-5),
+                    IsActive = true,
+                    CreatedAtUtc = DateTimeOffset.UtcNow,
+                    UpdatedAtUtc = DateTimeOffset.UtcNow
+                });
+            await seedContext.SaveChangesAsync();
+        }
+
+        var service = new AppUserAuthenticationService(
+            new TestDbContextFactory(dbContextOptions),
+            new AppUserPasswordHasher());
+
+        var result = await service.AuthenticateAsync("owner", "Passw0rd!", CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Null(result.User);
+        Assert.Equal("This local account has expired. Ask the app owner to extend or reseed the account.", result.Message);
+    }
+
+    [Fact]
     public void CreatePrincipalAddsExpectedIdentityClaims()
     {
         var service = new AppUserAuthenticationService(

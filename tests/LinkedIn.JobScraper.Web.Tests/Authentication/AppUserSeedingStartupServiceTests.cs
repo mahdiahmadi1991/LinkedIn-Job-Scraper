@@ -43,6 +43,36 @@ public sealed class AppUserSeedingStartupServiceTests
     }
 
     [Fact]
+    public async Task StartAsyncAddsConfiguredExpiryWhenProvided()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var expectedExpiry = DateTimeOffset.UtcNow.AddDays(7).ToUniversalTime();
+        await using var dbContext = CreateDbContext(databaseName);
+
+        var service = CreateService(
+            databaseName,
+            new AppAuthenticationOptions
+            {
+                SeedUsers =
+                [
+                    new AppAuthenticationSeedUserOptions
+                    {
+                        UserName = "owner",
+                        DisplayName = "Local Owner",
+                        Password = "Passw0rd!",
+                        ExpiresAtUtc = expectedExpiry
+                    }
+                ]
+            },
+            isSqlConfigured: true);
+
+        await service.StartAsync(CancellationToken.None);
+
+        var user = await dbContext.AppUsers.SingleAsync();
+        Assert.Equal(expectedExpiry, user.ExpiresAtUtc);
+    }
+
+    [Fact]
     public async Task StartAsyncDoesNothingWhenSqlConnectionIsNotConfigured()
     {
         var databaseName = Guid.NewGuid().ToString("N");
@@ -114,6 +144,56 @@ public sealed class AppUserSeedingStartupServiceTests
 
         Assert.True(hasher.VerifyPassword("NewPassw0rd!", user.PasswordHash));
         Assert.False(hasher.VerifyPassword("OldPassw0rd!", user.PasswordHash));
+    }
+
+    [Fact]
+    public async Task StartAsyncUpdatesExistingSeedUserExpiryWhenExpiryChanges()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var hasher = new AppUserPasswordHasher();
+        var updatedExpiry = DateTimeOffset.UtcNow.AddDays(30).ToUniversalTime();
+
+        await using (var setupContext = CreateDbContext(databaseName))
+        {
+            setupContext.AppUsers.Add(
+                new AppUserRecord
+                {
+                    UserName = "owner",
+                    DisplayName = "Local Owner",
+                    PasswordHash = hasher.HashPassword("Passw0rd!"),
+                    ExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1).ToUniversalTime(),
+                    IsActive = true,
+                    IsSeeded = true,
+                    CreatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
+                    UpdatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1)
+                });
+
+            await setupContext.SaveChangesAsync();
+        }
+
+        var service = CreateService(
+            databaseName,
+            new AppAuthenticationOptions
+            {
+                SeedUsers =
+                [
+                    new AppAuthenticationSeedUserOptions
+                    {
+                        UserName = "owner",
+                        DisplayName = "Local Owner",
+                        Password = "Passw0rd!",
+                        ExpiresAtUtc = updatedExpiry
+                    }
+                ]
+            },
+            isSqlConfigured: true);
+
+        await service.StartAsync(CancellationToken.None);
+
+        await using var verificationContext = CreateDbContext(databaseName);
+        var user = await verificationContext.AppUsers.SingleAsync();
+
+        Assert.Equal(updatedExpiry, user.ExpiresAtUtc);
     }
 
     private static LinkedInJobScraperDbContext CreateDbContext(string databaseName)

@@ -34,6 +34,29 @@ public sealed class AccountControllerTests
     }
 
     [Fact]
+    public async Task LoginPostReturnsExpiredAccountMessageWhenUserIsExpired()
+    {
+        var controller = CreateController(
+            new FakeAuthenticationService(
+                false,
+                "This local account has expired. Ask the app owner to extend or reseed the account."));
+
+        var result = await controller.Login(
+            new LoginPageViewModel
+            {
+                UserName = "owner",
+                Password = "Passw0rd!"
+            },
+            CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.IsType<LoginPageViewModel>(view.Model);
+
+        var modelStateEntry = Assert.Single(controller.ModelState[string.Empty]!.Errors);
+        Assert.Equal("This local account has expired. Ask the app owner to extend or reseed the account.", modelStateEntry.ErrorMessage);
+    }
+
+    [Fact]
     public async Task LoginPostSignsInAndUsesPersistentCookieWhenRememberMeIsSelected()
     {
         var authenticationService = new FakeAuthenticationService(true);
@@ -122,17 +145,19 @@ public sealed class AccountControllerTests
     private sealed class FakeAuthenticationService : IAppUserAuthenticationService
     {
         private readonly bool _shouldSucceed;
+        private readonly string _failureMessage;
 
-        public FakeAuthenticationService(bool shouldSucceed)
+        public FakeAuthenticationService(bool shouldSucceed, string? failureMessage = null)
         {
             _shouldSucceed = shouldSucceed;
+            _failureMessage = failureMessage ?? "The username or password is incorrect.";
         }
 
         public Task<AppUserAuthenticationResult> AuthenticateAsync(string userName, string password, CancellationToken cancellationToken)
         {
             if (!_shouldSucceed)
             {
-                return Task.FromResult(new AppUserAuthenticationResult(false, "The username or password is incorrect.", null));
+                return Task.FromResult(new AppUserAuthenticationResult(false, _failureMessage, null));
             }
 
             return Task.FromResult(

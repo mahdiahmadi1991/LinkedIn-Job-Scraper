@@ -66,6 +66,7 @@ public sealed class LinkedInJobScraperDbContext : DbContext
 
                 entity.HasIndex(static user => user.UserName).IsUnique();
                 entity.HasIndex(static user => user.IsActive);
+                entity.HasIndex(static user => user.ExpiresAtUtc);
             });
 
         modelBuilder.Entity<JobStatusHistoryRecord>(

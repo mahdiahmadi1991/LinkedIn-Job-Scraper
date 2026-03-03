@@ -102,6 +102,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - A dedicated `docs/ai-settings-recommended-profile.md` document now stores a ready-to-use AI scoring profile tailored to the current backend .NET job-search goal, so future updates do not require re-explaining the scoring intent.
 - `Search Settings` location input now uses an autocomplete dropdown fed by a lightweight JSON suggestion endpoint instead of the previous full-submit “Find Locations” flow, while the stored `geoId` selection model remains unchanged.
 - Seeded local app users now support password rotation during startup synchronization. `OpenAI` placeholder values were removed from tracked `appsettings` files, and local seeded users can be defined in development config when explicitly desired.
+- Seeded local app users now also support an optional `ExpiresAtUtc` value. Startup synchronization keeps that expiry in sync, and expired local users are blocked at login with a user-facing message instead of being authenticated.
 
 ## Product Intent
 

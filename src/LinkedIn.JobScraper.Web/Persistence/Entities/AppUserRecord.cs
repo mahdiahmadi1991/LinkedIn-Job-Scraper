@@ -14,6 +14,8 @@ public sealed class AppUserRecord
 
     public bool IsSeeded { get; set; }
 
+    public DateTimeOffset? ExpiresAtUtc { get; set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public DateTimeOffset UpdatedAtUtc { get; set; }

@@ -66,6 +66,7 @@ public sealed class AppUserSeedingStartupService : IHostedService
                     var normalizedDisplayName = string.IsNullOrWhiteSpace(seedUser.DisplayName)
                         ? normalizedUserName
                         : seedUser.DisplayName.Trim();
+                    var normalizedExpiry = NormalizeExpiry(seedUser.ExpiresAtUtc);
                     var hasWritablePassword = !string.IsNullOrWhiteSpace(seedUser.Password);
                     var passwordNeedsUpdate = hasWritablePassword &&
                         !_passwordHasher.VerifyPassword(seedUser.Password.Trim(), existingUser.PasswordHash);
@@ -73,11 +74,13 @@ public sealed class AppUserSeedingStartupService : IHostedService
                     if (!string.Equals(existingUser.DisplayName, normalizedDisplayName, StringComparison.Ordinal) ||
                         !existingUser.IsSeeded ||
                         !existingUser.IsActive ||
+                        existingUser.ExpiresAtUtc != normalizedExpiry ||
                         passwordNeedsUpdate)
                     {
                         existingUser.DisplayName = normalizedDisplayName;
                         existingUser.IsSeeded = true;
                         existingUser.IsActive = true;
+                        existingUser.ExpiresAtUtc = normalizedExpiry;
 
                         if (passwordNeedsUpdate)
                         {
@@ -106,6 +109,7 @@ public sealed class AppUserSeedingStartupService : IHostedService
                         PasswordHash = _passwordHasher.HashPassword(seedUser.Password.Trim()),
                         IsActive = true,
                         IsSeeded = true,
+                        ExpiresAtUtc = NormalizeExpiry(seedUser.ExpiresAtUtc),
                         CreatedAtUtc = utcNow,
                         UpdatedAtUtc = utcNow
                     });
@@ -129,6 +133,11 @@ public sealed class AppUserSeedingStartupService : IHostedService
     public Task StopAsync(CancellationToken cancellationToken)
     {
         return Task.CompletedTask;
+    }
+
+    private static DateTimeOffset? NormalizeExpiry(DateTimeOffset? expiresAtUtc)
+    {
+        return expiresAtUtc?.ToUniversalTime();
     }
 }
 

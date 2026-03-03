@@ -45,6 +45,14 @@ public sealed class AppUserAuthenticationService : IAppUserAuthenticationService
             return new AppUserAuthenticationResult(false, "The username or password is incorrect.", null);
         }
 
+        if (user.ExpiresAtUtc is DateTimeOffset expiresAtUtc && expiresAtUtc <= DateTimeOffset.UtcNow)
+        {
+            return new AppUserAuthenticationResult(
+                false,
+                "This local account has expired. Ask the app owner to extend or reseed the account.",
+                null);
+        }
+
         return new AppUserAuthenticationResult(
             true,
             "Authentication succeeded.",
