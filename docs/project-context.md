@@ -57,6 +57,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - A narrow local-only rate-limit policy now protects the most sensitive POST actions (session launch/capture/verify/revoke and `Fetch & Score`) without throttling normal dashboard reads or session-state polling
 - Application startup now emits warning logs for missing SQL Server or OpenAI configuration instead of failing startup immediately, so local misconfiguration surfaces early while CI-safe test runs remain unaffected
 - The `Fetch & Score` workflow now emits structured start/stage/completion logs with a per-run workflow identifier so background activity can be correlated more easily during diagnostics
+- Health checks are now split into simple liveness (`/health`) and configuration readiness (`/health/ready`), where readiness stays CI-safe by validating local config shape without touching SQL Server or external services
 
 ## Product Intent
 
