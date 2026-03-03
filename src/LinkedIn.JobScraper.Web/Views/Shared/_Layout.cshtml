@@ -1,4 +1,35 @@
-﻿<!DOCTYPE html>
+﻿@using LinkedIn.JobScraper.Web.Models
+@using LinkedIn.JobScraper.Web.LinkedIn.Session
+@inject ILinkedInBrowserLoginService LinkedInBrowserLoginService
+@{
+    LinkedInSessionPageViewModel linkedInSessionViewModel;
+
+    try
+    {
+        var linkedInSessionState = await LinkedInBrowserLoginService.GetStateAsync(Context.RequestAborted);
+
+        linkedInSessionViewModel = new LinkedInSessionPageViewModel
+        {
+            BrowserOpen = linkedInSessionState.BrowserOpen,
+            CurrentPageUrl = linkedInSessionState.CurrentPageUrl,
+            StoredSessionAvailable = linkedInSessionState.StoredSessionAvailable,
+            StoredSessionCapturedAtUtc = linkedInSessionState.StoredSessionCapturedAtUtc,
+            StoredSessionSource = linkedInSessionState.StoredSessionSource,
+            AutoCaptureActive = linkedInSessionState.AutoCaptureActive,
+            AutoCaptureStatusMessage = linkedInSessionState.AutoCaptureStatusMessage,
+            AutoCaptureCompletedSuccessfully = linkedInSessionState.AutoCaptureCompletedSuccessfully
+        };
+    }
+    catch (Exception exception)
+    {
+        linkedInSessionViewModel = new LinkedInSessionPageViewModel
+        {
+            StatusMessage = $"Session state is unavailable: {exception.Message}",
+            StatusSucceeded = false
+        };
+    }
+}
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -30,15 +61,24 @@
                             <a class="nav-link px-3" asp-area="" asp-controller="Jobs" asp-action="Index">Jobs</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link px-3" asp-area="" asp-controller="LinkedInSession" asp-action="Index">LinkedIn Session</a>
-                        </li>
-                        <li class="nav-item">
                             <a class="nav-link px-3" asp-area="" asp-controller="AiSettings" asp-action="Index">AI Settings</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link px-3" asp-area="" asp-controller="SearchSettings" asp-action="Index">Search Settings</a>
                         </li>
                     </ul>
+                    <div class="session-topbar-slot">
+                        <button
+                            type="button"
+                            class="btn session-indicator-button @linkedInSessionViewModel.SessionIndicatorClass"
+                            data-bs-toggle="modal"
+                            data-bs-target="#linkedInSessionModal"
+                            data-session-indicator
+                            aria-label="Open LinkedIn session controls">
+                            <span class="session-indicator-dot"></span>
+                            <span class="session-indicator-label" data-session-indicator-label>@linkedInSessionViewModel.SessionIndicatorLabel</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </nav>
@@ -54,9 +94,225 @@
             &copy; 2026 - LinkedIn Job Scraper
         </div>
     </footer>
+    <partial name="_LinkedInSessionModal" model="linkedInSessionViewModel" />
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script>
+        (() => {
+            const modalElement = document.querySelector("[data-linked-in-session-modal]");
+            const indicator = document.querySelector("[data-session-indicator]");
+            const indicatorLabel = document.querySelector("[data-session-indicator-label]");
+            const antiForgeryInput = document.querySelector("#linkedInSessionAntiForgeryForm input[name='__RequestVerificationToken']");
+
+            if (!modalElement || !indicator || !indicatorLabel || !antiForgeryInput) {
+                return;
+            }
+
+            const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+            const feedback = modalElement.querySelector("[data-session-feedback]");
+            const autoCapture = modalElement.querySelector("[data-session-auto-capture]");
+            const browserOpen = modalElement.querySelector("[data-session-browser-open]");
+            const currentPage = modalElement.querySelector("[data-session-current-page]");
+            const capturedAt = modalElement.querySelector("[data-session-captured-at]");
+            const source = modalElement.querySelector("[data-session-source]");
+            const statusLabel = modalElement.querySelector("[data-session-status-label]");
+            const launchButton = modalElement.querySelector("[data-session-launch]");
+            const captureButton = modalElement.querySelector("[data-session-capture]");
+            const verifyButton = modalElement.querySelector("[data-session-verify]");
+
+            let autoCloseArmed = false;
+            let pollTimer = null;
+
+            const setBusy = (busy) => {
+                [launchButton, captureButton, verifyButton].forEach((button) => {
+                    if (button) {
+                        button.disabled = busy;
+                    }
+                });
+            };
+
+            const setFeedback = (message, success) => {
+                if (!feedback) {
+                    return;
+                }
+
+                if (!message) {
+                    feedback.classList.add("d-none");
+                    feedback.textContent = "";
+                    feedback.classList.remove("alert-success", "alert-danger", "alert-secondary");
+                    return;
+                }
+
+                feedback.classList.remove("d-none", "alert-success", "alert-danger", "alert-secondary");
+                feedback.classList.add(success ? "alert-success" : "alert-danger");
+                feedback.textContent = message;
+            };
+
+            const setAutoCaptureMessage = (message, active) => {
+                if (!autoCapture) {
+                    return;
+                }
+
+                if (!message) {
+                    autoCapture.classList.add("d-none");
+                    autoCapture.textContent = "";
+                    autoCapture.classList.remove("alert-primary", "alert-secondary");
+                    return;
+                }
+
+                autoCapture.classList.remove("d-none", "alert-primary", "alert-secondary");
+                autoCapture.classList.add(active ? "alert-primary" : "alert-secondary");
+                autoCapture.textContent = message;
+            };
+
+            const applyState = (state) => {
+                if (!state) {
+                    return;
+                }
+
+                if (browserOpen) {
+                    browserOpen.textContent = state.browserOpen ? "Open" : "Closed";
+                }
+
+                if (currentPage) {
+                    currentPage.textContent = state.currentPageUrl || "Not available";
+                }
+
+                if (capturedAt) {
+                    capturedAt.textContent = state.storedSessionCapturedAtUtc
+                        ? new Date(state.storedSessionCapturedAtUtc).toISOString().replace("T", " ").replace(".000Z", " UTC")
+                        : "Not available";
+                }
+
+                if (source) {
+                    source.textContent = state.storedSessionSource || "Not available";
+                }
+
+                if (statusLabel) {
+                    statusLabel.textContent = state.sessionIndicatorLabel || "Missing";
+                }
+
+                indicatorLabel.textContent = state.sessionIndicatorLabel || "Missing";
+                indicator.classList.remove("session-state-connected", "session-state-connecting", "session-state-missing");
+                if (state.sessionIndicatorClass) {
+                    indicator.classList.add(state.sessionIndicatorClass);
+                }
+
+                setAutoCaptureMessage(state.autoCaptureStatusMessage, state.autoCaptureActive);
+
+                if (autoCloseArmed && state.autoCaptureCompletedSuccessfully && state.storedSessionAvailable) {
+                    autoCloseArmed = false;
+                    window.clearTimeout(pollTimer);
+                    pollTimer = null;
+                    modal.hide();
+                }
+
+                if (autoCloseArmed && !state.autoCaptureActive && !state.autoCaptureCompletedSuccessfully) {
+                    window.clearTimeout(pollTimer);
+                    pollTimer = null;
+                }
+            };
+
+            const fetchState = async () => {
+                const response = await fetch("/LinkedInSession/State", {
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest"
+                    },
+                    credentials: "same-origin"
+                });
+
+                if (!response.ok) {
+                    throw new Error("Could not refresh LinkedIn session state.");
+                }
+
+                const payload = await response.json();
+                setFeedback(payload.message, payload.success);
+                applyState(payload.state);
+                return payload;
+            };
+
+            const postAction = async (path, closeOnSuccess) => {
+                setBusy(true);
+
+                try {
+                    const response = await fetch(path, {
+                        method: "POST",
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest",
+                            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+                        },
+                        body: new URLSearchParams({
+                            "__RequestVerificationToken": antiForgeryInput.value
+                        }),
+                        credentials: "same-origin"
+                    });
+
+                    const payload = await response.json();
+                    setFeedback(payload.message, payload.success);
+                    applyState(payload.state);
+
+                    if (closeOnSuccess && payload.success && payload.state?.storedSessionAvailable) {
+                        modal.hide();
+                    }
+
+                    return payload;
+                } finally {
+                    setBusy(false);
+                }
+            };
+
+            const startPolling = () => {
+                window.clearTimeout(pollTimer);
+
+                const tick = async () => {
+                    try {
+                        await fetchState();
+                    } catch {
+                    }
+
+                    if (autoCloseArmed) {
+                        pollTimer = window.setTimeout(tick, 2000);
+                    }
+                };
+
+                pollTimer = window.setTimeout(tick, 1500);
+            };
+
+            modalElement.addEventListener("show.bs.modal", () => {
+                autoCloseArmed = false;
+                void fetchState();
+            });
+
+            modalElement.addEventListener("hidden.bs.modal", () => {
+                autoCloseArmed = false;
+                window.clearTimeout(pollTimer);
+                pollTimer = null;
+            });
+
+            if (launchButton) {
+                launchButton.addEventListener("click", async () => {
+                    const payload = await postAction("/LinkedInSession/Launch", false);
+                    if (payload.success) {
+                        autoCloseArmed = true;
+                        startPolling();
+                    }
+                });
+            }
+
+            if (captureButton) {
+                captureButton.addEventListener("click", async () => {
+                    await postAction("/LinkedInSession/Capture", true);
+                });
+            }
+
+            if (verifyButton) {
+                verifyButton.addEventListener("click", async () => {
+                    await postAction("/LinkedInSession/Verify", false);
+                });
+            }
+        })();
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

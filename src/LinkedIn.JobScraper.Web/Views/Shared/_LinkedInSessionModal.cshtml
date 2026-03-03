@@ -1,0 +1,57 @@
+@model LinkedIn.JobScraper.Web.Models.LinkedInSessionPageViewModel
+
+<div class="modal fade" id="linkedInSessionModal" tabindex="-1" aria-labelledby="linkedInSessionModalLabel" aria-hidden="true" data-linked-in-session-modal>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content session-modal-shell">
+            <div class="modal-header border-0 pb-0">
+                <div>
+                    <div class="section-label mb-2">Session Capture</div>
+                    <h2 class="modal-title h5 mb-0" id="linkedInSessionModalLabel">LinkedIn Session</h2>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body d-flex flex-column gap-3 pt-3">
+                <div class="small text-muted">
+                    Launch the controlled browser, complete login, and let auto-capture save the new session. The dialog closes automatically after capture succeeds.
+                </div>
+
+                <div class="alert @(Model.StatusSucceeded ? "alert-success" : "alert-secondary") d-none" role="alert" data-session-feedback></div>
+
+                <div class="alert alert-primary d-none" role="alert" data-session-auto-capture></div>
+
+                <div class="selection-card selection-card-tight">
+                    <div class="state-grid">
+                        <div class="state-grid-row">
+                            <div class="state-grid-label">Session Status</div>
+                            <div class="state-grid-value" data-session-status-label>@Model.SessionIndicatorLabel</div>
+                        </div>
+                        <div class="state-grid-row">
+                            <div class="state-grid-label">Browser</div>
+                            <div class="state-grid-value" data-session-browser-open>@(Model.BrowserOpen ? "Open" : "Closed")</div>
+                        </div>
+                        <div class="state-grid-row">
+                            <div class="state-grid-label">Current Page</div>
+                            <div class="state-grid-value" data-session-current-page>@(Model.CurrentPageUrl ?? "Not available")</div>
+                        </div>
+                        <div class="state-grid-row">
+                            <div class="state-grid-label">Captured At</div>
+                            <div class="state-grid-value" data-session-captured-at>@(Model.StoredSessionCapturedAtUtc?.ToString("u") ?? "Not available")</div>
+                        </div>
+                        <div class="state-grid-row">
+                            <div class="state-grid-label">Source</div>
+                            <div class="state-grid-value" data-session-source>@(Model.StoredSessionSource ?? "Not available")</div>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="linkedInSessionAntiForgeryForm">@Html.AntiForgeryToken()</form>
+
+                <div class="stacked-actions">
+                    <button type="button" class="btn btn-primary" data-session-launch>Launch Login Browser</button>
+                    <button type="button" class="btn btn-outline-primary" data-session-capture>Capture Session</button>
+                    <button type="button" class="btn btn-outline-secondary" data-session-verify>Verify Session</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

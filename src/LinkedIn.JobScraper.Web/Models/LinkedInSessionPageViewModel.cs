@@ -14,9 +14,25 @@ public sealed class LinkedInSessionPageViewModel
 
     public bool AutoCaptureActive { get; set; }
 
+    public bool AutoCaptureCompletedSuccessfully { get; set; }
+
     public string? AutoCaptureStatusMessage { get; set; }
 
     public string? StatusMessage { get; set; }
 
     public bool StatusSucceeded { get; set; }
+
+    public string SessionIndicatorLabel =>
+        AutoCaptureActive
+            ? "Connecting"
+            : StoredSessionAvailable
+                ? "Connected"
+                : "Missing";
+
+    public string SessionIndicatorClass =>
+        AutoCaptureActive
+            ? "session-state-connecting"
+            : StoredSessionAvailable
+                ? "session-state-connected"
+                : "session-state-missing";
 }

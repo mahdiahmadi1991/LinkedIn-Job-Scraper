@@ -20,6 +20,54 @@ public class LinkedInSessionController : Controller
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
+        await BuildViewModelAsync(cancellationToken);
+
+        return RedirectToAction("Index", "Jobs");
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> State(CancellationToken cancellationToken)
+    {
+        var viewModel = await BuildViewModelAsync(cancellationToken);
+        return Json(CreatePayload(viewModel));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Capture(CancellationToken cancellationToken)
+    {
+        var result = await _linkedInBrowserLoginService.CaptureAndSaveAsync(cancellationToken);
+        return await BuildActionResponseAsync(result.Success, result.Message, cancellationToken);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Launch(CancellationToken cancellationToken)
+    {
+        var result = await _linkedInBrowserLoginService.LaunchLoginAsync(cancellationToken);
+        return await BuildActionResponseAsync(result.Success, result.Message, cancellationToken);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Verify(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _linkedInSessionVerificationService.VerifyCurrentAsync(cancellationToken);
+            return await BuildActionResponseAsync(result.Success, result.Message, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            return await BuildActionResponseAsync(
+                false,
+                $"Stored session verification failed: {exception.Message}",
+                cancellationToken);
+        }
+    }
+
+    private async Task<LinkedInSessionPageViewModel> BuildViewModelAsync(CancellationToken cancellationToken)
+    {
         var viewModel = new LinkedInSessionPageViewModel
         {
             StatusMessage = TempData["LinkedInSessionStatusMessage"] as string,
@@ -40,6 +88,7 @@ public class LinkedInSessionController : Controller
             viewModel.StoredSessionSource = state.StoredSessionSource;
             viewModel.AutoCaptureActive = state.AutoCaptureActive;
             viewModel.AutoCaptureStatusMessage = state.AutoCaptureStatusMessage;
+            viewModel.AutoCaptureCompletedSuccessfully = state.AutoCaptureCompletedSuccessfully;
         }
         catch (Exception exception)
         {
@@ -51,44 +100,53 @@ public class LinkedInSessionController : Controller
             viewModel.StatusSucceeded = false;
         }
 
-        return View(viewModel);
+        return viewModel;
     }
 
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Capture(CancellationToken cancellationToken)
+    private async Task<IActionResult> BuildActionResponseAsync(
+        bool success,
+        string message,
+        CancellationToken cancellationToken)
     {
-        var result = await _linkedInBrowserLoginService.CaptureAndSaveAsync(cancellationToken);
-        WriteStatusMessage(result.Success, result.Message);
+        WriteStatusMessage(success, message);
 
-        return RedirectToAction(nameof(Index));
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Launch(CancellationToken cancellationToken)
-    {
-        var result = await _linkedInBrowserLoginService.LaunchLoginAsync(cancellationToken);
-        WriteStatusMessage(result.Success, result.Message);
-
-        return RedirectToAction(nameof(Index));
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Verify(CancellationToken cancellationToken)
-    {
-        try
+        if (!IsAjaxRequest())
         {
-            var result = await _linkedInSessionVerificationService.VerifyCurrentAsync(cancellationToken);
-            WriteStatusMessage(result.Success, result.Message);
-        }
-        catch (Exception exception)
-        {
-            WriteStatusMessage(false, $"Stored session verification failed: {exception.Message}");
+            return RedirectToAction("Index", "Jobs");
         }
 
-        return RedirectToAction(nameof(Index));
+        var viewModel = await BuildViewModelAsync(cancellationToken);
+        return Json(CreatePayload(viewModel));
+    }
+
+    private static object CreatePayload(LinkedInSessionPageViewModel viewModel)
+    {
+        return new
+        {
+            success = viewModel.StatusSucceeded,
+            message = viewModel.StatusMessage,
+            state = new
+            {
+                browserOpen = viewModel.BrowserOpen,
+                currentPageUrl = viewModel.CurrentPageUrl,
+                storedSessionAvailable = viewModel.StoredSessionAvailable,
+                storedSessionCapturedAtUtc = viewModel.StoredSessionCapturedAtUtc,
+                storedSessionSource = viewModel.StoredSessionSource,
+                autoCaptureActive = viewModel.AutoCaptureActive,
+                autoCaptureStatusMessage = viewModel.AutoCaptureStatusMessage,
+                autoCaptureCompletedSuccessfully = viewModel.AutoCaptureCompletedSuccessfully,
+                sessionIndicatorLabel = viewModel.SessionIndicatorLabel,
+                sessionIndicatorClass = viewModel.SessionIndicatorClass
+            }
+        };
+    }
+
+    private bool IsAjaxRequest()
+    {
+        return string.Equals(
+            Request.Headers["X-Requested-With"].ToString(),
+            "XMLHttpRequest",
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private void WriteStatusMessage(bool success, string message)

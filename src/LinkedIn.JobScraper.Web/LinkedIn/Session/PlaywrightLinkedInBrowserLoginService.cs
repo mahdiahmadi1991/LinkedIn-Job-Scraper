@@ -18,6 +18,7 @@ public sealed class PlaywrightLinkedInBrowserLoginService :
 
     private CancellationTokenSource? _autoCaptureCancellationTokenSource;
     private volatile bool _autoCaptureActive;
+    private volatile bool _autoCaptureCompletedSuccessfully;
     private volatile string? _autoCaptureStatusMessage;
     private Task? _autoCaptureTask;
     private IPlaywright? _playwright;
@@ -58,6 +59,7 @@ public sealed class PlaywrightLinkedInBrowserLoginService :
             }
 
             await _sessionStore.SaveAsync(snapshot, cancellationToken);
+            _autoCaptureCompletedSuccessfully = false;
             _autoCaptureStatusMessage = "LinkedIn session was captured manually.";
 
             return new LinkedInBrowserLoginActionResult(
@@ -90,7 +92,8 @@ public sealed class PlaywrightLinkedInBrowserLoginService :
             StoredSessionCapturedAtUtc: storedSession?.CapturedAtUtc,
             StoredSessionSource: storedSession?.Source,
             AutoCaptureActive: _autoCaptureActive,
-            AutoCaptureStatusMessage: _autoCaptureStatusMessage);
+            AutoCaptureStatusMessage: _autoCaptureStatusMessage,
+            AutoCaptureCompletedSuccessfully: _autoCaptureCompletedSuccessfully);
     }
 
     public async Task<LinkedInBrowserLoginActionResult> LaunchLoginAsync(CancellationToken cancellationToken)
@@ -191,6 +194,7 @@ public sealed class PlaywrightLinkedInBrowserLoginService :
 
         _autoCaptureCancellationTokenSource = new CancellationTokenSource();
         _autoCaptureActive = true;
+        _autoCaptureCompletedSuccessfully = false;
         _autoCaptureStatusMessage = "Watching for a completed LinkedIn login so the session can be captured automatically.";
 
         var cancellationToken = _autoCaptureCancellationTokenSource.Token;
@@ -244,6 +248,7 @@ public sealed class PlaywrightLinkedInBrowserLoginService :
                 }
 
                 await _sessionStore.SaveAsync(snapshot, effectiveCancellationToken);
+                _autoCaptureCompletedSuccessfully = true;
                 _autoCaptureStatusMessage =
                     "LinkedIn login was detected and the session was captured automatically. Verification is now optional.";
                 return;

@@ -45,6 +45,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The jobs table now keeps primary rows compact and moves AI rationale plus secondary actions into a per-job expandable child row so scanning large result sets stays cleaner
 - The expandable child rows in the jobs table now open and close with a lightweight animated transition instead of snapping instantly
 - The jobs lazy-load sentinel now shows an animated loading indicator so background row fetching feels explicit while additional batches are being appended
+- LinkedIn session management is moving into a compact top-bar status control with a modal workflow, replacing the dedicated session page and automatically closing the modal after successful auto-capture
 
 ## Product Intent
 
