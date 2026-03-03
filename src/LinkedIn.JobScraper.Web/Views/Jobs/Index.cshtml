@@ -258,137 +258,8 @@
                                 <th>Activity</th>
                             </tr>
                         </thead>
-                        <tbody>
-                        @foreach (var job in Model.Jobs)
-                        {
-                            var fitBadgeClass = job.AiLabel switch
-                            {
-                                "StrongMatch" => "bg-success-subtle text-success-emphasis",
-                                "Review" => "bg-warning-subtle text-warning-emphasis",
-                                "Skip" => "bg-secondary-subtle text-secondary-emphasis",
-                                _ => "bg-light text-dark"
-                            };
-
-                            <tr>
-                                <td class="w-50">
-                                    <div class="job-opportunity-cell">
-                                        <div class="job-title-row">
-                                            <span class="job-kicker">Opportunity</span>
-                                        </div>
-                                        <a asp-action="Details" asp-route-jobId="@job.Id" class="job-title-link">
-                                            @job.Title
-                                        </a>
-                                        <div class="job-meta-wrap">
-                                            <span class="job-meta-pill">@(job.CompanyName ?? "Unknown company")</span>
-                                            @if (!string.IsNullOrWhiteSpace(job.LocationName))
-                                            {
-                                                <span class="job-meta-pill">@job.LocationName</span>
-                                            }
-                                            @if (!string.IsNullOrWhiteSpace(job.EmploymentStatus))
-                                            {
-                                                <span class="job-meta-pill">@job.EmploymentStatus</span>
-                                            }
-                                        </div>
-                                        @if (!string.IsNullOrWhiteSpace(job.AiSummary))
-                                        {
-                                            <div class="job-summary line-clamp-2">
-                                                @job.AiSummary
-                                            </div>
-                                        }
-                                        @if (!string.IsNullOrWhiteSpace(job.AiWhyMatched) || !string.IsNullOrWhiteSpace(job.AiConcerns))
-                                        {
-                                            <div class="job-signal-stack">
-                                                @if (!string.IsNullOrWhiteSpace(job.AiWhyMatched))
-                                                {
-                                                    <div class="job-signal-item">
-                                                        <span class="job-signal-label match">Match</span>
-                                                        <span class="text-body-secondary line-clamp-1">@job.AiWhyMatched</span>
-                                                    </div>
-                                                }
-                                                @if (!string.IsNullOrWhiteSpace(job.AiConcerns))
-                                                {
-                                                    <div class="job-signal-item">
-                                                        <span class="job-signal-label concern">Concern</span>
-                                                        <span class="text-body-secondary line-clamp-1">@job.AiConcerns</span>
-                                                    </div>
-                                                }
-                                            </div>
-                                        }
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="fit-cell">
-                                        @if (job.AiScore.HasValue)
-                                        {
-                                            <div class="fit-score">@job.AiScore<span class="fit-score-muted">/100</span></div>
-                                        }
-                                        else
-                                        {
-                                            <div class="fit-score-muted">Not scored</div>
-                                        }
-
-                                        <div class="badge rounded-pill @fitBadgeClass fit-label-badge">
-                                            @(job.AiLabel ?? "Pending")
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <form asp-action="UpdateStatus" method="post" class="status-form-compact workflow-cell">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="jobId" value="@job.Id" />
-                                        <input type="hidden" name="Search" value="@query.Search" />
-                                        <input type="hidden" name="FilterStatus" value="@query.FilterStatus" />
-                                        <input type="hidden" name="AiLabel" value="@query.AiLabel" />
-                                        <input type="hidden" name="OnlyUnscored" value="@query.OnlyUnscored" />
-                                        <input type="hidden" name="MinScore" value="@query.MinScore" />
-                                        <input type="hidden" name="SortBy" value="@query.GetNormalizedSortBy()" />
-                                        <div class="workflow-status-pill">@job.CurrentStatus</div>
-                                        <select class="form-select form-select-sm" name="status">
-                                            @foreach (var status in Enum.GetValues<JobWorkflowStatus>())
-                                            {
-                                                <option value="@status" selected="@(status == job.CurrentStatus ? "selected" : null)">
-                                                    @status
-                                                </option>
-                                            }
-                                        </select>
-                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Save</button>
-                                    </form>
-                                </td>
-                                <td class="small text-muted">
-                                    <div class="activity-cell">
-                                        <div class="dates-stack">
-                                            <div>
-                                                <strong>Last Seen</strong>
-                                                <span>@job.LastSeenAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</span>
-                                            </div>
-                                            <div>
-                                                <strong>Listed</strong>
-                                                <span>
-                                                    @(job.ListedAtUtc.HasValue
-                                                        ? job.ListedAtUtc.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
-                                                        : "Unknown")
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div class="apply-actions pt-1">
-                                            <a asp-action="Details" asp-route-jobId="@job.Id" class="btn btn-outline-secondary btn-sm">
-                                                Open Details
-                                            </a>
-                                            @if (!string.IsNullOrWhiteSpace(job.CompanyApplyUrl))
-                                            {
-                                                <a class="btn btn-outline-primary btn-sm" href="@job.CompanyApplyUrl" target="_blank" rel="noreferrer">
-                                                    Open Apply
-                                                </a>
-                                            }
-                                            else
-                                            {
-                                                <span class="text-muted small">No direct apply</span>
-                                            }
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        }
+                        <tbody data-jobs-rows-body>
+                        <partial name="_JobRows" model="Model.RowsChunk" />
                         </tbody>
                     </table>
                 </div>
@@ -571,6 +442,104 @@
                     setIdleState();
                 }
             });
+        })();
+
+        (() => {
+            const rowsBody = document.querySelector("[data-jobs-rows-body]");
+            if (!rowsBody) {
+                return;
+            }
+
+            let observer = null;
+            let loadInFlight = false;
+
+            const loadNextRows = async (sentinelRow) => {
+                if (!sentinelRow || loadInFlight) {
+                    return;
+                }
+
+                const loadUrl = sentinelRow.dataset.jobsLoadMoreUrl;
+                if (!loadUrl) {
+                    return;
+                }
+
+                loadInFlight = true;
+                sentinelRow.classList.add("is-loading");
+
+                const button = sentinelRow.querySelector("[data-jobs-load-more-button]");
+                const status = sentinelRow.querySelector("[data-jobs-load-more-status]");
+
+                if (button) {
+                    button.disabled = true;
+                }
+
+                if (status) {
+                    status.textContent = "Loading next jobs batch...";
+                }
+
+                try {
+                    const response = await fetch(loadUrl, {
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest"
+                        },
+                        credentials: "same-origin"
+                    });
+
+                    if (!response.ok) {
+                        throw new Error("Could not load the next jobs batch.");
+                    }
+
+                    const html = await response.text();
+                    sentinelRow.remove();
+                    rowsBody.insertAdjacentHTML("beforeend", html);
+                    attachLazySentinel();
+                } catch {
+                    sentinelRow.classList.remove("is-loading");
+
+                    if (button) {
+                        button.disabled = false;
+                    }
+
+                    if (status) {
+                        status.textContent = "Could not load more jobs. Retry.";
+                    }
+                } finally {
+                    loadInFlight = false;
+                }
+            };
+
+            const attachLazySentinel = () => {
+                if (observer) {
+                    observer.disconnect();
+                }
+
+                const sentinelRow = rowsBody.querySelector("[data-jobs-lazy-sentinel]");
+                if (!sentinelRow) {
+                    return;
+                }
+
+                const button = sentinelRow.querySelector("[data-jobs-load-more-button]");
+                if (button) {
+                    button.onclick = () => {
+                        void loadNextRows(sentinelRow);
+                    };
+                }
+
+                observer = new IntersectionObserver(
+                    (entries) => {
+                        const isVisible = entries.some((entry) => entry.isIntersecting);
+                        if (isVisible) {
+                            void loadNextRows(sentinelRow);
+                        }
+                    },
+                    {
+                        rootMargin: "220px 0px"
+                    });
+
+                observer.observe(sentinelRow);
+            };
+
+            attachLazySentinel();
         })();
     </script>
 }

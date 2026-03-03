@@ -7,6 +7,8 @@ namespace LinkedIn.JobScraper.Web.Jobs;
 
 public sealed class JobsDashboardService : IJobsDashboardService
 {
+    private const int JobsPageSize = 40;
+
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly IJobEnrichmentService _jobEnrichmentService;
     private readonly IJobImportService _jobImportService;
@@ -35,69 +37,14 @@ public sealed class JobsDashboardService : IJobsDashboardService
 
         query ??= new JobsDashboardQuery();
 
-        var filteredQuery = dbContext.Jobs
-            .AsNoTracking()
-            .AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(query.Search))
-        {
-            var search = query.Search.Trim();
-
-            filteredQuery = filteredQuery.Where(
-                job =>
-                    job.Title.Contains(search) ||
-                    (job.CompanyName != null && job.CompanyName.Contains(search)) ||
-                    (job.LocationName != null && job.LocationName.Contains(search)) ||
-                    (job.AiSummary != null && job.AiSummary.Contains(search)));
-        }
-
-        if (query.FilterStatus.HasValue)
-        {
-            var status = query.FilterStatus.Value;
-            filteredQuery = filteredQuery.Where(job => job.CurrentStatus == status);
-        }
-
-        if (!string.IsNullOrWhiteSpace(query.AiLabel))
-        {
-            var aiLabel = query.AiLabel.Trim();
-            filteredQuery = filteredQuery.Where(job => job.AiLabel == aiLabel);
-        }
-
-        if (query.OnlyUnscored)
-        {
-            filteredQuery = filteredQuery.Where(static job => job.AiScore == null);
-        }
-
-        if (query.MinScore.HasValue)
-        {
-            var minScore = query.MinScore.Value;
-            filteredQuery = filteredQuery.Where(job => job.AiScore != null && job.AiScore >= minScore);
-        }
+        var filteredQuery = ApplyFilters(dbContext.Jobs.AsNoTracking(), query);
 
         var filteredJobs = await filteredQuery.CountAsync(cancellationToken);
-
-        filteredQuery = query.GetNormalizedSortBy() switch
-        {
-            "listed" => filteredQuery
-                .OrderByDescending(job => job.ListedAtUtc ?? DateTimeOffset.MinValue)
-                .ThenByDescending(job => job.LastSeenAtUtc),
-            "score" => filteredQuery
-                .OrderByDescending(job => job.AiScore ?? int.MinValue)
-                .ThenByDescending(job => job.LastSeenAtUtc),
-            "title" => filteredQuery
-                .OrderBy(job => job.Title)
-                .ThenByDescending(job => job.LastSeenAtUtc),
-            "company" => filteredQuery
-                .OrderBy(job => job.CompanyName ?? string.Empty)
-                .ThenBy(job => job.Title),
-            _ => filteredQuery
-                .OrderByDescending(job => job.LastSeenAtUtc)
-                .ThenByDescending(job => job.AiScore ?? int.MinValue)
-        };
-
-        var jobs = await filteredQuery
-            .Take(200)
-            .ToListAsync(cancellationToken);
+        var rowsChunk = await GetRowsChunkAsync(
+            ApplySorting(filteredQuery, query),
+            query,
+            0,
+            cancellationToken);
 
         var dashboardCounts = await dbContext.Jobs
             .GroupBy(static _ => 1)
@@ -121,23 +68,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
             strongMatches,
             totalJobs - scoredJobs,
             query,
-            jobs.Select(
-                    static job => new JobDashboardRow(
-                        job.Id,
-                        job.Title,
-                        job.CompanyName,
-                        job.LocationName,
-                        job.EmploymentStatus,
-                        job.ListedAtUtc,
-                        job.LastSeenAtUtc,
-                        job.CurrentStatus,
-                        job.AiScore,
-                        job.AiLabel,
-                        job.AiSummary,
-                        job.AiWhyMatched,
-                        job.AiConcerns,
-                        job.CompanyApplyUrl))
-                .ToArray());
+            rowsChunk);
     }
 
     public async Task<JobDetailsSnapshot?> GetJobDetailsAsync(
@@ -172,6 +103,22 @@ public sealed class JobsDashboardService : IJobsDashboardService
             job.AiSummary,
             job.AiWhyMatched,
             job.AiConcerns);
+    }
+
+    public async Task<JobsRowsChunk> GetRowsAsync(
+        JobsDashboardQuery query,
+        int offset,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        query ??= new JobsDashboardQuery();
+        offset = Math.Max(0, offset);
+
+        var filteredQuery = ApplyFilters(dbContext.Jobs.AsNoTracking(), query);
+        var sortedQuery = ApplySorting(filteredQuery, query);
+
+        return await GetRowsChunkAsync(sortedQuery, query, offset, cancellationToken);
     }
 
     public async Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(
@@ -377,5 +324,110 @@ public sealed class JobsDashboardService : IJobsDashboardService
         CancellationToken cancellationToken)
     {
         return _jobsWorkflowProgressNotifier.PublishAsync(progressConnectionId, update, cancellationToken);
+    }
+
+    private static IQueryable<JobRecord> ApplyFilters(
+        IQueryable<JobRecord> queryable,
+        JobsDashboardQuery query)
+    {
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var search = query.Search.Trim();
+
+            queryable = queryable.Where(
+                job =>
+                    job.Title.Contains(search) ||
+                    (job.CompanyName != null && job.CompanyName.Contains(search)) ||
+                    (job.LocationName != null && job.LocationName.Contains(search)) ||
+                    (job.AiSummary != null && job.AiSummary.Contains(search)));
+        }
+
+        if (query.FilterStatus.HasValue)
+        {
+            var status = query.FilterStatus.Value;
+            queryable = queryable.Where(job => job.CurrentStatus == status);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.AiLabel))
+        {
+            var aiLabel = query.AiLabel.Trim();
+            queryable = queryable.Where(job => job.AiLabel == aiLabel);
+        }
+
+        if (query.OnlyUnscored)
+        {
+            queryable = queryable.Where(static job => job.AiScore == null);
+        }
+
+        if (query.MinScore.HasValue)
+        {
+            var minScore = query.MinScore.Value;
+            queryable = queryable.Where(job => job.AiScore != null && job.AiScore >= minScore);
+        }
+
+        return queryable;
+    }
+
+    private static IQueryable<JobRecord> ApplySorting(
+        IQueryable<JobRecord> queryable,
+        JobsDashboardQuery query)
+    {
+        return query.GetNormalizedSortBy() switch
+        {
+            "listed" => queryable
+                .OrderByDescending(job => job.ListedAtUtc ?? DateTimeOffset.MinValue)
+                .ThenByDescending(job => job.LastSeenAtUtc),
+            "score" => queryable
+                .OrderByDescending(job => job.AiScore ?? int.MinValue)
+                .ThenByDescending(job => job.LastSeenAtUtc),
+            "title" => queryable
+                .OrderBy(job => job.Title)
+                .ThenByDescending(job => job.LastSeenAtUtc),
+            "company" => queryable
+                .OrderBy(job => job.CompanyName ?? string.Empty)
+                .ThenBy(job => job.Title),
+            _ => queryable
+                .OrderByDescending(job => job.LastSeenAtUtc)
+                .ThenByDescending(job => job.AiScore ?? int.MinValue)
+        };
+    }
+
+    private static async Task<JobsRowsChunk> GetRowsChunkAsync(
+        IQueryable<JobRecord> sortedQuery,
+        JobsDashboardQuery query,
+        int offset,
+        CancellationToken cancellationToken)
+    {
+        var page = await sortedQuery
+            .Skip(offset)
+            .Take(JobsPageSize + 1)
+            .ToListAsync(cancellationToken);
+
+        var hasMoreJobs = page.Count > JobsPageSize;
+        var materializedRows = page
+            .Take(JobsPageSize)
+            .Select(
+                static job => new JobDashboardRow(
+                    job.Id,
+                    job.Title,
+                    job.CompanyName,
+                    job.LocationName,
+                    job.EmploymentStatus,
+                    job.ListedAtUtc,
+                    job.LastSeenAtUtc,
+                    job.CurrentStatus,
+                    job.AiScore,
+                    job.AiLabel,
+                    job.AiSummary,
+                    job.AiWhyMatched,
+                    job.AiConcerns,
+                    job.CompanyApplyUrl))
+            .ToArray();
+
+        return new JobsRowsChunk(
+            query,
+            materializedRows,
+            offset + materializedRows.Length,
+            hasMoreJobs);
     }
 }

@@ -664,6 +664,23 @@ a:hover {
   gap: 0.75rem;
 }
 
+.jobs-load-more-row td {
+  padding: 0.9rem 1rem 1.15rem;
+  background: linear-gradient(180deg, rgba(248, 251, 253, 0.94), rgba(240, 246, 252, 0.92));
+}
+
+.jobs-load-more-shell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.jobs-load-more-row.is-loading {
+  opacity: 0.82;
+}
+
 .empty-state-card {
   padding: 3rem 1.5rem;
   color: var(--app-ink-500);

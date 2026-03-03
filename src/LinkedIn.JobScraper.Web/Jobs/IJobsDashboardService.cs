@@ -13,6 +13,11 @@ public interface IJobsDashboardService
         Guid jobId,
         CancellationToken cancellationToken);
 
+    Task<JobsRowsChunk> GetRowsAsync(
+        JobsDashboardQuery query,
+        int offset,
+        CancellationToken cancellationToken);
+
     Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(
         string? progressConnectionId,
         CancellationToken cancellationToken);
@@ -30,7 +35,20 @@ public sealed record JobsDashboardSnapshot(
     int StrongMatches,
     int UnscoredJobs,
     JobsDashboardQuery Query,
-    IReadOnlyList<JobDashboardRow> Jobs);
+    JobsRowsChunk RowsChunk)
+{
+    public bool HasMoreJobs => RowsChunk.HasMoreJobs;
+
+    public IReadOnlyList<JobDashboardRow> Jobs => RowsChunk.Jobs;
+
+    public int NextOffset => RowsChunk.NextOffset;
+}
+
+public sealed record JobsRowsChunk(
+    JobsDashboardQuery Query,
+    IReadOnlyList<JobDashboardRow> Jobs,
+    int NextOffset,
+    bool HasMoreJobs);
 
 public sealed record JobDetailsSnapshot(
     Guid Id,

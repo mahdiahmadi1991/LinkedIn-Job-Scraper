@@ -35,6 +35,16 @@ public class JobsController : Controller
         return View(job);
     }
 
+    [HttpGet]
+    public async Task<IActionResult> Rows(
+        [FromQuery] JobsDashboardQuery query,
+        [FromQuery] int offset,
+        CancellationToken cancellationToken)
+    {
+        var rowsChunk = await _jobsDashboardService.GetRowsAsync(query, offset, cancellationToken);
+        return PartialView("_JobRows", rowsChunk);
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> FetchAndScore(
