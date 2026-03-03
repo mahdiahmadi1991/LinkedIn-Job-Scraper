@@ -122,7 +122,8 @@ What to do:
 1. Increase `OpenAI:Security:RequestTimeoutSeconds` for individual create/get calls.
 2. Increase `OpenAI:Security:BackgroundPollingTimeoutSeconds` if background mode is enabled.
 3. Adjust `OpenAI:Security:BackgroundPollingIntervalMilliseconds` if you need faster or less frequent polling.
-4. Disable `OpenAI:Security:UseBackgroundMode` only if you explicitly want single-request foreground behavior.
+4. Increase `OpenAI:Security:MaxConcurrentScoringRequests` if scoring is too serialized and your account can handle more parallel requests.
+5. Disable `OpenAI:Security:UseBackgroundMode` only if you explicitly want single-request foreground behavior.
 
 ## 4. SQL Server Problems
 

@@ -1,6 +1,9 @@
 using LinkedIn.JobScraper.Web.Jobs;
+using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Persistence;
+using LinkedIn.JobScraper.Web.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.AI;
 
@@ -9,15 +12,18 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
     private readonly IAiBehaviorSettingsService _behaviorSettingsService;
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly IJobScoringGateway _jobScoringGateway;
+    private readonly IOptions<OpenAiSecurityOptions> _openAiSecurityOptions;
 
     public JobBatchScoringService(
         IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
         IJobScoringGateway jobScoringGateway,
-        IAiBehaviorSettingsService behaviorSettingsService)
+        IAiBehaviorSettingsService behaviorSettingsService,
+        IOptions<OpenAiSecurityOptions> openAiSecurityOptions)
     {
         _dbContextFactory = dbContextFactory;
         _jobScoringGateway = jobScoringGateway;
         _behaviorSettingsService = behaviorSettingsService;
+        _openAiSecurityOptions = openAiSecurityOptions;
     }
 
     public async Task<JobBatchScoringResult> ScoreReadyJobsAsync(
@@ -47,11 +53,44 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
             return JobBatchScoringResult.Succeeded(maxCount, 0, 0, 0);
         }
 
+        var scoringOptions = _openAiSecurityOptions.Value;
+        var concurrencyValidationError = scoringOptions.ValidateScoringConcurrency();
+
+        if (concurrencyValidationError is not null)
+        {
+            return JobBatchScoringResult.Failed(
+                concurrencyValidationError,
+                StatusCodes.Status500InternalServerError,
+                jobsToScore.Count,
+                0,
+                0,
+                0);
+        }
+
+        var maxConcurrency = Math.Min(scoringOptions.MaxConcurrentScoringRequests, jobsToScore.Count);
+        var scoringWorkItems = jobsToScore
+            .Select(
+                job =>
+                    new PendingScoringJob(
+                        job,
+                        string.IsNullOrWhiteSpace(job.Title) ? job.Id.ToString("N") : job.Title,
+                        new JobScoringGatewayRequest(
+                            job.Title,
+                            job.Description!,
+                            behaviorProfile.BehavioralInstructions,
+                            behaviorProfile.PrioritySignals,
+                            behaviorProfile.ExclusionSignals,
+                            behaviorProfile.OutputLanguageCode,
+                            job.CompanyName,
+                            job.LocationName,
+                            job.EmploymentStatus)))
+            .ToArray();
+
         if (progressCallback is not null)
         {
             await progressCallback(
                 new JobStageProgress(
-                    $"Queued {jobsToScore.Count} jobs for AI scoring.",
+                    $"Queued {jobsToScore.Count} jobs for AI scoring with up to {maxConcurrency} concurrent request(s).",
                     jobsToScore.Count,
                     0,
                     0,
@@ -66,69 +105,69 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
         int? firstFailureStatusCode = null;
         var originalAutoDetectChanges = dbContext.ChangeTracker.AutoDetectChangesEnabled;
         dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
+        using var concurrencyGate = new SemaphoreSlim(maxConcurrency, maxConcurrency);
 
         try
         {
-            foreach (var job in jobsToScore)
+            var allScoringTasks = scoringWorkItems
+                .Select(workItem => ScoreJobAsync(workItem, concurrencyGate, cancellationToken))
+                .ToArray();
+            var pendingScoringTasks = allScoringTasks.ToList();
+            var completedScoringResults = new List<CompletedScoringJob>(scoringWorkItems.Length);
+
+            try
             {
-                processedCount++;
-                var displayTitle = string.IsNullOrWhiteSpace(job.Title) ? job.Id.ToString("N") : job.Title;
-
-                var result = await _jobScoringGateway.ScoreAsync(
-                    new JobScoringGatewayRequest(
-                        job.Title,
-                        job.Description!,
-                        behaviorProfile.BehavioralInstructions,
-                        behaviorProfile.PrioritySignals,
-                        behaviorProfile.ExclusionSignals,
-                        behaviorProfile.OutputLanguageCode,
-                        job.CompanyName,
-                        job.LocationName,
-                        job.EmploymentStatus),
-                    cancellationToken);
-
-                if (!result.CanScore ||
-                    !result.Score.HasValue ||
-                    string.IsNullOrWhiteSpace(result.Label))
+                while (pendingScoringTasks.Count > 0)
                 {
-                    failedCount++;
-                    firstFailureMessage ??= result.Message;
-                    firstFailureStatusCode ??= result.StatusCode ?? StatusCodes.Status502BadGateway;
+                    var completedTask = await Task.WhenAny(pendingScoringTasks);
+                    pendingScoringTasks.Remove(completedTask);
+
+                    var completedScoringJob = await completedTask;
+                    completedScoringResults.Add(completedScoringJob);
+                    processedCount++;
+
+                    if (!completedScoringJob.Result.CanScore ||
+                        !completedScoringJob.Result.Score.HasValue ||
+                        string.IsNullOrWhiteSpace(completedScoringJob.Result.Label))
+                    {
+                        failedCount++;
+                        firstFailureMessage ??= completedScoringJob.Result.Message;
+                        firstFailureStatusCode ??= completedScoringJob.Result.StatusCode ?? StatusCodes.Status502BadGateway;
+
+                        if (progressCallback is not null)
+                        {
+                            await progressCallback(
+                                new JobStageProgress(
+                                    $"Scoring {processedCount}/{jobsToScore.Count} failed for '{completedScoringJob.WorkItem.DisplayTitle}': {completedScoringJob.Result.Message}",
+                                    jobsToScore.Count,
+                                    processedCount,
+                                    scoredCount,
+                                    failedCount),
+                                cancellationToken);
+                        }
+
+                        continue;
+                    }
+
+                    scoredCount++;
 
                     if (progressCallback is not null)
                     {
                         await progressCallback(
                             new JobStageProgress(
-                                $"Scoring {processedCount}/{jobsToScore.Count} failed for '{displayTitle}': {result.Message}",
+                                $"Scoring {processedCount}/{jobsToScore.Count} completed for '{completedScoringJob.WorkItem.DisplayTitle}'.",
                                 jobsToScore.Count,
                                 processedCount,
                                 scoredCount,
                                 failedCount),
                             cancellationToken);
                     }
-
-                    continue;
                 }
-
-                job.AiScore = result.Score.Value;
-                job.AiLabel = result.Label;
-                job.AiSummary = result.Summary;
-                job.AiWhyMatched = result.WhyMatched;
-                job.AiConcerns = result.Concerns;
-                job.LastScoredAtUtc = DateTimeOffset.UtcNow;
-                scoredCount++;
-
-                if (progressCallback is not null)
-                {
-                    await progressCallback(
-                        new JobStageProgress(
-                            $"Scoring {processedCount}/{jobsToScore.Count} saved a score for '{displayTitle}'.",
-                            jobsToScore.Count,
-                            processedCount,
-                            scoredCount,
-                            failedCount),
-                        cancellationToken);
-                }
+            }
+            catch
+            {
+                await ObserveRemainingTasksAsync(allScoringTasks);
+                throw;
             }
 
             if (scoredCount == 0 && failedCount > 0)
@@ -140,6 +179,23 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
                     processedCount,
                     0,
                     failedCount);
+            }
+
+            foreach (var completedScoringJob in completedScoringResults)
+            {
+                if (!completedScoringJob.Result.CanScore ||
+                    !completedScoringJob.Result.Score.HasValue ||
+                    string.IsNullOrWhiteSpace(completedScoringJob.Result.Label))
+                {
+                    continue;
+                }
+
+                completedScoringJob.WorkItem.Job.AiScore = completedScoringJob.Result.Score.Value;
+                completedScoringJob.WorkItem.Job.AiLabel = completedScoringJob.Result.Label;
+                completedScoringJob.WorkItem.Job.AiSummary = completedScoringJob.Result.Summary;
+                completedScoringJob.WorkItem.Job.AiWhyMatched = completedScoringJob.Result.WhyMatched;
+                completedScoringJob.WorkItem.Job.AiConcerns = completedScoringJob.Result.Concerns;
+                completedScoringJob.WorkItem.Job.LastScoredAtUtc = DateTimeOffset.UtcNow;
             }
 
             if (progressCallback is not null)
@@ -164,4 +220,42 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
 
         return JobBatchScoringResult.Succeeded(maxCount, processedCount, scoredCount, failedCount);
     }
+
+    private async Task<CompletedScoringJob> ScoreJobAsync(
+        PendingScoringJob workItem,
+        SemaphoreSlim concurrencyGate,
+        CancellationToken cancellationToken)
+    {
+        await concurrencyGate.WaitAsync(cancellationToken);
+
+        try
+        {
+            var result = await _jobScoringGateway.ScoreAsync(workItem.Request, cancellationToken);
+            return new CompletedScoringJob(workItem, result);
+        }
+        finally
+        {
+            concurrencyGate.Release();
+        }
+    }
+
+    private static async Task ObserveRemainingTasksAsync(IEnumerable<Task<CompletedScoringJob>> tasks)
+    {
+        try
+        {
+            await Task.WhenAll(tasks);
+        }
+        catch
+        {
+        }
+    }
+
+    private sealed record PendingScoringJob(
+        JobRecord Job,
+        string DisplayTitle,
+        JobScoringGatewayRequest Request);
+
+    private sealed record CompletedScoringJob(
+        PendingScoringJob WorkItem,
+        JobScoringGatewayResult Result);
 }

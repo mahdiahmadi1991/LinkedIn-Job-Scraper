@@ -18,6 +18,8 @@ public sealed class OpenAiSecurityOptions
 
     public int BackgroundPollingTimeoutSeconds { get; set; } = 120;
 
+    public int MaxConcurrentScoringRequests { get; set; } = 2;
+
     public string? ValidateForScoring()
     {
         if (string.IsNullOrWhiteSpace(ApiKey))
@@ -46,6 +48,23 @@ public sealed class OpenAiSecurityOptions
             {
                 return "OpenAI background polling timeout must be greater than zero. Set 'OpenAI:Security:BackgroundPollingTimeoutSeconds' to a positive integer value.";
             }
+        }
+
+        var scoringConcurrencyValidationError = ValidateScoringConcurrency();
+
+        if (scoringConcurrencyValidationError is not null)
+        {
+            return scoringConcurrencyValidationError;
+        }
+
+        return null;
+    }
+
+    public string? ValidateScoringConcurrency()
+    {
+        if (MaxConcurrentScoringRequests <= 0)
+        {
+            return "OpenAI concurrent scoring limit must be greater than zero. Set 'OpenAI:Security:MaxConcurrentScoringRequests' to a positive integer value.";
         }
 
         return null;
