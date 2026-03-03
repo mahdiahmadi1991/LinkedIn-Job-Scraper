@@ -65,6 +65,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The CI workflow now publishes TRX test results and XPlat code coverage artifacts so failures and coverage output can be inspected directly from GitHub Actions runs
 - The public README is being expanded to reflect the current product reality, local setup, CI posture, safety constraints, and modular-monolith architecture more accurately for portfolio review
 - The documentation set now includes a dedicated architecture overview and troubleshooting guide so maintainers can understand both the intended structure and common local recovery paths more quickly
+- The documentation set now includes a dedicated documentation map so new maintainers and AI agents can choose the right context file quickly instead of re-reading every document
 
 ## Product Intent
 

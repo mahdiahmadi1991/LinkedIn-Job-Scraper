@@ -84,6 +84,7 @@ For a deeper technical walkthrough, see:
 - [PLAN_REVISED.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/PLAN_REVISED.md)
 - [ai-onboarding-report.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/ai-onboarding-report.md)
 - [architecture-overview.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/architecture-overview.md)
+- [documentation-map.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/documentation-map.md)
 - [project-context.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/project-context.md)
 - [troubleshooting.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/troubleshooting.md)
 
