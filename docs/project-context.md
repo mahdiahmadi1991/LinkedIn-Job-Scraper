@@ -51,6 +51,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The dedicated Home landing page is being retired; `/` now lands directly on the jobs dashboard so the core workflow is the default entry point
 - Primary navigation is moving from a horizontal top bar into a compact right-aligned hamburger menu, with the LinkedIn session status control kept beside it for a cleaner dashboard-first shell
 - A CI-safe automated test foundation is now being introduced, starting with pure/unit-level coverage that requires no live SQL Server, LinkedIn session, or OpenAI credentials
+- Tracked development configuration is moving to secret-free defaults, with local sensitive values expected to come from user-secrets or environment variables instead of committed appsettings
 
 ## Product Intent
 
