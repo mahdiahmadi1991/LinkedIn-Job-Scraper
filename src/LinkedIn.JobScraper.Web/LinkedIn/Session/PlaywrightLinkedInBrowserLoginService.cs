@@ -248,9 +248,10 @@ public sealed class PlaywrightLinkedInBrowserLoginService :
                 }
 
                 await _sessionStore.SaveAsync(snapshot, effectiveCancellationToken);
+                await CloseControlledBrowserSessionAsync();
                 _autoCaptureCompletedSuccessfully = true;
                 _autoCaptureStatusMessage =
-                    "LinkedIn login was detected and the session was captured automatically. Verification is now optional.";
+                    "LinkedIn login was detected, the session was captured automatically, and the controlled browser was closed. Verification is now optional.";
                 return;
             }
             finally
@@ -264,6 +265,13 @@ public sealed class PlaywrightLinkedInBrowserLoginService :
             _autoCaptureStatusMessage =
                 "Auto-capture timed out before a logged-in LinkedIn session was detected. You can still finish manually with Capture Session.";
         }
+    }
+
+    private async Task CloseControlledBrowserSessionAsync()
+    {
+        await ClosePageSafelyAsync();
+        await CloseContextSafelyAsync();
+        await CloseBrowserSafelyAsync();
     }
 
     private async Task<LinkedInSessionSnapshot?> TryCreateSnapshotAsync(string source)

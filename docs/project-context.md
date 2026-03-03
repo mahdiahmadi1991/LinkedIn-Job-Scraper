@@ -94,6 +94,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - A minimal redaction policy now sanitizes sensitive token-like text in exception-derived operational messages and diagnostics surfaces, reducing the chance of cookies, API keys, or bearer-like strings being echoed back to users or nearby logs
 - The latest architecture-and-quality remediation execution queue is now closed: its CI and documentation follow-up items were rechecked after implementation and no further gap-only pass was justified for that phase
 - Inline page scripts are being moved out of Razor views into versioned static files, and first-run settings forms no longer pre-populate workflow filters or AI guidance text
+- After a successful Playwright auto-capture, the controlled browser now closes automatically so the happy path no longer leaves the login window open after session capture
 
 ## Product Intent
 
