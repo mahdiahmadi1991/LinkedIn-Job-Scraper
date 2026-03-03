@@ -103,6 +103,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - `Search Settings` location input now uses an autocomplete dropdown fed by a lightweight JSON suggestion endpoint instead of the previous full-submit “Find Locations” flow, while the stored `geoId` selection model remains unchanged.
 - Seeded local app users now support password rotation during startup synchronization. `OpenAI` placeholder values were removed from tracked `appsettings` files, and local seeded users can be defined in development config when explicitly desired.
 - Seeded local app users now also support an optional `ExpiresAtUtc` value. Startup synchronization keeps that expiry in sync, and expired local users are blocked at login with a user-facing message instead of being authenticated.
+- Every application startup now creates a per-run log file under `src/LinkedIn.JobScraper.Web/logs/`. This gives each manual test run a separate inspectable log artifact, and sensitive token-like strings are sanitized before they are written there.
 
 ## Product Intent
 

@@ -3,10 +3,17 @@ using System.Threading.RateLimiting;
 using LinkedIn.JobScraper.Web.Composition;
 using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Jobs;
+using LinkedIn.JobScraper.Web.Logging;
 using LinkedIn.JobScraper.Web.Middleware;
 using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+var perRunLogFilePath = PerRunLogFilePath.Create(
+    builder.Environment.ContentRootPath,
+    DateTimeOffset.UtcNow,
+    Environment.ProcessId);
+
+builder.Logging.AddProvider(new PerRunFileLoggerProvider(perRunLogFilePath));
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
@@ -29,6 +36,8 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddMvpApplication(builder.Configuration);
 
 var app = builder.Build();
+
+StartupLog.PerRunLogFileInitialized(app.Logger, perRunLogFilePath);
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

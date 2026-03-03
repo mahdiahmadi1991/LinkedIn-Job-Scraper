@@ -24,3 +24,4 @@ node_modules/
 
 docs/api-sample/
 src/LinkedIn.JobScraper.Web/bin\\Debug/
+src/LinkedIn.JobScraper.Web/logs/
