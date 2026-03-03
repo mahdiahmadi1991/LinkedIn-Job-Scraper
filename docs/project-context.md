@@ -36,6 +36,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The UI is now being refreshed toward a LinkedIn-inspired visual signature with denser cards, cleaner navigation, and a more compact jobs review table without changing the underlying workflow logic
 - The job details page is now being aligned with the same LinkedIn-inspired visual language so drill-down review feels consistent with the dashboard
 - The remaining legacy diagnostics path no longer reads onboarding samples at runtime and now uses lightweight public reachability plus stored-session verification checks instead
+- The jobs table and job details view are being tightened further so AI rationale stays scannable, actions stay compact, and long text no longer dominates the review surface
 
 ## Product Intent
 
