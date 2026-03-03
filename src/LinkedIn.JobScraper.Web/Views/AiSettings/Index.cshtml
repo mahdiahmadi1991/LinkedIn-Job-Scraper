@@ -67,18 +67,23 @@
                     <div class="section-label">AI Connection</div>
                     <h2 class="h5">AI Connection</h2>
                     <div class="session-modal-status-stack">
-                        <div class="session-status-note @(Model.OpenAiConnectionReady ? "success" : "danger")">
+                        <div class="session-status-note @(Model.OpenAiConnectionReady ? "success" : "danger")" data-ai-connection-status-note>
                             @Model.OpenAiConnectionStatusMessage
                         </div>
-                        <div class="session-status-note subtle active">
-                            <strong>API key:</strong> @(Model.OpenAiApiKeyConfigured ? "Configured" : "Not configured")
+                        <div class="session-status-note subtle active" data-ai-connection-api-key>
+                            <strong>API key:</strong> <span data-ai-connection-api-key-value>@(Model.OpenAiApiKeyConfigured ? "Configured" : "Not configured")</span>
                         </div>
-                        <div class="session-status-note subtle active">
-                            <strong>Model:</strong> @(string.IsNullOrWhiteSpace(Model.OpenAiModel) ? "Not configured" : Model.OpenAiModel)
+                        <div class="session-status-note subtle active" data-ai-connection-model>
+                            <strong>Model:</strong> <span data-ai-connection-model-value>@(string.IsNullOrWhiteSpace(Model.OpenAiModel) ? "Not configured" : Model.OpenAiModel)</span>
                         </div>
-                        <div class="session-status-note subtle active">
-                            <strong>Base URL:</strong> @Model.OpenAiBaseUrl
+                        <div class="session-status-note subtle active" data-ai-connection-base-url>
+                            <strong>Base URL:</strong> <span data-ai-connection-base-url-value>@Model.OpenAiBaseUrl</span>
                         </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-ai-connection-check>
+                            Check Current Readiness
+                        </button>
                     </div>
                     <p class="small text-muted mb-0">
                         API keys are not stored in the database. Keep them in <code>dotnet user-secrets</code> or environment variables.
@@ -101,3 +106,75 @@
         </div>
     </section>
 </div>
+
+@section Scripts {
+    <script>
+        (() => {
+            const button = document.querySelector("[data-ai-connection-check]");
+            const statusNote = document.querySelector("[data-ai-connection-status-note]");
+            const apiKeyValue = document.querySelector("[data-ai-connection-api-key-value]");
+            const modelValue = document.querySelector("[data-ai-connection-model-value]");
+            const baseUrlValue = document.querySelector("[data-ai-connection-base-url-value]");
+
+            if (!button || !statusNote || !apiKeyValue || !modelValue || !baseUrlValue) {
+                return;
+            }
+
+            const setStatus = (message, ready) => {
+                statusNote.textContent = message;
+                statusNote.classList.remove("success", "danger");
+                statusNote.classList.add(ready ? "success" : "danger");
+            };
+
+            const tryReadProblem = async (response) => {
+                const contentType = response.headers.get("Content-Type") || "";
+                if (!contentType.includes("application/problem+json") && !contentType.includes("application/json")) {
+                    return null;
+                }
+
+                try {
+                    return await response.json();
+                } catch {
+                    return null;
+                }
+            };
+
+            button.addEventListener("click", async () => {
+                const idleText = button.textContent;
+                button.disabled = true;
+                button.textContent = "Checking...";
+
+                try {
+                    const response = await fetch("@Url.Action("ConnectionStatus", "AiSettings")", {
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest"
+                        },
+                        credentials: "same-origin"
+                    });
+
+                    const payload = await tryReadProblem(response);
+
+                    if (!response.ok) {
+                        setStatus(payload?.detail || payload?.title || "AI connection check failed.", false);
+                        return;
+                    }
+
+                    if (!payload?.state) {
+                        setStatus("AI connection check did not return a usable response.", false);
+                        return;
+                    }
+
+                    setStatus(payload.message || "OpenAI connection settings are configured and ready for scoring.", !!payload.state.ready);
+                    apiKeyValue.textContent = payload.state.apiKeyConfigured ? "Configured" : "Not configured";
+                    modelValue.textContent = payload.state.model || "Not configured";
+                    baseUrlValue.textContent = payload.state.baseUrl || "https://api.openai.com/v1";
+                } catch {
+                    setStatus("AI connection check failed.", false);
+                } finally {
+                    button.disabled = false;
+                    button.textContent = idleText;
+                }
+            });
+        })();
+    </script>
+}

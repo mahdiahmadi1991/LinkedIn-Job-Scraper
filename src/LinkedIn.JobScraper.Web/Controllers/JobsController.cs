@@ -1,5 +1,6 @@
 using LinkedIn.JobScraper.Web.Jobs;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using LinkedIn.JobScraper.Web.Configuration;
 using Microsoft.AspNetCore.RateLimiting;
@@ -64,9 +65,19 @@ public class JobsController : Controller
 
         if (Request.Headers.XRequestedWith == "XMLHttpRequest")
         {
+            if (!result.Success)
+            {
+                return Problem(
+                    title: "Fetch & Score failed",
+                    detail: result.Message,
+                    statusCode: result.ImportResult.StatusCode > 0
+                        ? result.ImportResult.StatusCode
+                        : StatusCodes.Status409Conflict);
+            }
+
             return Json(new
             {
-                success = result.Success,
+                success = true,
                 severity = result.Severity,
                 message = result.Message,
                 redirectUrl

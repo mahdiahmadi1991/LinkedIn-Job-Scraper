@@ -1,6 +1,7 @@
 using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
@@ -85,17 +86,63 @@ public sealed class AiSettingsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    [HttpGet]
+    public IActionResult ConnectionStatus()
+    {
+        var payload = CreateConnectionStatusPayload();
+
+        if (!payload.Ready)
+        {
+            return Problem(
+                title: "AI connection is not ready",
+                detail: payload.Message,
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+
+        return Json(new
+        {
+            success = true,
+            message = payload.Message,
+            state = new
+            {
+                apiKeyConfigured = payload.ApiKeyConfigured,
+                model = payload.Model,
+                baseUrl = payload.BaseUrl,
+                ready = payload.Ready
+            }
+        });
+    }
+
     private void PopulateConnectionStatus(AiSettingsPageViewModel viewModel)
+    {
+        var payload = CreateConnectionStatusPayload();
+
+        viewModel.OpenAiApiKeyConfigured = payload.ApiKeyConfigured;
+        viewModel.OpenAiModel = payload.Model;
+        viewModel.OpenAiBaseUrl = payload.BaseUrl;
+        viewModel.OpenAiConnectionReady = payload.Ready;
+        viewModel.OpenAiConnectionStatusMessage = payload.Message;
+    }
+
+    private OpenAiConnectionStatusPayload CreateConnectionStatusPayload()
     {
         var options = _openAiSecurityOptions.Value;
         var validationMessage = options.ValidateForScoring();
 
-        viewModel.OpenAiApiKeyConfigured = !string.IsNullOrWhiteSpace(options.ApiKey);
-        viewModel.OpenAiModel = string.IsNullOrWhiteSpace(options.Model) ? null : options.Model.Trim();
-        viewModel.OpenAiBaseUrl = string.IsNullOrWhiteSpace(options.BaseUrl)
-            ? "https://api.openai.com/v1"
-            : options.BaseUrl.TrimEnd('/');
-        viewModel.OpenAiConnectionReady = validationMessage is null;
-        viewModel.OpenAiConnectionStatusMessage = validationMessage ?? "OpenAI connection settings are configured and ready for scoring.";
+        return new OpenAiConnectionStatusPayload(
+            ApiKeyConfigured: !string.IsNullOrWhiteSpace(options.ApiKey),
+            Model: string.IsNullOrWhiteSpace(options.Model) ? null : options.Model.Trim(),
+            BaseUrl: string.IsNullOrWhiteSpace(options.BaseUrl)
+                ? "https://api.openai.com/v1"
+                : options.BaseUrl.TrimEnd('/'),
+            Ready: validationMessage is null,
+            Message: validationMessage ?? "OpenAI connection settings are configured and ready for scoring.");
     }
+
+    private sealed record OpenAiConnectionStatusPayload(
+        bool ApiKeyConfigured,
+        string? Model,
+        string BaseUrl,
+        bool Ready,
+        string Message);
 }

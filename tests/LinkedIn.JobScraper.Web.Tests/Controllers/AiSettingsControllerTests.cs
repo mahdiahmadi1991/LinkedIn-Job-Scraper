@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 
 namespace LinkedIn.JobScraper.Web.Tests.Controllers;
 
@@ -70,6 +71,48 @@ public sealed class AiSettingsControllerTests
         Assert.False(model.StatusSucceeded);
         Assert.Contains("updated by another operation", model.StatusMessage, StringComparison.Ordinal);
         Assert.True(model.OpenAiApiKeyConfigured);
+    }
+
+    [Fact]
+    public void ConnectionStatusReturnsProblemDetailsWhenConfigurationIsIncomplete()
+    {
+        var controller = new AiSettingsController(
+            new FakeAiBehaviorSettingsService(),
+            Options.Create(new OpenAiSecurityOptions
+            {
+                Model = "gpt-5-mini"
+            }));
+
+        var result = controller.ConnectionStatus();
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        var details = Assert.IsType<ProblemDetails>(problem.Value);
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, problem.StatusCode);
+        Assert.Equal("AI connection is not ready", details.Title);
+        Assert.Contains("OpenAI:Security:ApiKey", details.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ConnectionStatusReturnsJsonPayloadWhenConfigurationIsReady()
+    {
+        var controller = new AiSettingsController(
+            new FakeAiBehaviorSettingsService(),
+            Options.Create(new OpenAiSecurityOptions
+            {
+                ApiKey = "test-key",
+                Model = "gpt-5-mini",
+                BaseUrl = "https://api.openai.com/v1"
+            }));
+
+        var result = controller.ConnectionStatus();
+
+        var json = Assert.IsType<JsonResult>(result);
+        using var document = JsonDocument.Parse(JsonSerializer.Serialize(json.Value));
+
+        Assert.True(document.RootElement.GetProperty("success").GetBoolean());
+        Assert.True(document.RootElement.GetProperty("state").GetProperty("ready").GetBoolean());
+        Assert.Equal("gpt-5-mini", document.RootElement.GetProperty("state").GetProperty("model").GetString());
     }
 
     private sealed class FakeAiBehaviorSettingsService : IAiBehaviorSettingsService

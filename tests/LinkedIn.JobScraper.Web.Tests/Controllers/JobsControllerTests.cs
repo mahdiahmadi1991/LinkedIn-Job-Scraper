@@ -46,6 +46,33 @@ public sealed class JobsControllerTests
         Assert.Equal("connection-1", service.LastConnectionId);
     }
 
+    [Fact]
+    public async Task FetchAndScoreReturnsProblemDetailsForAjaxFailures()
+    {
+        var controller = new JobsController(new FailedJobsDashboardService())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider()),
+            Url = new TestUrlHelper("/Jobs")
+        };
+
+        controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
+
+        var result = await controller.FetchAndScore(new JobsDashboardQuery(), "connection-1", CancellationToken.None);
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        var details = Assert.IsType<ProblemDetails>(problem.Value);
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, problem.StatusCode);
+        Assert.Equal("Fetch & Score failed", details.Title);
+        Assert.Equal("Workflow failed.", details.Detail);
+        Assert.Equal("Workflow failed.", controller.TempData["JobsAlertMessage"]);
+        Assert.Equal("danger", controller.TempData["JobsAlertSeverity"]);
+    }
+
     private sealed class FakeJobsDashboardService : IJobsDashboardService
     {
         public string? LastConnectionId { get; private set; }
@@ -99,6 +126,43 @@ public sealed class JobsControllerTests
                     import,
                     enrichment,
                     scoring));
+        }
+
+        public Task<JobStatusChangeResult> UpdateStatusAsync(Guid jobId, JobWorkflowStatus status, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private sealed class FailedJobsDashboardService : IJobsDashboardService
+    {
+        public Task<JobsDashboardSnapshot> GetSnapshotAsync(JobsDashboardQuery query, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<JobDetailsSnapshot?> GetJobDetailsAsync(Guid jobId, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<JobsRowsChunk> GetRowsAsync(JobsDashboardQuery query, int offset, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(string? progressConnectionId, CancellationToken cancellationToken)
+        {
+            var import = JobImportResult.Failed("Import failed.", StatusCodes.Status503ServiceUnavailable);
+
+            return Task.FromResult(
+                new FetchAndScoreWorkflowResult(
+                    false,
+                    "Workflow failed.",
+                    "danger",
+                    import,
+                    null,
+                    null));
         }
 
         public Task<JobStatusChangeResult> UpdateStatusAsync(Guid jobId, JobWorkflowStatus status, CancellationToken cancellationToken)
