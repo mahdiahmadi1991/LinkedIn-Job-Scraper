@@ -435,6 +435,68 @@ a:hover {
   padding: 0.9rem;
 }
 
+.search-location-autocomplete {
+  position: relative;
+}
+
+.search-location-dropdown {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 1rem;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.14);
+  overflow: hidden;
+}
+
+.search-location-suggestions {
+  max-height: 18rem;
+  overflow-y: auto;
+}
+
+.search-location-option {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+
+.search-location-option:hover,
+.search-location-option:focus-visible {
+  background: rgba(10, 102, 194, 0.08);
+  outline: none;
+}
+
+.search-location-option + .search-location-option {
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.search-location-option-name {
+  color: #10233e;
+  font-weight: 600;
+}
+
+.search-location-option-id {
+  color: #6a7280;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.search-location-empty {
+  padding: 0.85rem 1rem;
+  color: #6a7280;
+  font-size: 0.9rem;
+}
+
 .card {
   border: 1px solid var(--app-border);
   border-radius: 1rem;

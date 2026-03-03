@@ -99,6 +99,8 @@ Build a simple local web application for personal use that helps collect LinkedI
 - Cookie-based app authentication is now wired at the platform level with a dedicated local scheme and persistent-cookie support, but route protection and the login UI are still deferred to the next steps so current behavior does not break mid-rollout
 - Main app controllers now require the local cookie-auth scheme, while `Account/Login` remains anonymous and the top-right menu exposes a direct `Sign out` action.
 - Browser branding now includes a project-specific SVG favicon and a minimal web manifest, wired into both the main app shell and the standalone login page.
+- A dedicated `docs/ai-settings-recommended-profile.md` document now stores a ready-to-use AI scoring profile tailored to the current backend .NET job-search goal, so future updates do not require re-explaining the scoring intent.
+- `Search Settings` location input now uses an autocomplete dropdown fed by a lightweight JSON suggestion endpoint instead of the previous full-submit “Find Locations” flow, while the stored `geoId` selection model remains unchanged.
 - Seeded local app users now support password rotation during startup synchronization. `OpenAI` placeholder values were removed from tracked `appsettings` files, and local seeded users can be defined in development config when explicitly desired.
 
 ## Product Intent

@@ -35,35 +35,33 @@ public sealed class SearchSettingsController : Controller
         return View(viewModel);
     }
 
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SearchLocation(
-        LinkedInSearchSettingsPageViewModel viewModel,
+    [HttpGet]
+    public async Task<IActionResult> LocationSuggestions(
+        [FromQuery] string? query,
         CancellationToken cancellationToken)
     {
-        LinkedInSearchSettingsViewModelAdapter.NormalizeSelections(viewModel);
-        LinkedInSearchSettingsViewModelAdapter.ResetSelectedLocation(viewModel);
-        ModelState.Remove(nameof(viewModel.LocationDisplayName));
-        ModelState.Remove(nameof(viewModel.LocationGeoId));
-
-        if (string.IsNullOrWhiteSpace(viewModel.LocationInput))
+        if (string.IsNullOrWhiteSpace(query) || query.Trim().Length < 2)
         {
-            viewModel.StatusMessage = "Enter a city, state, or zip code before searching for LinkedIn locations.";
-            viewModel.StatusSucceeded = false;
-            return View("Index", viewModel);
+            return Json(new LinkedInLocationSuggestionsResponse([]));
         }
 
-        var result = await _linkedInLocationLookupService.SearchAsync(viewModel.LocationInput, cancellationToken);
+        var result = await _linkedInLocationLookupService.SearchAsync(query.Trim(), cancellationToken);
 
-        viewModel.StatusMessage = result.Success
-            ? $"{result.Suggestions.Count} LinkedIn location suggestions were found. Choose one, then save."
-            : result.Message;
-        viewModel.StatusSucceeded = result.Success;
-        viewModel.LocationSuggestions = result.Suggestions
-            .Select(static suggestion => new LinkedInLocationSuggestionViewModel(suggestion.GeoId, suggestion.DisplayName))
-            .ToList();
+        if (!result.Success)
+        {
+            return Problem(
+                title: "Location suggestion lookup failed",
+                detail: result.Message,
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
 
-        return View("Index", viewModel);
+        return Json(
+            new LinkedInLocationSuggestionsResponse(
+                result.Suggestions
+                    .Select(static suggestion => new LinkedInLocationSuggestionResponseItem(
+                        suggestion.GeoId,
+                        suggestion.DisplayName))
+                    .ToArray()));
     }
 
     [HttpPost]

@@ -106,6 +106,40 @@ public sealed class SearchSettingsControllerTests
         Assert.Equal("token-saved", payload.ConcurrencyToken);
     }
 
+    [Fact]
+    public async Task LocationSuggestionsReturnsJsonSuggestionsWhenLookupSucceeds()
+    {
+        var controller = new SearchSettingsController(
+            new SavingLinkedInSearchSettingsService(),
+            new SuccessfulLinkedInLocationLookupService());
+
+        var result = await controller.LocationSuggestions("Lim", CancellationToken.None);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var payload = Assert.IsType<LinkedInLocationSuggestionsResponse>(json.Value);
+
+        Assert.Single(payload.Suggestions);
+        Assert.Equal("106394980", payload.Suggestions[0].GeoId);
+        Assert.Equal("Limassol, Cyprus", payload.Suggestions[0].DisplayName);
+    }
+
+    [Fact]
+    public async Task LocationSuggestionsReturnsProblemDetailsWhenLookupFails()
+    {
+        var controller = new SearchSettingsController(
+            new SavingLinkedInSearchSettingsService(),
+            new FailingLinkedInLocationLookupService());
+
+        var result = await controller.LocationSuggestions("Lim", CancellationToken.None);
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        var details = Assert.IsType<ProblemDetails>(problem.Value);
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, problem.StatusCode);
+        Assert.Equal("Location suggestion lookup failed", details.Title);
+        Assert.Contains("LinkedIn", details.Detail, StringComparison.Ordinal);
+    }
+
     private sealed class ConcurrencyFailureLinkedInSearchSettingsService : ILinkedInSearchSettingsService
     {
         public Task<LinkedInSearchSettings> GetActiveAsync(CancellationToken cancellationToken)
@@ -124,6 +158,27 @@ public sealed class SearchSettingsControllerTests
         public Task<LinkedInLocationLookupResult> SearchAsync(string locationQuery, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
+        }
+    }
+
+    private sealed class SuccessfulLinkedInLocationLookupService : ILinkedInLocationLookupService
+    {
+        public Task<LinkedInLocationLookupResult> SearchAsync(string locationQuery, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                LinkedInLocationLookupResult.Succeeded(
+                    [new LinkedInLocationSuggestion("106394980", "Limassol, Cyprus")]));
+        }
+    }
+
+    private sealed class FailingLinkedInLocationLookupService : ILinkedInLocationLookupService
+    {
+        public Task<LinkedInLocationLookupResult> SearchAsync(string locationQuery, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                LinkedInLocationLookupResult.Failed(
+                    "LinkedIn location suggestions are currently unavailable.",
+                    StatusCodes.Status503ServiceUnavailable));
         }
     }
 
