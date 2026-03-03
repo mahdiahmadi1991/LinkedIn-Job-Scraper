@@ -5,14 +5,13 @@
     var alertSeverity = Model.StatusSucceeded ? "success" : "warning";
 }
 
-<div class="d-flex flex-column gap-4">
-    <section class="d-flex flex-column gap-2">
-        <div>
-            <h1 class="h2 mb-1">LinkedIn Search Settings</h1>
-            <p class="text-muted mb-0">
-                Configure the exact LinkedIn search that powers <strong>Fetch &amp; Score</strong>. These settings define which jobs get pulled into the dashboard.
-            </p>
-        </div>
+<div class="page-shell">
+    <section class="page-hero">
+        <div class="section-label mb-2">Fetch Definition</div>
+        <h1 class="hero-title h2">LinkedIn Search Settings</h1>
+        <p class="hero-lead">
+            Configure the exact LinkedIn search that powers <strong>Fetch &amp; Score</strong>. These settings define which jobs get pulled into the dashboard.
+        </p>
     </section>
 
     @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -24,8 +23,8 @@
 
     <section class="row g-4">
         <div class="col-12 col-xl-8">
-            <div class="card">
-                <div class="card-body">
+            <div class="card app-panel">
+                <div class="card-body app-panel-body">
                     <form asp-action="Save" method="post" class="d-flex flex-column gap-4" id="search-settings-form">
                         @Html.AntiForgeryToken()
 
@@ -67,8 +66,8 @@
 
                         @if (Model.LocationSuggestions.Count > 0)
                         {
-                            <div class="border rounded p-3">
-                                <div class="small text-muted text-uppercase mb-2">LinkedIn Location Suggestions</div>
+                            <div class="selection-card">
+                                <div class="section-label mb-2">LinkedIn Location Suggestions</div>
                                 <div class="d-flex flex-column gap-2">
                                     @foreach (var suggestion in Model.LocationSuggestions)
                                     {
@@ -93,8 +92,8 @@
 
                         <div class="row g-4">
                             <div class="col-12 col-lg-6">
-                                <div class="border rounded p-3 h-100">
-                                    <div class="small text-muted text-uppercase mb-2">Remote</div>
+                                <div class="selection-card selection-card-tight h-100">
+                                    <div class="section-label mb-2">Remote</div>
                                     <div class="d-flex flex-column gap-2">
                                         @foreach (var option in LinkedInSearchSettingsPageViewModel.WorkplaceTypeOptions)
                                         {
@@ -114,8 +113,8 @@
                             </div>
 
                             <div class="col-12 col-lg-6">
-                                <div class="border rounded p-3 h-100">
-                                    <div class="small text-muted text-uppercase mb-2">Job Type</div>
+                                <div class="selection-card selection-card-tight h-100">
+                                    <div class="section-label mb-2">Job Type</div>
                                     <div class="d-flex flex-column gap-2">
                                         @foreach (var option in LinkedInSearchSettingsPageViewModel.JobTypeOptions)
                                         {
@@ -145,9 +144,10 @@
         </div>
 
         <div class="col-12 col-xl-4">
-            <div class="card h-100">
-                <div class="card-body d-flex flex-column gap-3">
+            <div class="card h-100 app-panel">
+                <div class="card-body app-panel-body d-flex flex-column gap-3">
                     <div>
+                        <div class="section-label mb-2">What this controls</div>
                         <h2 class="h5">What this controls</h2>
                         <p class="small text-muted mb-0">
                             These filters determine the exact LinkedIn search request used by the next <strong>Fetch &amp; Score</strong> run.

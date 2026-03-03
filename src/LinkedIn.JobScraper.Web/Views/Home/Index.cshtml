@@ -2,11 +2,45 @@
     ViewData["Title"] = "Home";
 }
 
-<div class="p-4 p-lg-5 bg-light rounded-3 border">
-    <h1 class="display-6 mb-3">LinkedIn Job Scraper MVP</h1>
-    <p class="lead mb-4">Start from the jobs dashboard for the full workflow, or refresh the LinkedIn session if the platform expires your stored cookies.</p>
-    <div class="d-flex flex-column flex-sm-row gap-2">
-        <a class="btn btn-primary" asp-controller="Jobs" asp-action="Index">Open Jobs Dashboard</a>
-        <a class="btn btn-outline-secondary" asp-controller="LinkedInSession" asp-action="Index">Open LinkedIn Session</a>
-    </div>
+<div class="page-shell">
+    <section class="page-hero">
+        <div class="section-label mb-2">Local MVP</div>
+        <h1 class="hero-title display-6">LinkedIn Job Scraper</h1>
+        <p class="hero-lead lead mb-4">Start from the jobs dashboard for the full workflow, or refresh the LinkedIn session if the platform expires your stored cookies.</p>
+        <div class="stacked-actions">
+            <a class="btn btn-primary" asp-controller="Jobs" asp-action="Index">Open Jobs Dashboard</a>
+            <a class="btn btn-outline-secondary" asp-controller="LinkedInSession" asp-action="Index">Open LinkedIn Session</a>
+            <a class="btn btn-outline-primary" asp-controller="SearchSettings" asp-action="Index">Adjust Search Settings</a>
+        </div>
+    </section>
+
+    <section class="row g-3">
+        <div class="col-12 col-lg-4">
+            <div class="card h-100 app-panel">
+                <div class="card-body app-panel-body">
+                    <div class="section-label mb-2">Capture</div>
+                    <h2 class="h5">LinkedIn Session</h2>
+                    <p class="text-muted mb-0">Open the controlled browser, sign in manually, and keep a reusable session ready for authenticated LinkedIn requests.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-4">
+            <div class="card h-100 app-panel">
+                <div class="card-body app-panel-body">
+                    <div class="section-label mb-2">Collect</div>
+                    <h2 class="h5">Search &amp; Import</h2>
+                    <p class="text-muted mb-0">Use saved LinkedIn filters, fetch multiple pages conservatively, enrich fresh jobs, then keep only genuinely new opportunities.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-4">
+            <div class="card h-100 app-panel">
+                <div class="card-body app-panel-body">
+                    <div class="section-label mb-2">Review</div>
+                    <h2 class="h5">AI Triage</h2>
+                    <p class="text-muted mb-0">Score jobs with the stored AI behavior profile so the dashboard surfaces the highest-value opportunities first.</p>
+                </div>
+            </div>
+        </div>
+    </section>
 </div>
