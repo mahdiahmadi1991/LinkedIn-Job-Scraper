@@ -89,6 +89,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The LinkedIn search settings page now follows the same progressive-enhancement pattern for the main save action, while preserving the separate full form submit path for location lookup
 - The Web layer no longer references the persistence `JobWorkflowStatus` enum directly in jobs controllers and views; a web-facing `JobWorkflowState` now carries that concern while mapping stays inside the `Jobs` module
 - `SearchSettingsController` is now thinner: its non-trivial normalization, validation, and read-model-to-view-model mapping for LinkedIn search settings have moved into a dedicated `LinkedIn.Search` adapter helper without changing behavior
+- `AiSettingsController` is now thinner as well: profile-to-view-model mapping and OpenAI connection-state shaping now live in a dedicated `AI` adapter helper, while controller actions remain orchestration-only
 
 ## Product Intent
 

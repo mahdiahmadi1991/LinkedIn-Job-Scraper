@@ -25,23 +25,17 @@ public sealed class AiSettingsController : Controller
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
         var profile = await _aiBehaviorSettingsService.GetActiveAsync(cancellationToken);
-
-        var viewModel = new AiSettingsPageViewModel
-        {
-            ConcurrencyToken = profile.ConcurrencyToken,
-            ProfileName = profile.ProfileName,
-            BehavioralInstructions = profile.BehavioralInstructions,
-            PrioritySignals = profile.PrioritySignals,
-            ExclusionSignals = profile.ExclusionSignals,
-            OutputLanguageCode = profile.OutputLanguageCode,
-            StatusMessage = TempData["AiSettingsStatusMessage"] as string,
-            StatusSucceeded = string.Equals(
+        var viewModel = AiSettingsViewModelAdapter.ToViewModel(
+            profile,
+            TempData["AiSettingsStatusMessage"] as string,
+            string.Equals(
                 TempData["AiSettingsStatusSucceeded"] as string,
                 bool.TrueString,
-                StringComparison.OrdinalIgnoreCase)
-        };
+                StringComparison.OrdinalIgnoreCase));
 
-        PopulateConnectionStatus(viewModel);
+        AiSettingsViewModelAdapter.PopulateConnectionStatus(
+            viewModel,
+            AiSettingsViewModelAdapter.CreateConnectionState(_openAiSecurityOptions.Value));
 
         return View(viewModel);
     }
@@ -54,7 +48,9 @@ public sealed class AiSettingsController : Controller
     {
         if (!ModelState.IsValid)
         {
-            PopulateConnectionStatus(viewModel);
+            AiSettingsViewModelAdapter.PopulateConnectionStatus(
+                viewModel,
+                AiSettingsViewModelAdapter.CreateConnectionState(_openAiSecurityOptions.Value));
             viewModel.StatusMessage = "All AI behavior fields are required.";
             viewModel.StatusSucceeded = false;
 
@@ -85,7 +81,9 @@ public sealed class AiSettingsController : Controller
         }
         catch (InvalidOperationException exception)
         {
-            PopulateConnectionStatus(viewModel);
+            AiSettingsViewModelAdapter.PopulateConnectionStatus(
+                viewModel,
+                AiSettingsViewModelAdapter.CreateConnectionState(_openAiSecurityOptions.Value));
             viewModel.StatusMessage = exception.Message;
             viewModel.StatusSucceeded = false;
 
@@ -124,7 +122,7 @@ public sealed class AiSettingsController : Controller
     [HttpGet]
     public IActionResult ConnectionStatus()
     {
-        var payload = CreateConnectionStatusPayload();
+        var payload = AiSettingsViewModelAdapter.CreateConnectionState(_openAiSecurityOptions.Value);
 
         if (!payload.Ready)
         {
@@ -144,39 +142,6 @@ public sealed class AiSettingsController : Controller
                     payload.BaseUrl,
                     payload.Ready)));
     }
-
-    private void PopulateConnectionStatus(AiSettingsPageViewModel viewModel)
-    {
-        var payload = CreateConnectionStatusPayload();
-
-        viewModel.OpenAiApiKeyConfigured = payload.ApiKeyConfigured;
-        viewModel.OpenAiModel = payload.Model;
-        viewModel.OpenAiBaseUrl = payload.BaseUrl;
-        viewModel.OpenAiConnectionReady = payload.Ready;
-        viewModel.OpenAiConnectionStatusMessage = payload.Message;
-    }
-
-    private OpenAiConnectionStatusPayload CreateConnectionStatusPayload()
-    {
-        var options = _openAiSecurityOptions.Value;
-        var validationMessage = options.ValidateForScoring();
-
-        return new OpenAiConnectionStatusPayload(
-            ApiKeyConfigured: !string.IsNullOrWhiteSpace(options.ApiKey),
-            Model: string.IsNullOrWhiteSpace(options.Model) ? null : options.Model.Trim(),
-            BaseUrl: string.IsNullOrWhiteSpace(options.BaseUrl)
-                ? "https://api.openai.com/v1"
-                : options.BaseUrl.TrimEnd('/'),
-            Ready: validationMessage is null,
-            Message: validationMessage ?? "OpenAI connection settings are configured and ready for scoring.");
-    }
-
-    private sealed record OpenAiConnectionStatusPayload(
-        bool ApiKeyConfigured,
-        string? Model,
-        string BaseUrl,
-        bool Ready,
-        string Message);
 
     private bool IsAjaxRequest()
     {
