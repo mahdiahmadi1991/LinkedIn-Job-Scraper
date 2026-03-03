@@ -54,6 +54,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - Tracked development configuration is moving to secret-free defaults, with local sensitive values expected to come from user-secrets or environment variables instead of committed appsettings
 - Missing SQL Server and OpenAI runtime configuration is now being validated with actionable error messages that point developers to the expected user-secrets setup
 - The HTTP pipeline now applies a small set of low-risk security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`) globally, while preserving any explicitly-set response values
+- A narrow local-only rate-limit policy now protects the most sensitive POST actions (session launch/capture/verify/revoke and `Fetch & Score`) without throttling normal dashboard reads or session-state polling
 
 ## Product Intent
 

@@ -1,6 +1,8 @@
 using LinkedIn.JobScraper.Web.Jobs;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
 using Microsoft.AspNetCore.Mvc;
+using LinkedIn.JobScraper.Web.Configuration;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace LinkedIn.JobScraper.Web.Controllers;
 
@@ -47,6 +49,7 @@ public class JobsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting(SecurityRateLimitPolicies.SensitiveLocalActions)]
     public async Task<IActionResult> FetchAndScore(
         [FromForm] JobsDashboardQuery query,
         [FromHeader(Name = "X-Progress-ConnectionId")] string? progressConnectionId,

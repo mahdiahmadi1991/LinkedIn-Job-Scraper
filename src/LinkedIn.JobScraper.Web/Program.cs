@@ -1,13 +1,27 @@
 using System.Net;
+using System.Threading.RateLimiting;
 using LinkedIn.JobScraper.Web.Composition;
+using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Jobs;
 using LinkedIn.JobScraper.Web.Middleware;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddHealthChecks();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter(SecurityRateLimitPolicies.SensitiveLocalActions, limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 6;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueLimit = 0;
+        limiterOptions.AutoReplenishment = true;
+    });
+});
 builder.Services.AddMvpApplication(builder.Configuration);
 
 var app = builder.Build();
@@ -23,6 +37,7 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseBasicSecurityHeaders();
 app.UseRouting();
+app.UseRateLimiter();
 
 app.UseAuthorization();
 

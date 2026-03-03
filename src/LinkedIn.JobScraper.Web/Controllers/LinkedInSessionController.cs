@@ -1,6 +1,8 @@
+using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using LinkedIn.JobScraper.Web.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace LinkedIn.JobScraper.Web.Controllers;
 
@@ -35,6 +37,7 @@ public class LinkedInSessionController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting(SecurityRateLimitPolicies.SensitiveLocalActions)]
     public async Task<IActionResult> Capture(CancellationToken cancellationToken)
     {
         var result = await _linkedInBrowserLoginService.CaptureAndSaveAsync(cancellationToken);
@@ -52,6 +55,7 @@ public class LinkedInSessionController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting(SecurityRateLimitPolicies.SensitiveLocalActions)]
     public async Task<IActionResult> Launch(CancellationToken cancellationToken)
     {
         var result = await _linkedInBrowserLoginService.LaunchLoginAsync(cancellationToken);
@@ -60,6 +64,7 @@ public class LinkedInSessionController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting(SecurityRateLimitPolicies.SensitiveLocalActions)]
     public async Task<IActionResult> Verify(CancellationToken cancellationToken)
     {
         return await VerifyAndBuildActionResponseAsync(
@@ -70,6 +75,7 @@ public class LinkedInSessionController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting(SecurityRateLimitPolicies.SensitiveLocalActions)]
     public async Task<IActionResult> Revoke(CancellationToken cancellationToken)
     {
         try
