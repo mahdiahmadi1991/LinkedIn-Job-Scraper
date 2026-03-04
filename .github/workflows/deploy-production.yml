@@ -1,0 +1,109 @@
+name: Deploy Production
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      IMAGE_NAME: ghcr.io/mahdiahmadi1991/linkedin-job-scraper-web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Log In To GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build And Push Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:main
+            ${{ env.IMAGE_NAME }}:${{ github.event.workflow_run.head_sha }}
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' '${{ secrets.DEPLOY_SSH_KEY }}' > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p '${{ secrets.DEPLOY_SSH_PORT }}' -H '${{ secrets.DEPLOY_HOST }}' >> ~/.ssh/known_hosts
+
+      - name: Create Remote Directories
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_ed25519 -p '${{ secrets.DEPLOY_SSH_PORT }}' '${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}' \
+            "mkdir -p '${{ secrets.DEPLOY_APP_DIR }}/nginx' '${{ secrets.DEPLOY_APP_DIR }}/logs'"
+
+      - name: Upload Deploy Assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          scp -i ~/.ssh/id_ed25519 -P '${{ secrets.DEPLOY_SSH_PORT }}' \
+            deploy/production/docker-compose.yml \
+            deploy/production/remote-deploy.sh \
+            '${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_APP_DIR }}/'
+          scp -i ~/.ssh/id_ed25519 -P '${{ secrets.DEPLOY_SSH_PORT }}' \
+            deploy/production/nginx/app-http.conf.template \
+            deploy/production/nginx/app-https.conf.template \
+            '${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_APP_DIR }}/nginx/'
+
+      - name: Write Runtime Configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_ed25519 -p '${{ secrets.DEPLOY_SSH_PORT }}' '${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}' \
+            "cat > '${{ secrets.DEPLOY_APP_DIR }}/.env.runtime'" <<'EOF'
+          SqlServer__ConnectionString=${{ secrets.SQLSERVER__CONNECTIONSTRING }}
+          OpenAI__Security__ApiKey=${{ secrets.OPENAI__SECURITY__APIKEY }}
+          OpenAI__Security__Model=${{ secrets.OPENAI__SECURITY__MODEL }}
+          OpenAI__Security__BaseUrl=${{ secrets.OPENAI__SECURITY__BASEURL }}
+          AppAuthentication__SeedUsers__0__UserName=${{ secrets.APPAUTHENTICATION__SEEDUSERS__0__USERNAME }}
+          AppAuthentication__SeedUsers__0__Password=${{ secrets.APPAUTHENTICATION__SEEDUSERS__0__PASSWORD }}
+          AppAuthentication__SeedUsers__0__DisplayName=${{ secrets.APPAUTHENTICATION__SEEDUSERS__0__DISPLAYNAME }}
+          AppAuthentication__SeedUsers__1__UserName=${{ secrets.APPAUTHENTICATION__SEEDUSERS__1__USERNAME }}
+          AppAuthentication__SeedUsers__1__Password=${{ secrets.APPAUTHENTICATION__SEEDUSERS__1__PASSWORD }}
+          AppAuthentication__SeedUsers__1__DisplayName=${{ secrets.APPAUTHENTICATION__SEEDUSERS__1__DISPLAYNAME }}
+          EOF
+
+      - name: Run Remote Deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_ed25519 -p '${{ secrets.DEPLOY_SSH_PORT }}' '${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}' \
+            "chmod 700 '${{ secrets.DEPLOY_APP_DIR }}/remote-deploy.sh' && \
+             DEPLOY_APP_DIR='${{ secrets.DEPLOY_APP_DIR }}' \
+             DEPLOY_DOMAIN='${{ secrets.DEPLOY_DOMAIN }}' \
+             GHCR_USERNAME='${{ secrets.GHCR_USERNAME }}' \
+             GHCR_TOKEN='${{ secrets.GHCR_TOKEN }}' \
+             IMAGE_REF='${{ env.IMAGE_NAME }}:${{ github.event.workflow_run.head_sha }}' \
+             '${{ secrets.DEPLOY_APP_DIR }}/remote-deploy.sh'"

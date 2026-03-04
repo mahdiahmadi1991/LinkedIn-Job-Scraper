@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-      - develop
-  pull_request:
 
 jobs:
   build-test:
@@ -45,14 +43,3 @@ jobs:
           name: test-results
           path: artifacts/test-results
           if-no-files-found: error
-
-  dependency-review:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Dependency Review
-        uses: actions/dependency-review-action@v4

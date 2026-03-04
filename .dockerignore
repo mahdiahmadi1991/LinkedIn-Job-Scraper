@@ -1,0 +1,15 @@
+.git
+.github
+.idea
+.vscode
+.vs
+.secrets
+artifacts
+bin
+obj
+node_modules
+TestResults
+coverage
+docs/api-sample
+tests
+src/LinkedIn.JobScraper.Web/logs

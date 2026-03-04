@@ -1,0 +1,14 @@
+services:
+  web:
+    image: ${IMAGE_REF:-ghcr.io/mahdiahmadi1991/linkedin-job-scraper-web:main}
+    container_name: linkedin-job-scraper-web
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env.runtime
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://127.0.0.1:5180
+      DOTNET_RUNNING_IN_CONTAINER: "true"
+    volumes:
+      - ./logs:/app/logs

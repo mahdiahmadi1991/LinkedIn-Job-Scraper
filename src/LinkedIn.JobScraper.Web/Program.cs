@@ -5,6 +5,7 @@ using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Jobs;
 using LinkedIn.JobScraper.Web.Logging;
 using LinkedIn.JobScraper.Web.Middleware;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -34,11 +35,18 @@ builder.Services.AddRateLimiter(options =>
         limiterOptions.AutoReplenishment = true;
     });
 });
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownProxies.Add(IPAddress.Loopback);
+    options.KnownProxies.Add(IPAddress.IPv6Loopback);
+});
 builder.Services.AddMvpApplication(builder.Configuration);
 
 var app = builder.Build();
 
 StartupLog.PerRunLogFileInitialized(app.Logger, perRunLogFilePath);
+app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
