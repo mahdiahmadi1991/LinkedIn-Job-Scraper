@@ -9,7 +9,7 @@ namespace LinkedIn.JobScraper.Web.Jobs;
 
 public sealed class JobsDashboardService : IJobsDashboardService
 {
-    private const int JobsPageSize = 40;
+    private const int JobsPageSize = 10;
     private static readonly Action<ILogger, string, string?, Exception?> LogWorkflowStarted =
         LoggerMessage.Define<string, string?>(
             LogLevel.Information,

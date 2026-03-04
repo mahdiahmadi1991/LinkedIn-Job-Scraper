@@ -719,7 +719,7 @@
 
         const label = toggle.querySelector(".job-expand-label");
         if (label) {
-            label.textContent = nextExpanded ? "Less" : "More";
+            label.textContent = nextExpanded ? "Hide" : "Expand";
         }
     });
 

@@ -13,115 +13,131 @@
     };
 
     <tr class="job-primary-row" data-job-primary-row data-job-ui-root data-job-id="@job.Id">
-        <td class="w-50">
-            <div class="job-opportunity-cell">
-                <div class="job-title-row">
-                    <span class="job-kicker">Opportunity</span>
-                    <button
-                        type="button"
-                        class="btn btn-outline-secondary btn-sm job-expand-toggle"
-                        data-job-row-toggle
-                        data-target-id="@detailRowId"
-                        aria-expanded="false"
-                        aria-controls="@detailRowId">
-                        <span class="job-expand-label">More</span>
-                    </button>
-                </div>
-                <a asp-action="Details" asp-route-jobId="@job.Id" class="job-title-link">
-                    @job.Title
-                </a>
-                <div class="job-meta-wrap">
-                    <span class="job-meta-pill">@(job.CompanyName ?? "Unknown company")</span>
-                    @if (!string.IsNullOrWhiteSpace(job.LocationName))
-                    {
-                        <span class="job-meta-pill">@job.LocationName</span>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(job.EmploymentStatus))
-                    {
-                        <span class="job-meta-pill">@job.EmploymentStatus</span>
-                    }
-                </div>
-            </div>
-        </td>
-        <td>
-            <div class="fit-cell">
-                <div class="fit-score @(job.AiScore.HasValue ? null : "d-none")" data-job-score-shell>
-                    <span data-job-score-number>@(job.AiScore?.ToString() ?? string.Empty)</span><span class="fit-score-muted">/100</span>
-                </div>
-                <div class="fit-score-muted @(job.AiScore.HasValue ? "d-none" : null)" data-job-score-empty>Not scored</div>
-
-                <div class="badge rounded-pill @fitBadgeClass fit-label-badge" data-job-label-badge>
-                    @(job.AiLabel ?? "Pending")
-                </div>
-            </div>
-        </td>
-        <td>
-            <form asp-action="UpdateStatus" method="post" class="status-form-compact workflow-cell">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="jobId" value="@job.Id" />
-                <input type="hidden" name="Search" value="@Model.Query.Search" />
-                <input type="hidden" name="FilterStatus" value="@Model.Query.FilterStatus" />
-                <input type="hidden" name="AiLabel" value="@Model.Query.AiLabel" />
-                <input type="hidden" name="OnlyUnscored" value="@Model.Query.OnlyUnscored" />
-                <input type="hidden" name="MinScore" value="@Model.Query.MinScore" />
-                <input type="hidden" name="SortBy" value="@Model.Query.GetNormalizedSortBy()" />
-                <div class="workflow-status-pill">@job.CurrentStatus</div>
-                <select class="form-select form-select-sm" name="status">
-                    @foreach (var status in Enum.GetValues<JobWorkflowState>())
-                    {
-                        <option value="@status" selected="@(status == job.CurrentStatus ? "selected" : null)">
-                            @status
-                        </option>
-                    }
-                </select>
-                <button type="submit" class="btn btn-outline-secondary btn-sm" data-loading-text="Saving...">Save</button>
-            </form>
-        </td>
-        <td class="small text-muted">
-            <div class="activity-cell">
-                <div class="dates-stack">
-                    <div>
-                        <strong>Last Seen</strong>
-                        <span>@job.LastSeenAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</span>
-                    </div>
-                    <div>
-                        <strong>Listed</strong>
-                        <span>
-                            @(job.ListedAtUtc.HasValue
-                                ? job.ListedAtUtc.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
-                                : "Unknown")
-                        </span>
-                    </div>
-                </div>
-                <div class="activity-actions">
-                    <form asp-action="ScoreJob" method="post" class="d-inline-flex" data-score-job-form data-job-id="@job.Id">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="jobId" value="@job.Id" />
-                        <button type="submit"
-                                class="btn btn-outline-primary btn-sm"
-                                data-score-job-button
-                                data-idle-text="Score"
-                                data-busy-text="Scoring..."
-                                data-done-text="Scored"
-                                data-score-complete="@(job.AiScore.HasValue && job.ScoredAtUtc.HasValue ? "true" : "false")"
-                                @(job.AiScore.HasValue && job.ScoredAtUtc.HasValue ? "disabled" : null)>
-                            <span class="d-none button-loading-shell" data-score-spinner>
-                                <span class="button-loading-spinner" aria-hidden="true"></span>
-                            </span>
-                            <span data-score-button-text>@(job.AiScore.HasValue && job.ScoredAtUtc.HasValue ? "Scored" : "Score")</span>
+        <td colspan="4" class="job-card-cell">
+            <article class="job-card">
+                <div class="job-card-main">
+                    <div class="job-card-head">
+                        <div class="job-title-stack">
+                            <a asp-action="Details" asp-route-jobId="@job.Id" class="job-title-link">
+                                @job.Title
+                            </a>
+                            <div class="job-inline-meta">
+                                <span class="job-company-inline">@(job.CompanyName ?? "Unknown company")</span>
+                                @if (!string.IsNullOrWhiteSpace(job.LocationName))
+                                {
+                                    <span class="job-inline-separator">•</span>
+                                    <span>@job.LocationName</span>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(job.EmploymentStatus))
+                                {
+                                    <span class="job-inline-separator">•</span>
+                                    <span>@job.EmploymentStatus</span>
+                                }
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            class="btn btn-outline-secondary btn-sm job-expand-toggle"
+                            data-job-row-toggle
+                            data-target-id="@detailRowId"
+                            aria-expanded="false"
+                            aria-controls="@detailRowId">
+                            <span class="job-expand-label">Expand</span>
                         </button>
-                    </form>
-                    <a asp-action="Details" asp-route-jobId="@job.Id" class="btn btn-outline-secondary btn-sm">
-                        Open Details
-                    </a>
-                    @if (!string.IsNullOrWhiteSpace(job.CompanyApplyUrl))
-                    {
-                        <a class="btn btn-outline-primary btn-sm" href="@job.CompanyApplyUrl" target="_blank" rel="noreferrer">
-                            Apply
-                        </a>
-                    }
+                    </div>
+
+                    <div class="job-card-fit">
+                        <div class="fit-cell">
+                            <div class="fit-label-badge-row">
+                                <div class="badge rounded-pill @fitBadgeClass fit-label-badge" data-job-label-badge>
+                                    @(job.AiLabel ?? "Pending")
+                                </div>
+                            </div>
+                            <div class="fit-score @(job.AiScore.HasValue ? null : "d-none")" data-job-score-shell>
+                                <span data-job-score-number>@(job.AiScore?.ToString() ?? string.Empty)</span><span class="fit-score-muted">/100</span>
+                            </div>
+                            <div class="fit-score-muted @(job.AiScore.HasValue ? "d-none" : null)" data-job-score-empty>Not scored yet</div>
+                            <div class="fit-support-copy">Manual AI scoring keeps the queue focused and cost-aware.</div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+
+                <div class="job-card-side">
+                    <div class="job-side-section">
+                        <div class="job-side-label">Workflow</div>
+                        <form asp-action="UpdateStatus" method="post" class="status-form-compact workflow-cell">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="jobId" value="@job.Id" />
+                            <input type="hidden" name="Search" value="@Model.Query.Search" />
+                            <input type="hidden" name="FilterStatus" value="@Model.Query.FilterStatus" />
+                            <input type="hidden" name="AiLabel" value="@Model.Query.AiLabel" />
+                            <input type="hidden" name="OnlyUnscored" value="@Model.Query.OnlyUnscored" />
+                            <input type="hidden" name="MinScore" value="@Model.Query.MinScore" />
+                            <input type="hidden" name="SortBy" value="@Model.Query.GetNormalizedSortBy()" />
+                            <div class="workflow-status-pill">@job.CurrentStatus</div>
+                            <select class="form-select form-select-sm" name="status">
+                                @foreach (var status in Enum.GetValues<JobWorkflowState>())
+                                {
+                                    <option value="@status" selected="@(status == job.CurrentStatus ? "selected" : null)">
+                                        @status
+                                    </option>
+                                }
+                            </select>
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" data-loading-text="Saving...">Save</button>
+                        </form>
+                    </div>
+
+                    <div class="job-side-section">
+                        <div class="job-side-label">Activity</div>
+                        <div class="dates-stack">
+                            <div>
+                                <strong>Last Seen</strong>
+                                <span>@job.LastSeenAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</span>
+                            </div>
+                            <div>
+                                <strong>Listed</strong>
+                                <span>
+                                    @(job.ListedAtUtc.HasValue
+                                        ? job.ListedAtUtc.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
+                                        : "Unknown")
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="job-side-section">
+                        <div class="job-side-label">Actions</div>
+                        <div class="activity-actions">
+                            <form asp-action="ScoreJob" method="post" class="d-inline-flex" data-score-job-form data-job-id="@job.Id">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="jobId" value="@job.Id" />
+                                <button type="submit"
+                                        class="btn btn-primary btn-sm"
+                                        data-score-job-button
+                                        data-idle-text="Score"
+                                        data-busy-text="Scoring..."
+                                        data-done-text="Scored"
+                                        data-score-complete="@(job.AiScore.HasValue && job.ScoredAtUtc.HasValue ? "true" : "false")"
+                                        @(job.AiScore.HasValue && job.ScoredAtUtc.HasValue ? "disabled" : null)>
+                                    <span class="d-none button-loading-shell" data-score-spinner>
+                                        <span class="button-loading-spinner" aria-hidden="true"></span>
+                                    </span>
+                                    <span data-score-button-text>@(job.AiScore.HasValue && job.ScoredAtUtc.HasValue ? "Scored" : "Score")</span>
+                                </button>
+                            </form>
+                            <a asp-action="Details" asp-route-jobId="@job.Id" class="btn btn-outline-secondary btn-sm">
+                                Inspect
+                            </a>
+                            @if (!string.IsNullOrWhiteSpace(job.CompanyApplyUrl))
+                            {
+                                <a class="btn btn-outline-secondary btn-sm" href="@job.CompanyApplyUrl" target="_blank" rel="noreferrer">
+                                    Apply
+                                </a>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </article>
         </td>
     </tr>
     <tr class="job-detail-row is-collapsed" id="@detailRowId" data-job-detail-row data-job-ui-root data-job-id="@job.Id" aria-hidden="true">
