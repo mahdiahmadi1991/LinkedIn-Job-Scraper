@@ -52,6 +52,13 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
         }
 
         var searchSettings = await _linkedInSearchSettingsService.GetActiveAsync(cancellationToken);
+        var settingsValidationFailure = ValidateSearchSettingsForFetch(searchSettings);
+
+        if (settingsValidationFailure is not null)
+        {
+            return settingsValidationFailure;
+        }
+
         var headers = MergeHeaders(sessionSnapshot, searchSettings);
         var aggregatedJobs = new List<LinkedInJobSearchItem>(searchJobCap);
         var seenJobIds = new HashSet<string>(StringComparer.Ordinal);
@@ -308,6 +315,26 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
             aggregatedJobs.Count,
             totalAvailableCount,
             aggregatedJobs);
+    }
+
+    private static LinkedInJobSearchFetchResult? ValidateSearchSettingsForFetch(LinkedInSearchSettings searchSettings)
+    {
+        if (string.IsNullOrWhiteSpace(searchSettings.Keywords))
+        {
+            return LinkedInJobSearchFetchResult.Failed(
+                "LinkedIn search settings are incomplete. Open Search Settings and save at least a Keywords value before fetching jobs.",
+                StatusCodes.Status409Conflict);
+        }
+
+        if (!string.IsNullOrWhiteSpace(searchSettings.LocationInput) &&
+            string.IsNullOrWhiteSpace(searchSettings.LocationGeoId))
+        {
+            return LinkedInJobSearchFetchResult.Failed(
+                "LinkedIn search settings contain a typed location but no stored LinkedIn geoId. Open Search Settings, choose a location suggestion, and save again before fetching jobs.",
+                StatusCodes.Status409Conflict);
+        }
+
+        return null;
     }
 
     private static LinkedInJobSearchPageResult ParsePage(string body)

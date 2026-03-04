@@ -3,6 +3,7 @@ using LinkedIn.JobScraper.Web.LinkedIn;
 using LinkedIn.JobScraper.Web.LinkedIn.Search;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using LinkedIn.JobScraper.Web.Configuration;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -29,6 +30,42 @@ public sealed class LinkedInJobSearchServiceTests
         Assert.False(result.Success);
         Assert.Equal(502, result.StatusCode);
         Assert.Empty(result.Jobs);
+        Assert.Equal(0, apiClient.CallCount);
+        Assert.False(sessionStore.InvalidateCalled);
+    }
+
+    [Fact]
+    public async Task FetchCurrentSearchAsyncReturnsFailureWhenKeywordsAreMissing()
+    {
+        var apiClient = new FakeLinkedInApiClient(
+            new LinkedInApiResponse(200, true, "{}"));
+        var sessionStore = new FakeLinkedInSessionStore(
+            new LinkedInSessionSnapshot(
+                new Dictionary<string, string> { ["Cookie"] = "li_at=test" },
+                DateTimeOffset.UtcNow,
+                "Test"));
+        var service = new LinkedInJobSearchService(
+            apiClient,
+            sessionStore,
+            new FakeLinkedInSearchSettingsService(
+                new LinkedInSearchSettings(
+                    "Default",
+                    string.Empty,
+                    null,
+                    null,
+                    null,
+                    false,
+                    [],
+                    [])),
+            Options.Create(new LinkedInFetchDiagnosticsOptions()),
+            Options.Create(new LinkedInFetchLimitsOptions()),
+            NullLogger<LinkedInJobSearchService>.Instance);
+
+        var result = await service.FetchCurrentSearchAsync(CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(StatusCodes.Status409Conflict, result.StatusCode);
+        Assert.Contains("Search Settings", result.Message, StringComparison.Ordinal);
         Assert.Equal(0, apiClient.CallCount);
         Assert.False(sessionStore.InvalidateCalled);
     }
@@ -154,18 +191,24 @@ public sealed class LinkedInJobSearchServiceTests
 
     private sealed class FakeLinkedInSearchSettingsService : ILinkedInSearchSettingsService
     {
+        private readonly LinkedInSearchSettings _settings;
+
+        public FakeLinkedInSearchSettingsService(LinkedInSearchSettings? settings = null)
+        {
+            _settings = settings ?? new LinkedInSearchSettings(
+                "Default",
+                "C# .Net",
+                "Limassol, Cyprus",
+                "Limassol, Cyprus",
+                "106394980",
+                true,
+                ["1", "2", "3"],
+                ["F", "P"]);
+        }
+
         public Task<LinkedInSearchSettings> GetActiveAsync(CancellationToken cancellationToken)
         {
-            return Task.FromResult(
-                new LinkedInSearchSettings(
-                    "Default",
-                    "C# .Net",
-                    "Limassol, Cyprus",
-                    "Limassol, Cyprus",
-                    "106394980",
-                    true,
-                    ["1", "2", "3"],
-                    ["F", "P"]));
+            return Task.FromResult(_settings);
         }
 
         public Task<LinkedInSearchSettings> SaveAsync(LinkedInSearchSettings settings, CancellationToken cancellationToken)
