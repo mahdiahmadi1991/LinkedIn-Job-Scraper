@@ -106,7 +106,8 @@ public sealed class ConfigurationValidationTests
             Options.DefaultName,
             new LinkedInRequestOptions
             {
-                GraphQlQueryId = ""
+                GraphQlQueryId = "",
+                GeoTypeaheadQueryId = ""
             });
 
         Assert.True(requestValidation.Failed);

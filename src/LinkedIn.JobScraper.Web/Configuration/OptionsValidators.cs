@@ -107,6 +107,12 @@ public sealed class LinkedInRequestOptionsValidator : IValidateOptions<LinkedInR
                 "LinkedIn GraphQL query id is not configured. Set 'LinkedIn:RequestOptions:GraphQlQueryId' to a valid persisted query id.");
         }
 
+        if (string.IsNullOrWhiteSpace(options.GeoTypeaheadQueryId))
+        {
+            return ValidateOptionsResult.Fail(
+                "LinkedIn geo typeahead query id is not configured. Set 'LinkedIn:RequestOptions:GeoTypeaheadQueryId' to a valid persisted query id.");
+        }
+
         return ValidateOptionsResult.Success;
     }
 }

@@ -5,7 +5,7 @@ namespace LinkedIn.JobScraper.Web.Tests.LinkedIn;
 public sealed class LinkedInSessionHeaderSanitizerTests
 {
     [Fact]
-    public async Task InMemorySessionStoreKeepsOnlyRequiredHeaders()
+    public async Task InMemorySessionStoreKeepsOnlyAllowedHeaders()
     {
         var store = new InMemoryLinkedInSessionStore();
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -27,12 +27,12 @@ public sealed class LinkedInSessionHeaderSanitizerTests
         var snapshot = await store.GetCurrentAsync(CancellationToken.None);
 
         Assert.NotNull(snapshot);
-        Assert.Equal(6, snapshot.Headers.Count);
+        Assert.Equal(8, snapshot.Headers.Count);
         Assert.Equal("li_at=secret; JSESSIONID=\"ajax:123\"", snapshot.Headers["Cookie"]);
         Assert.Equal("ajax:123", snapshot.Headers["csrf-token"]);
         Assert.DoesNotContain("Accept", snapshot.Headers.Keys);
-        Assert.DoesNotContain("Referer", snapshot.Headers.Keys);
-        Assert.DoesNotContain("x-li-pem-metadata", snapshot.Headers.Keys);
+        Assert.Equal("https://www.linkedin.com/jobs/", snapshot.Headers["Referer"]);
+        Assert.Equal("Voyager - Something", snapshot.Headers["x-li-pem-metadata"]);
     }
 
     [Fact]

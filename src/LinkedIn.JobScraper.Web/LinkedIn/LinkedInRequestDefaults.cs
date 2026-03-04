@@ -105,8 +105,8 @@ public static class LinkedInRequestDefaults
     {
         var safeQuery = Uri.EscapeDataString(query);
         var rawUri = string.IsNullOrWhiteSpace(graphQlQueryId)
-            ? $"https://www.linkedin.com/voyager/api/graphql?variables=(keywords:{safeQuery},query:(typeaheadUseCase:JOBS),type:GEO)"
-            : $"https://www.linkedin.com/voyager/api/graphql?variables=(keywords:{safeQuery},query:(typeaheadUseCase:JOBS),type:GEO)&queryId={Uri.EscapeDataString(graphQlQueryId)}";
+            ? $"https://www.linkedin.com/voyager/api/graphql?includeWebMetadata=true&variables=(keywords:{safeQuery},query:(typeaheadFilterQuery:(geoSearchTypes:List(POSTCODE_1,POSTCODE_2,POPULATED_PLACE,ADMIN_DIVISION_1,ADMIN_DIVISION_2,COUNTRY_REGION,MARKET_AREA,COUNTRY_CLUSTER)),typeaheadUseCase:JOBS),type:GEO)"
+            : $"https://www.linkedin.com/voyager/api/graphql?includeWebMetadata=true&variables=(keywords:{safeQuery},query:(typeaheadFilterQuery:(geoSearchTypes:List(POSTCODE_1,POSTCODE_2,POPULATED_PLACE,ADMIN_DIVISION_1,ADMIN_DIVISION_2,COUNTRY_REGION,MARKET_AREA,COUNTRY_CLUSTER)),typeaheadUseCase:JOBS),type:GEO)&queryId={Uri.EscapeDataString(graphQlQueryId)}";
 
         return new Uri(rawUri, UriKind.Absolute);
     }

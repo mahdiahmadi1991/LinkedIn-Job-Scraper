@@ -84,15 +84,17 @@ public sealed class LinkedInRequestDefaultsTests
     }
 
     [Fact]
-    public void BuildGeoTypeaheadUriOmitsQueryIdAndTypeaheadFilter()
+    public void BuildGeoTypeaheadUriUsesGeoTypeaheadQueryShape()
     {
         var uri = LinkedInRequestDefaults.BuildGeoTypeaheadUri(
             "Cyprus",
-            "voyagerJobsDashJobPostings.891aed7916d7453a37e4bbf5f1f60de4");
+            "voyagerSearchDashReusableTypeahead.4c7caa85341b17b470153ad3d1a29caf");
 
+        Assert.Contains("includeWebMetadata=true", uri.Query, StringComparison.Ordinal);
         Assert.Contains("variables=", uri.Query, StringComparison.Ordinal);
-        Assert.Contains("queryId=voyagerJobsDashJobPostings.891aed7916d7453a37e4bbf5f1f60de4", uri.Query, StringComparison.Ordinal);
-        Assert.DoesNotContain("typeaheadFilterQuery", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
+        Assert.Contains("queryId=voyagerSearchDashReusableTypeahead.4c7caa85341b17b470153ad3d1a29caf", uri.Query, StringComparison.Ordinal);
+        Assert.Contains("typeaheadFilterQuery", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
         Assert.Contains("typeaheadUseCase:JOBS", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
+        Assert.Contains("geoSearchTypes:List(POSTCODE_1,POSTCODE_2,POPULATED_PLACE,ADMIN_DIVISION_1,ADMIN_DIVISION_2,COUNTRY_REGION,MARKET_AREA,COUNTRY_CLUSTER)", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
     }
 }

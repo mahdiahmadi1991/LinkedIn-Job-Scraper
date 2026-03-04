@@ -22,6 +22,9 @@ public sealed class LinkedInSessionCurlImportServiceTests
               -H 'cookie: li_at=test-cookie' \
               -H 'csrf-token: ajax:123' \
               -H 'user-agent: test-agent' \
+              -H 'referer: https://www.linkedin.com/jobs/search/?keywords=C%23%20.Net' \
+              -H 'x-li-track: {"clientVersion":"1.13.42597"}' \
+              -H 'x-li-page-instance: urn:li:page:d_flagship3_search_srp_jobs;abc123' \
               --compressed
             """;
 
@@ -35,6 +38,9 @@ public sealed class LinkedInSessionCurlImportServiceTests
         Assert.Equal("li_at=test-cookie", sessionStore.CurrentSnapshot.Headers["Cookie"]);
         Assert.Equal("ajax:123", sessionStore.CurrentSnapshot.Headers["csrf-token"]);
         Assert.Equal("test-agent", sessionStore.CurrentSnapshot.Headers["User-Agent"]);
+        Assert.Equal("https://www.linkedin.com/jobs/search/?keywords=C%23%20.Net", sessionStore.CurrentSnapshot.Headers["Referer"]);
+        Assert.Equal("{\"clientVersion\":\"1.13.42597\"}", sessionStore.CurrentSnapshot.Headers["x-li-track"]);
+        Assert.Equal("urn:li:page:d_flagship3_search_srp_jobs;abc123", sessionStore.CurrentSnapshot.Headers["x-li-page-instance"]);
         Assert.Equal(1, verificationService.VerifyCallCount);
     }
 

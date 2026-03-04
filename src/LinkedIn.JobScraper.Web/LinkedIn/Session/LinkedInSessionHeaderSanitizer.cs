@@ -7,8 +7,12 @@ internal static class LinkedInSessionHeaderSanitizer
         "Cookie",
         "csrf-token",
         "User-Agent",
+        "Referer",
         "Accept-Language",
         "x-li-lang",
+        "x-li-track",
+        "x-li-page-instance",
+        "x-li-pem-metadata",
         "x-restli-protocol-version"
     ];
 

@@ -25,8 +25,8 @@ public sealed class LinkedInLocationLookupService : ILinkedInLocationLookupServi
         ILogger<LinkedInLocationLookupService> logger)
     {
         _linkedInApiClient = linkedInApiClient;
-        _sessionStore = sessionStore;
         _linkedInRequestOptions = linkedInRequestOptions.Value;
+        _sessionStore = sessionStore;
         _logger = logger;
     }
 
@@ -47,8 +47,8 @@ public sealed class LinkedInLocationLookupService : ILinkedInLocationLookupServi
         var response = await _linkedInApiClient.GetAsync(
             LinkedInRequestDefaults.BuildGeoTypeaheadUri(
                 query.Trim(),
-                _linkedInRequestOptions.GraphQlQueryId),
-            BuildHeaders(sessionSnapshot, query.Trim()),
+                _linkedInRequestOptions.GeoTypeaheadQueryId),
+            BuildHeaders(sessionSnapshot),
             cancellationToken);
 
         if (response.StatusCode != StatusCodes.Status200OK)
@@ -63,7 +63,21 @@ public sealed class LinkedInLocationLookupService : ILinkedInLocationLookupServi
         try
         {
             using var document = JsonDocument.Parse(response.Body);
-            var suggestions = ReadSuggestions(document.RootElement);
+            var root = document.RootElement;
+
+            if (HasGraphQlErrors(root))
+            {
+                return LinkedInLocationLookupResult.Failed(
+                    "LinkedIn location lookup returned an error payload.",
+                    StatusCodes.Status502BadGateway);
+            }
+
+            if (!TryReadSuggestions(root, out var suggestions))
+            {
+                return LinkedInLocationLookupResult.Failed(
+                    "LinkedIn location lookup returned an unexpected payload.",
+                    StatusCodes.Status502BadGateway);
+            }
 
             return LinkedInLocationLookupResult.Succeeded(suggestions);
         }
@@ -77,34 +91,53 @@ public sealed class LinkedInLocationLookupService : ILinkedInLocationLookupServi
         }
     }
 
-    private static Dictionary<string, string> BuildHeaders(LinkedInSessionSnapshot sessionSnapshot, string query)
+    private static Dictionary<string, string> BuildHeaders(LinkedInSessionSnapshot sessionSnapshot)
     {
         var headers = new Dictionary<string, string>(sessionSnapshot.Headers, StringComparer.OrdinalIgnoreCase)
         {
             ["Accept"] = "application/vnd.linkedin.normalized+json+2.1",
-            ["Referer"] = LinkedInRequestDefaults.BuildSearchReferer(
-                query,
-                locationGeoId: null,
-                easyApply: false,
-                jobTypeCodes: [],
-                workplaceTypeCodes: [])
+            ["x-li-pem-metadata"] = "Voyager - Search Single Typeahead=jobs-geo"
         };
+
+        if (!headers.TryGetValue("Referer", out var referer) || string.IsNullOrWhiteSpace(referer))
+        {
+            headers["Referer"] = "https://www.linkedin.com/jobs/search/";
+        }
 
         return headers;
     }
 
-    private static IReadOnlyList<LinkedInLocationSuggestion> ReadSuggestions(JsonElement root)
+    private static bool HasGraphQlErrors(JsonElement root)
     {
         if (!root.TryGetProperty("data", out var dataNode) ||
+            dataNode.ValueKind != JsonValueKind.Object ||
+            !dataNode.TryGetProperty("errors", out var errorsNode))
+        {
+            return false;
+        }
+
+        return errorsNode.ValueKind == JsonValueKind.Array && errorsNode.GetArrayLength() > 0;
+    }
+
+    private static bool TryReadSuggestions(
+        JsonElement root,
+        out IReadOnlyList<LinkedInLocationSuggestion> suggestions)
+    {
+        suggestions = Array.Empty<LinkedInLocationSuggestion>();
+
+        if (!root.TryGetProperty("data", out var dataNode) ||
+            dataNode.ValueKind != JsonValueKind.Object ||
             !dataNode.TryGetProperty("data", out var nestedDataNode) ||
+            nestedDataNode.ValueKind != JsonValueKind.Object ||
             !nestedDataNode.TryGetProperty("searchDashReusableTypeaheadByType", out var typeaheadNode) ||
+            typeaheadNode.ValueKind != JsonValueKind.Object ||
             !typeaheadNode.TryGetProperty("elements", out var elementsNode) ||
             elementsNode.ValueKind != JsonValueKind.Array)
         {
-            return Array.Empty<LinkedInLocationSuggestion>();
+            return false;
         }
 
-        var suggestions = new List<LinkedInLocationSuggestion>();
+        var parsedSuggestions = new List<LinkedInLocationSuggestion>();
 
         foreach (var element in elementsNode.EnumerateArray())
         {
@@ -131,10 +164,11 @@ public sealed class LinkedInLocationLookupService : ILinkedInLocationLookupServi
                 continue;
             }
 
-            suggestions.Add(new LinkedInLocationSuggestion(geoId, displayName));
+            parsedSuggestions.Add(new LinkedInLocationSuggestion(geoId, displayName));
         }
 
-        return suggestions;
+        suggestions = parsedSuggestions;
+        return true;
     }
 
     private static string? ExtractGeoId(string? geoUrn)
