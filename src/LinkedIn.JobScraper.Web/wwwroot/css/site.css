@@ -87,6 +87,8 @@ a:hover {
 }
 
 .app-topbar {
+  position: relative;
+  z-index: 1040;
   margin: 0 0 1.5rem;
   border-bottom: 1px solid rgba(10, 102, 194, 0.08);
   background: rgba(255, 255, 255, 0.92);
@@ -199,6 +201,7 @@ a:hover {
 
 .app-menu-dropdown {
   min-width: 13rem;
+  z-index: 1045;
   margin-top: 0.7rem;
   padding: 0.45rem;
   border: 1px solid rgba(10, 102, 194, 0.08);
