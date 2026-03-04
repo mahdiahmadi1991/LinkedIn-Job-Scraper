@@ -780,6 +780,55 @@
 
     const getJobButtons = (jobId) => Array.from(document.querySelectorAll(`[data-score-job-form][data-job-id="${jobId}"] [data-score-job-button]`));
 
+    const parseInteger = (value) => {
+        const parsed = Number.parseInt(String(value ?? ""), 10);
+        return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const setIntegerText = (element, value) => {
+        if (!(element instanceof HTMLElement)) {
+            return;
+        }
+
+        element.textContent = String(Math.max(0, value));
+    };
+
+    const applyDashboardStatsDelta = (job, previousState) => {
+        if (!job) {
+            return;
+        }
+
+        const scoredNode = document.querySelector("[data-dashboard-scored-jobs]");
+        const strongMatchesNode = document.querySelector("[data-dashboard-strong-matches]");
+        const unscoredNode = document.querySelector("[data-dashboard-unscored-jobs]");
+
+        if (!(scoredNode instanceof HTMLElement) ||
+            !(strongMatchesNode instanceof HTMLElement) ||
+            !(unscoredNode instanceof HTMLElement)) {
+            return;
+        }
+
+        const isNowScored = Number.isFinite(Number(job.aiScore)) && Boolean(job.scoredAtUtc);
+        const wasScored = Boolean(previousState?.wasScored);
+
+        if (!wasScored && isNowScored) {
+            setIntegerText(scoredNode, parseInteger(scoredNode.textContent) + 1);
+            setIntegerText(unscoredNode, parseInteger(unscoredNode.textContent) - 1);
+        }
+
+        const previousLabel = previousState?.aiLabel || "";
+        const nextLabel = job.aiLabel || "";
+
+        if (previousLabel !== "StrongMatch" && nextLabel === "StrongMatch") {
+            setIntegerText(strongMatchesNode, parseInteger(strongMatchesNode.textContent) + 1);
+            return;
+        }
+
+        if (previousLabel === "StrongMatch" && nextLabel !== "StrongMatch") {
+            setIntegerText(strongMatchesNode, parseInteger(strongMatchesNode.textContent) - 1);
+        }
+    };
+
     const setScoreButtonState = (button, state) => {
         if (!(button instanceof HTMLButtonElement)) {
             return;
@@ -945,6 +994,14 @@
             return;
         }
 
+        const existingLabel = getJobRoots(jobId)
+            .map((root) => root.querySelector("[data-job-label-badge]")?.textContent?.trim())
+            .find((value) => Boolean(value)) || "";
+        const previousState = {
+            wasScored: button.dataset.scoreComplete === "true",
+            aiLabel: existingLabel
+        };
+
         if (button.dataset.scoreComplete === "true" || activeScoreRequests.has(jobId)) {
             clearPending(jobId);
             return;
@@ -976,6 +1033,7 @@
             }
 
             if (payload.job) {
+                applyDashboardStatsDelta(payload.job, previousState);
                 updateJobUi(payload.job);
             }
 
