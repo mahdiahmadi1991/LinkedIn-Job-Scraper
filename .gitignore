@@ -4,6 +4,7 @@ obj/
 .vs/
 .vscode/
 .idea/
+.secrets/
 
 TestResults/
 coverage/
