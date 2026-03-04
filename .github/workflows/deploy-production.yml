@@ -35,8 +35,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ secrets.GHCR_USERNAME }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
       - name: Build And Push Image
         uses: docker/build-push-action@v6
@@ -103,7 +103,7 @@ jobs:
             "chmod 700 '${{ secrets.DEPLOY_APP_DIR }}/remote-deploy.sh' && \
              DEPLOY_APP_DIR='${{ secrets.DEPLOY_APP_DIR }}' \
              DEPLOY_DOMAIN='${{ secrets.DEPLOY_DOMAIN }}' \
-             GHCR_USERNAME='${{ secrets.GHCR_USERNAME }}' \
-             GHCR_TOKEN='${{ secrets.GHCR_TOKEN }}' \
+             GHCR_USERNAME='${{ github.actor }}' \
+             GHCR_TOKEN='${{ github.token }}' \
              IMAGE_REF='${{ env.IMAGE_NAME }}:${{ github.event.workflow_run.head_sha }}' \
              '${{ secrets.DEPLOY_APP_DIR }}/remote-deploy.sh'"
