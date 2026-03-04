@@ -87,6 +87,23 @@
         }
     };
 
+    const resetWorkflowUi = ({ hidePanel = false } = {}) => {
+        stopPolling();
+        isSubmitting = false;
+        activeFetchPromise = null;
+        activeWorkflowId = null;
+        workflowTerminalState = null;
+        workflowRedirectUrl = null;
+        lastSequence = 0;
+        lastLoggedMessage = null;
+        clearActiveWorkflowId();
+        setIdleState();
+
+        if (hidePanel && progressPanel) {
+            progressPanel.classList.add("d-none");
+        }
+    };
+
     const stopPolling = () => {
         if (!workflowPollingTimer) {
             return;
@@ -282,12 +299,7 @@
 
         if (["completed", "failed", "cancelled"].includes(update.state)) {
             workflowTerminalState = update.state;
-            stopPolling();
-            isSubmitting = false;
-            activeFetchPromise = null;
-            clearActiveWorkflowId();
-            setIdleState();
-            workflowRedirectUrl = null;
+            resetWorkflowUi();
         }
 
         if (completionRedirectUrl) {
@@ -337,6 +349,12 @@
             }
 
             const payload = await response.json();
+            if (payload?.workflowFound === false) {
+                resetWorkflowUi({ hidePanel: true });
+                showToast("The previous fetch workflow is no longer active.", false);
+                return;
+            }
+
             const events = Array.isArray(payload?.events) ? payload.events : [];
 
             for (const item of events) {
