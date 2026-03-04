@@ -62,7 +62,8 @@ jobs:
         run: |
           set -euo pipefail
           ssh -i ~/.ssh/id_ed25519 -p '${{ secrets.DEPLOY_SSH_PORT }}' '${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}' \
-            "mkdir -p '${{ secrets.DEPLOY_APP_DIR }}/nginx' '${{ secrets.DEPLOY_APP_DIR }}/logs'"
+            "sudo install -d -m 755 '${{ secrets.DEPLOY_APP_DIR }}' '${{ secrets.DEPLOY_APP_DIR }}/nginx' '${{ secrets.DEPLOY_APP_DIR }}/logs' && \
+             sudo chown -R \$(id -u -n):\$(id -g -n) '${{ secrets.DEPLOY_APP_DIR }}'"
 
       - name: Upload Deploy Assets
         shell: bash
