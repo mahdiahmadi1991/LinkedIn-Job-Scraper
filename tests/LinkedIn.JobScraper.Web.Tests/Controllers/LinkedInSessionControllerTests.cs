@@ -16,6 +16,7 @@ public sealed class LinkedInSessionControllerTests
         var browserLoginService = new FakeLinkedInBrowserLoginService();
         var controller = new LinkedInSessionController(
             browserLoginService,
+            new FakeLinkedInSessionCurlImportService(),
             new FakeLinkedInSessionStore(),
             new FakeLinkedInSessionVerificationService())
         {
@@ -43,6 +44,7 @@ public sealed class LinkedInSessionControllerTests
     {
         var controller = new LinkedInSessionController(
             new FakeLinkedInBrowserLoginService(),
+            new FakeLinkedInSessionCurlImportService(),
             new FakeLinkedInSessionStore(),
             new FailingLinkedInSessionVerificationService())
         {
@@ -72,6 +74,7 @@ public sealed class LinkedInSessionControllerTests
     {
         var controller = new LinkedInSessionController(
             new FailingLinkedInBrowserLoginService(),
+            new FakeLinkedInSessionCurlImportService(),
             new FakeLinkedInSessionStore(),
             new FakeLinkedInSessionVerificationService())
         {
@@ -92,6 +95,33 @@ public sealed class LinkedInSessionControllerTests
         Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
         Assert.Equal("LinkedIn session action failed", details.Title);
         Assert.Equal("Browser launch failed.", details.Detail);
+    }
+
+    [Fact]
+    public async Task VerifyNormalizesNonErrorFailureStatusCodesToConflict()
+    {
+        var controller = new LinkedInSessionController(
+            new FakeLinkedInBrowserLoginService(),
+            new FakeLinkedInSessionCurlImportService(),
+            new FakeLinkedInSessionStore(),
+            new AmbiguousFailingLinkedInSessionVerificationService())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
+        };
+
+        controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
+
+        var result = await controller.Verify(CancellationToken.None);
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        var details = Assert.IsType<ProblemDetails>(problem.Value);
+
+        Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
+        Assert.Equal("Payload shape was unexpected.", details.Detail);
     }
 
     private sealed class FakeLinkedInBrowserLoginService : ILinkedInBrowserLoginService
@@ -164,6 +194,13 @@ public sealed class LinkedInSessionControllerTests
 
     private sealed class FakeLinkedInSessionVerificationService : ILinkedInSessionVerificationService
     {
+        public Task<LinkedInSessionVerificationResult> VerifyAsync(
+            LinkedInSessionSnapshot sessionSnapshot,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
         public Task<LinkedInSessionVerificationResult> VerifyCurrentAsync(CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
@@ -172,12 +209,45 @@ public sealed class LinkedInSessionControllerTests
 
     private sealed class FailingLinkedInSessionVerificationService : ILinkedInSessionVerificationService
     {
+        public Task<LinkedInSessionVerificationResult> VerifyAsync(
+            LinkedInSessionSnapshot sessionSnapshot,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
         public Task<LinkedInSessionVerificationResult> VerifyCurrentAsync(CancellationToken cancellationToken)
         {
             return Task.FromResult(
                 LinkedInSessionVerificationResult.Failed(
-                    "Stored session is no longer valid.",
+                "Stored session is no longer valid.",
                     StatusCodes.Status503ServiceUnavailable));
+        }
+    }
+
+    private sealed class AmbiguousFailingLinkedInSessionVerificationService : ILinkedInSessionVerificationService
+    {
+        public Task<LinkedInSessionVerificationResult> VerifyAsync(
+            LinkedInSessionSnapshot sessionSnapshot,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<LinkedInSessionVerificationResult> VerifyCurrentAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                LinkedInSessionVerificationResult.Failed(
+                    "Payload shape was unexpected.",
+                    StatusCodes.Status200OK));
+        }
+    }
+
+    private sealed class FakeLinkedInSessionCurlImportService : ILinkedInSessionCurlImportService
+    {
+        public Task<LinkedInSessionCurlImportResult> ImportAsync(string? curlText, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
         }
     }
 }

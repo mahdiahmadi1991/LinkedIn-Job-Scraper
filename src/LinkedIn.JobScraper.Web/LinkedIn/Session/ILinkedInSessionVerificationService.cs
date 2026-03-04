@@ -4,6 +4,10 @@ namespace LinkedIn.JobScraper.Web.LinkedIn.Session;
 
 public interface ILinkedInSessionVerificationService
 {
+    Task<LinkedInSessionVerificationResult> VerifyAsync(
+        LinkedInSessionSnapshot sessionSnapshot,
+        CancellationToken cancellationToken);
+
     Task<LinkedInSessionVerificationResult> VerifyCurrentAsync(CancellationToken cancellationToken);
 }
 

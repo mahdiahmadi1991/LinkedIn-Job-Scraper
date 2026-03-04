@@ -1,28 +1,23 @@
 using System.Net;
 using System.Text.Json;
-using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.LinkedIn;
 using LinkedIn.JobScraper.Web.LinkedIn.Api;
-using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.LinkedIn.Session;
 
 public sealed class LinkedInSessionVerificationService : ILinkedInSessionVerificationService
 {
     private readonly ILinkedInApiClient _linkedInApiClient;
-    private readonly LinkedInRequestOptions _linkedInRequestOptions;
     private readonly ILogger<LinkedInSessionVerificationService> _logger;
     private readonly ILinkedInSessionStore _sessionStore;
 
     public LinkedInSessionVerificationService(
         ILinkedInApiClient linkedInApiClient,
         ILinkedInSessionStore sessionStore,
-        IOptions<LinkedInRequestOptions> linkedInRequestOptions,
         ILogger<LinkedInSessionVerificationService> logger)
     {
         _linkedInApiClient = linkedInApiClient;
         _sessionStore = sessionStore;
-        _linkedInRequestOptions = linkedInRequestOptions.Value;
         _logger = logger;
     }
 
@@ -36,19 +31,42 @@ public sealed class LinkedInSessionVerificationService : ILinkedInSessionVerific
                 "No stored LinkedIn session is available yet.");
         }
 
-        var requestUri = BuildVerificationUri(_linkedInRequestOptions.GraphQlQueryId);
-        var headers = BuildHeaders(sessionSnapshot);
-        var response = await _linkedInApiClient.GetAsync(requestUri, headers, cancellationToken);
+        var result = await VerifySnapshotAsync(sessionSnapshot, cancellationToken);
 
-        if (response.StatusCode == (int)HttpStatusCode.Unauthorized)
+        if (!result.Success && result.StatusCode == (int)HttpStatusCode.Unauthorized)
         {
             await _sessionStore.InvalidateCurrentAsync(cancellationToken);
             Log.LinkedInSessionVerificationInvalidatedExpiredSession(_logger);
 
             return LinkedInSessionVerificationResult.Failed(
                 "Stored LinkedIn session has expired. Use the session control to capture a new one.",
-                response.StatusCode);
+                result.StatusCode);
         }
+
+        if (result.Success)
+        {
+            await _sessionStore.MarkCurrentValidatedAsync(DateTimeOffset.UtcNow, cancellationToken);
+        }
+
+        return result;
+    }
+
+    public Task<LinkedInSessionVerificationResult> VerifyAsync(
+        LinkedInSessionSnapshot sessionSnapshot,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(sessionSnapshot);
+
+        return VerifySnapshotAsync(sessionSnapshot, cancellationToken);
+    }
+
+    private async Task<LinkedInSessionVerificationResult> VerifySnapshotAsync(
+        LinkedInSessionSnapshot sessionSnapshot,
+        CancellationToken cancellationToken)
+    {
+        var requestUri = BuildVerificationUri();
+        var headers = BuildHeaders(sessionSnapshot);
+        var response = await _linkedInApiClient.GetAsync(requestUri, headers, cancellationToken);
 
         if (response.StatusCode != (int)HttpStatusCode.OK)
         {
@@ -62,35 +80,37 @@ public sealed class LinkedInSessionVerificationService : ILinkedInSessionVerific
         try
         {
             using var document = JsonDocument.Parse(response.Body);
-            var matchedLocationName = TryReadFirstLocationName(document.RootElement);
+            var resultCardCount = TryReadResultCardCount(document.RootElement);
 
-            if (string.IsNullOrWhiteSpace(matchedLocationName))
+            if (resultCardCount is null)
             {
                 return LinkedInSessionVerificationResult.Failed(
-                    "Stored session verification failed because LinkedIn returned an unexpected payload.",
-                    response.StatusCode);
+                    "Stored session verification failed because LinkedIn returned an unexpected payload.");
             }
 
-            await _sessionStore.MarkCurrentValidatedAsync(DateTimeOffset.UtcNow, cancellationToken);
-
             return LinkedInSessionVerificationResult.Succeeded(
-                $"Stored session is valid. LinkedIn location lookup is responding normally for '{matchedLocationName}'.",
-                response.StatusCode,
-                matchedLocationName);
+                $"Stored session is valid. LinkedIn jobs search responded normally and returned {resultCardCount.Value} included records.",
+                response.StatusCode);
         }
         catch (JsonException exception)
         {
             Log.LinkedInSessionVerificationFailedToParseJson(_logger, exception);
 
             return LinkedInSessionVerificationResult.Failed(
-                "Stored session verification failed because LinkedIn returned invalid JSON.",
-                response.StatusCode);
+                "Stored session verification failed because LinkedIn returned invalid JSON.");
         }
     }
 
-    private static Uri BuildVerificationUri(string? graphQlQueryId)
+    private static Uri BuildVerificationUri()
     {
-        return LinkedInRequestDefaults.BuildGeoTypeaheadUri("Cyprus", graphQlQueryId);
+        return LinkedInRequestDefaults.BuildSearchUri(
+            "Cyprus",
+            locationGeoId: null,
+            easyApply: false,
+            jobTypeCodes: [],
+            workplaceTypeCodes: [],
+            start: 0,
+            count: 1);
     }
 
     private static Dictionary<string, string> BuildHeaders(LinkedInSessionSnapshot sessionSnapshot)
@@ -109,35 +129,24 @@ public sealed class LinkedInSessionVerificationService : ILinkedInSessionVerific
         return headers;
     }
 
-    private static string? TryReadFirstLocationName(JsonElement root)
+    private static int? TryReadResultCardCount(JsonElement root)
     {
         if (!root.TryGetProperty("data", out var dataNode) ||
-            !dataNode.TryGetProperty("data", out var nestedDataNode) ||
-            !nestedDataNode.TryGetProperty("searchDashReusableTypeaheadByType", out var typeaheadNode) ||
-            !typeaheadNode.TryGetProperty("elements", out var elementsNode) ||
-            elementsNode.ValueKind != JsonValueKind.Array)
+            dataNode.ValueKind != JsonValueKind.Object ||
+            !root.TryGetProperty("included", out var includedNode) ||
+            includedNode.ValueKind != JsonValueKind.Array)
         {
             return null;
         }
 
-        foreach (var element in elementsNode.EnumerateArray())
+        if (dataNode.TryGetProperty("errors", out var errorsNode) &&
+            errorsNode.ValueKind == JsonValueKind.Array &&
+            errorsNode.GetArrayLength() > 0)
         {
-            if (!element.TryGetProperty("title", out var titleNode) ||
-                !titleNode.TryGetProperty("text", out var textNode) ||
-                textNode.ValueKind != JsonValueKind.String)
-            {
-                continue;
-            }
-
-            var locationName = textNode.GetString();
-
-            if (!string.IsNullOrWhiteSpace(locationName))
-            {
-                return locationName;
-            }
+            return null;
         }
 
-        return null;
+        return includedNode.GetArrayLength();
     }
 }
 

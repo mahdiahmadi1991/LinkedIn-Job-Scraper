@@ -1,8 +1,6 @@
 using LinkedIn.JobScraper.Web.LinkedIn.Api;
-using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.Tests.LinkedIn;
 
@@ -21,7 +19,6 @@ public sealed class LinkedInSessionVerificationServiceTests
         var service = new LinkedInSessionVerificationService(
             apiClient,
             sessionStore,
-            Options.Create(new LinkedInRequestOptions()),
             NullLogger<LinkedInSessionVerificationService>.Instance);
 
         var result = await service.VerifyCurrentAsync(CancellationToken.None);
@@ -32,6 +29,8 @@ public sealed class LinkedInSessionVerificationServiceTests
         Assert.False(sessionStore.MarkValidatedCalled);
         Assert.Contains("expired", result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, apiClient.CallCount);
+        Assert.Equal("/voyager/api/voyagerJobsDashJobCards", apiClient.LastRequestUri?.AbsolutePath);
+        Assert.DoesNotContain("queryId=", apiClient.LastRequestUri?.Query, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -41,18 +40,15 @@ public sealed class LinkedInSessionVerificationServiceTests
             """
             {
               "data": {
-                "data": {
-                  "searchDashReusableTypeaheadByType": {
-                    "elements": [
-                      {
-                        "title": {
-                          "text": "Cyprus"
-                        }
-                      }
-                    ]
-                  }
+                "paging": {
+                  "count": 1
                 }
-              }
+              },
+              "included": [
+                {
+                  "$type": "com.linkedin.voyager.dash.jobs.JobPosting"
+                }
+              ]
             }
             """;
 
@@ -66,16 +62,18 @@ public sealed class LinkedInSessionVerificationServiceTests
         var service = new LinkedInSessionVerificationService(
             apiClient,
             sessionStore,
-            Options.Create(new LinkedInRequestOptions()),
             NullLogger<LinkedInSessionVerificationService>.Instance);
 
         var result = await service.VerifyCurrentAsync(CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal("Cyprus", result.MatchedLocationName);
+        Assert.Null(result.MatchedLocationName);
+        Assert.Contains("jobs search responded normally", result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.True(sessionStore.MarkValidatedCalled);
         Assert.False(sessionStore.InvalidateCalled);
+        Assert.Equal("/voyager/api/voyagerJobsDashJobCards", apiClient.LastRequestUri?.AbsolutePath);
+        Assert.DoesNotContain("queryId=", apiClient.LastRequestUri?.Query, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -91,14 +89,51 @@ public sealed class LinkedInSessionVerificationServiceTests
         var service = new LinkedInSessionVerificationService(
             apiClient,
             sessionStore,
-            Options.Create(new LinkedInRequestOptions()),
             NullLogger<LinkedInSessionVerificationService>.Instance);
 
         var result = await service.VerifyCurrentAsync(CancellationToken.None);
 
         Assert.False(result.Success);
-        Assert.Equal(200, result.StatusCode);
+        Assert.Null(result.StatusCode);
         Assert.Contains("invalid JSON", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(sessionStore.MarkValidatedCalled);
+        Assert.False(sessionStore.InvalidateCalled);
+    }
+
+    [Fact]
+    public async Task VerifyCurrentAsyncReturnsConflictStyleFailureWhenPayloadShapeIsUnexpected()
+    {
+        const string responseBody =
+            """
+            {
+              "data": {
+                "errors": [
+                  {
+                    "message": "Unexpected request shape"
+                  }
+                ]
+              },
+              "included": []
+            }
+            """;
+
+        var apiClient = new FakeLinkedInApiClient(
+            new LinkedInApiResponse(200, true, responseBody));
+        var sessionStore = new FakeLinkedInSessionStore(
+            new LinkedInSessionSnapshot(
+                new Dictionary<string, string> { ["Cookie"] = "li_at=test" },
+                DateTimeOffset.UtcNow,
+                "Test"));
+        var service = new LinkedInSessionVerificationService(
+            apiClient,
+            sessionStore,
+            NullLogger<LinkedInSessionVerificationService>.Instance);
+
+        var result = await service.VerifyCurrentAsync(CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Null(result.StatusCode);
+        Assert.Contains("unexpected payload", result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.False(sessionStore.MarkValidatedCalled);
         Assert.False(sessionStore.InvalidateCalled);
     }
@@ -114,12 +149,15 @@ public sealed class LinkedInSessionVerificationServiceTests
 
         public int CallCount { get; private set; }
 
+        public Uri? LastRequestUri { get; private set; }
+
         public Task<LinkedInApiResponse> GetAsync(
             Uri requestUri,
             IReadOnlyDictionary<string, string> headers,
             CancellationToken cancellationToken)
         {
             CallCount++;
+            LastRequestUri = requestUri;
             return Task.FromResult(_response);
         }
     }

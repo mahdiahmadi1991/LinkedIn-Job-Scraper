@@ -207,6 +207,13 @@ public sealed class DiagnosticsControllerTests
 
     private sealed class FakeLinkedInSessionVerificationService : ILinkedInSessionVerificationService
     {
+        public Task<LinkedInSessionVerificationResult> VerifyAsync(
+            LinkedInSessionSnapshot sessionSnapshot,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(LinkedInSessionVerificationResult.Succeeded("ok"));
+        }
+
         public Task<LinkedInSessionVerificationResult> VerifyCurrentAsync(CancellationToken cancellationToken)
         {
             return Task.FromResult(LinkedInSessionVerificationResult.Succeeded("ok"));
@@ -215,11 +222,21 @@ public sealed class DiagnosticsControllerTests
 
     private sealed class FailingLinkedInSessionVerificationService : ILinkedInSessionVerificationService
     {
-        public Task<LinkedInSessionVerificationResult> VerifyCurrentAsync(CancellationToken cancellationToken)
+        public Task<LinkedInSessionVerificationResult> VerifyAsync(
+            LinkedInSessionSnapshot sessionSnapshot,
+            CancellationToken cancellationToken)
         {
             return Task.FromResult(
                 LinkedInSessionVerificationResult.Failed(
                     "Stored session is unavailable.",
+                    StatusCodes.Status503ServiceUnavailable));
+        }
+
+        public Task<LinkedInSessionVerificationResult> VerifyCurrentAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                LinkedInSessionVerificationResult.Failed(
+                "Stored session is unavailable.",
                     StatusCodes.Status503ServiceUnavailable));
         }
     }

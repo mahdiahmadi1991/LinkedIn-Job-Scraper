@@ -18,10 +18,14 @@
     const waitingPanel = modalElement.querySelector("[data-session-waiting]");
     const launchButton = modalElement.querySelector("[data-session-launch]");
     const captureButton = modalElement.querySelector("[data-session-capture]");
+    const importCurlButton = modalElement.querySelector("[data-session-import-curl]");
+    const curlTextInput = modalElement.querySelector("[data-session-curl-text]");
+    const curlFeedbackNote = modalElement.querySelector("[data-session-curl-feedback]");
     const revokeButton = modalElement.querySelector("[data-session-revoke]");
     const stateUrl = modalElement.getAttribute("data-session-state-url") || "/LinkedInSession/State";
     const launchUrl = modalElement.getAttribute("data-session-launch-url") || "/LinkedInSession/Launch";
     const captureUrl = modalElement.getAttribute("data-session-capture-url") || "/LinkedInSession/Capture";
+    const importCurlUrl = modalElement.getAttribute("data-session-import-curl-url") || "/LinkedInSession/ImportCurl";
     const verifyUrl = modalElement.getAttribute("data-session-verify-url") || "/LinkedInSession/Verify";
     const revokeUrl = modalElement.getAttribute("data-session-revoke-url") || "/LinkedInSession/Revoke";
     const showToast = window.appToast?.show ?? (() => {});
@@ -32,7 +36,7 @@
     let pollTimer = null;
 
     const setBusy = (busy, activeButton = null, busyText = null) => {
-        [launchButton, captureButton, revokeButton].forEach((button) => {
+        [launchButton, captureButton, importCurlButton, revokeButton].forEach((button) => {
             if (button) {
                 if (button === activeButton) {
                     setButtonLoading(button, busy, busyText);
@@ -44,12 +48,33 @@
                 }
             }
         });
+
+        if (curlTextInput) {
+            curlTextInput.disabled = busy;
+        }
     };
 
     const setFeedback = (message, success, shouldToast) => {
         if (shouldToast && message) {
             showToast(message, success);
         }
+    };
+
+    const setCurlFeedback = (message, tone = "subtle") => {
+        if (!curlFeedbackNote) {
+            return;
+        }
+
+        curlFeedbackNote.classList.remove("d-none", "subtle", "success", "danger");
+
+        if (!message) {
+            curlFeedbackNote.textContent = "";
+            curlFeedbackNote.classList.add("d-none");
+            return;
+        }
+
+        curlFeedbackNote.textContent = message;
+        curlFeedbackNote.classList.add(tone);
     };
 
     const setAutoCaptureMessage = (message, active) => {
@@ -178,19 +203,27 @@
         }
     };
 
-    const postAction = async (path, closeOnSuccess, actionButton = null, busyText = null) => {
+    const postAction = async (path, closeOnSuccess, actionButton = null, busyText = null, formFields = null, shouldToast = true) => {
         setBusy(true, actionButton, busyText);
 
         try {
+            const requestBody = new URLSearchParams({
+                "__RequestVerificationToken": antiForgeryInput.value
+            });
+
+            if (formFields) {
+                Object.entries(formFields).forEach(([key, value]) => {
+                    requestBody.append(key, value ?? "");
+                });
+            }
+
             const response = await fetch(path, {
                 method: "POST",
                 headers: {
                     "X-Requested-With": "XMLHttpRequest",
                     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
                 },
-                body: new URLSearchParams({
-                    "__RequestVerificationToken": antiForgeryInput.value
-                }),
+                body: requestBody,
                 credentials: "same-origin"
             });
 
@@ -198,7 +231,7 @@
 
             if (!response.ok) {
                 const problemMessage = payload?.detail || payload?.title || "LinkedIn session action failed.";
-                setFeedback(problemMessage, false, true);
+                setFeedback(problemMessage, false, shouldToast);
 
                 try {
                     await fetchState();
@@ -207,11 +240,12 @@
 
                 return {
                     success: false,
-                    state: null
+                    state: null,
+                    message: problemMessage
                 };
             }
 
-            setFeedback(payload.message, payload.success, true);
+            setFeedback(payload.message, payload.success, shouldToast);
             applyState(payload.state);
 
             if (closeOnSuccess && payload.success && payload.state?.storedSessionAvailable) {
@@ -244,6 +278,7 @@
     modalElement.addEventListener("show.bs.modal", () => {
         autoCloseArmed = false;
         autoVerifyInFlight = false;
+        setCurlFeedback(null);
         void fetchState();
     });
 
@@ -252,6 +287,7 @@
         autoVerifyInFlight = false;
         window.clearTimeout(pollTimer);
         pollTimer = null;
+        setCurlFeedback(null);
     });
 
     if (launchButton) {
@@ -267,6 +303,41 @@
     if (captureButton) {
         captureButton.addEventListener("click", async () => {
             await postAction(captureUrl, true, captureButton, "Capturing session...");
+        });
+    }
+
+    if (curlTextInput) {
+        curlTextInput.addEventListener("input", () => {
+            setCurlFeedback(null);
+        });
+    }
+
+    if (importCurlButton && curlTextInput) {
+        importCurlButton.addEventListener("click", async () => {
+            const curlText = curlTextInput.value.trim();
+
+            if (!curlText) {
+                setCurlFeedback("Paste a LinkedIn Copy as cURL (bash) request first.", "danger");
+                return;
+            }
+
+            setCurlFeedback("Validating the pasted cURL and checking the imported session...", "subtle");
+
+            const payload = await postAction(
+                importCurlUrl,
+                false,
+                importCurlButton,
+                "Validating cURL...",
+                {
+                    curlText
+                },
+                false);
+
+            setCurlFeedback(
+                payload.message || (payload.success
+                    ? "LinkedIn session was imported and verified."
+                    : "LinkedIn cURL import failed."),
+                payload.success ? "success" : "danger");
         });
     }
 

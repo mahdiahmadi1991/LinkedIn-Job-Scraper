@@ -14,15 +14,18 @@ namespace LinkedIn.JobScraper.Web.Controllers;
 public class LinkedInSessionController : Controller
 {
     private readonly ILinkedInBrowserLoginService _linkedInBrowserLoginService;
+    private readonly ILinkedInSessionCurlImportService _linkedInSessionCurlImportService;
     private readonly ILinkedInSessionStore _linkedInSessionStore;
     private readonly ILinkedInSessionVerificationService _linkedInSessionVerificationService;
 
     public LinkedInSessionController(
         ILinkedInBrowserLoginService linkedInBrowserLoginService,
+        ILinkedInSessionCurlImportService linkedInSessionCurlImportService,
         ILinkedInSessionStore linkedInSessionStore,
         ILinkedInSessionVerificationService linkedInSessionVerificationService)
     {
         _linkedInBrowserLoginService = linkedInBrowserLoginService;
+        _linkedInSessionCurlImportService = linkedInSessionCurlImportService;
         _linkedInSessionStore = linkedInSessionStore;
         _linkedInSessionVerificationService = linkedInSessionVerificationService;
     }
@@ -56,6 +59,21 @@ public class LinkedInSessionController : Controller
             "LinkedIn session was captured, but automatic verification failed",
             result.Message,
             cancellationToken);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting(SecurityRateLimitPolicies.SensitiveLocalActions)]
+    public async Task<IActionResult> ImportCurl(
+        [FromForm] string? curlText,
+        CancellationToken cancellationToken)
+    {
+        var result = await _linkedInSessionCurlImportService.ImportAsync(curlText, cancellationToken);
+
+        return await BuildActionResponseAsync(
+            result,
+            cancellationToken,
+            result.Success ? null : result.StatusCode);
     }
 
     [HttpPost]
@@ -158,7 +176,7 @@ public class LinkedInSessionController : Controller
             return Problem(
                 title: "LinkedIn session action failed",
                 detail: result.Message,
-                statusCode: failureStatusCode ?? StatusCodes.Status409Conflict);
+                statusCode: NormalizeFailureStatusCode(failureStatusCode));
         }
 
         var viewModel = await BuildViewModelAsync(cancellationToken);
@@ -213,6 +231,13 @@ public class LinkedInSessionController : Controller
                 viewModel.PrimaryActionLabel,
                 viewModel.SessionIndicatorLabel,
                 viewModel.SessionIndicatorClass));
+    }
+
+    private static int NormalizeFailureStatusCode(int? statusCode)
+    {
+        return statusCode is >= 400 and <= 599
+            ? statusCode.Value
+            : StatusCodes.Status409Conflict;
     }
 
     private bool IsAjaxRequest()

@@ -9,6 +9,7 @@
      data-session-state-url="@Url.Action("State", "LinkedInSession")"
      data-session-launch-url="@Url.Action("Launch", "LinkedInSession")"
      data-session-capture-url="@Url.Action("Capture", "LinkedInSession")"
+     data-session-import-curl-url="@Url.Action("ImportCurl", "LinkedInSession")"
      data-session-verify-url="@Url.Action("Verify", "LinkedInSession")"
      data-session-revoke-url="@Url.Action("Revoke", "LinkedInSession")">
     <div class="modal-dialog modal-dialog-centered">
@@ -61,6 +62,30 @@
                             <div class="state-grid-label">Source</div>
                             <div class="state-grid-value" data-session-source>@(Model.StoredSessionSource ?? "Not available")</div>
                         </div>
+                    </div>
+                </div>
+
+                <div class="selection-card selection-card-tight session-curl-import-panel">
+                    <div class="state-grid-label">Import From cURL</div>
+                    <div class="small text-muted">
+                        Paste <strong>Copy as cURL (bash)</strong> from a valid authenticated LinkedIn request. The imported session is verified before it replaces the current stored session.
+                    </div>
+                    <div class="session-curl-import-stack">
+                        <textarea
+                            id="linkedInSessionCurlText"
+                            class="form-control session-curl-textarea"
+                            rows="6"
+                            spellcheck="false"
+                            data-session-curl-text
+                            placeholder="curl 'https://www.linkedin.com/voyager/api/...'\n  -H 'cookie: li_at=...; JSESSIONID=&quot;ajax:...&quot;'"></textarea>
+                        <div class="session-status-note subtle d-none" data-session-curl-feedback></div>
+                        <button
+                            type="button"
+                            class="btn btn-outline-primary"
+                            data-loading-text="Validating cURL..."
+                            data-session-import-curl>
+                            Validate &amp; Import cURL
+                        </button>
                     </div>
                 </div>
 
