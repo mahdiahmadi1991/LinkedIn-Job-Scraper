@@ -10,10 +10,6 @@ public sealed class ConfigurationReadinessHealthCheckTests
     public async Task CheckHealthAsyncReturnsHealthyWhenRequiredConfigurationExists()
     {
         var healthCheck = new ConfigurationReadinessHealthCheck(
-            Options.Create(new SqlServerOptions
-            {
-                ConnectionString = "Server=.;Database=LinkedInJobScraper;Trusted_Connection=True;"
-            }),
             Options.Create(new OpenAiSecurityOptions
             {
                 ApiKey = "test-key",
@@ -30,14 +26,13 @@ public sealed class ConfigurationReadinessHealthCheckTests
         });
 
         Assert.Equal(HealthStatus.Healthy, result.Status);
-        Assert.Equal("Configuration readiness checks passed.", result.Description);
+        Assert.Equal("Optional AI scoring configuration checks passed.", result.Description);
     }
 
     [Fact]
     public async Task CheckHealthAsyncReturnsFailureStatusWhenConfigurationIsMissing()
     {
         var healthCheck = new ConfigurationReadinessHealthCheck(
-            Options.Create(new SqlServerOptions()),
             Options.Create(new OpenAiSecurityOptions()));
 
         var result = await healthCheck.CheckHealthAsync(new HealthCheckContext
@@ -51,6 +46,6 @@ public sealed class ConfigurationReadinessHealthCheckTests
 
         Assert.Equal(HealthStatus.Degraded, result.Status);
         Assert.NotNull(result.Description);
-        Assert.Contains("SQL Server connection string", result.Description, StringComparison.Ordinal);
+        Assert.Contains("OpenAI API key", result.Description, StringComparison.Ordinal);
     }
 }

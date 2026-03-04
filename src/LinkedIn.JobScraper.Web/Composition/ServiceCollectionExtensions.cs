@@ -21,30 +21,35 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddMvpApplication(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddOptions<SqlServerOptions>()
-            .Bind(configuration.GetSection(SqlServerOptions.SectionName));
+            .Bind(configuration.GetSection(SqlServerOptions.SectionName))
+            .ValidateOnStart();
 
         services.AddOptions<AppAuthenticationOptions>()
             .Bind(configuration.GetSection(AppAuthenticationOptions.SectionName));
 
         services.AddOptions<OpenAiSecurityOptions>()
-            .Bind(configuration.GetSection(OpenAiSecurityOptions.SectionName));
+            .Bind(configuration.GetSection(OpenAiSecurityOptions.SectionName))
+            .ValidateOnStart();
 
         services.AddOptions<LinkedInFetchDiagnosticsOptions>()
-            .Bind(configuration.GetSection(LinkedInFetchDiagnosticsOptions.SectionName));
+            .Bind(configuration.GetSection(LinkedInFetchDiagnosticsOptions.SectionName))
+            .ValidateOnStart();
 
         services.AddOptions<LinkedInFetchLimitsOptions>()
-            .Bind(configuration.GetSection(LinkedInFetchLimitsOptions.SectionName));
+            .Bind(configuration.GetSection(LinkedInFetchLimitsOptions.SectionName))
+            .ValidateOnStart();
 
         services.AddOptions<LinkedInRequestOptions>()
-            .Bind(configuration.GetSection(LinkedInRequestOptions.SectionName));
+            .Bind(configuration.GetSection(LinkedInRequestOptions.SectionName))
+            .ValidateOnStart();
 
         services.AddOptions<LinkedInBrowserAutomationOptions>()
             .Bind(configuration.GetSection(LinkedInBrowserAutomationOptions.SectionName));
 
         services.AddOptions<JobsWorkflowOptions>()
-            .Bind(configuration.GetSection(JobsWorkflowOptions.SectionName));
+            .Bind(configuration.GetSection(JobsWorkflowOptions.SectionName))
+            .ValidateOnStart();
 
-        services.AddHostedService<ConfigurationReadinessStartupService>();
         services.AddHostedService<AppUserSeedingStartupService>();
         services.AddAuthentication(AppAuthenticationDefaults.CookieScheme)
             .AddCookie(
@@ -61,6 +66,12 @@ public static class ServiceCollectionExtensions
                     options.Cookie.SameSite = SameSiteMode.Lax;
                 });
         services.AddSignalR();
+        services.AddSingleton<IValidateOptions<SqlServerOptions>, SqlServerOptionsValidator>();
+        services.AddSingleton<IValidateOptions<OpenAiSecurityOptions>, OpenAiSecurityOptionsValidator>();
+        services.AddSingleton<IValidateOptions<LinkedInFetchDiagnosticsOptions>, LinkedInFetchDiagnosticsOptionsValidator>();
+        services.AddSingleton<IValidateOptions<LinkedInFetchLimitsOptions>, LinkedInFetchLimitsOptionsValidator>();
+        services.AddSingleton<IValidateOptions<LinkedInRequestOptions>, LinkedInRequestOptionsValidator>();
+        services.AddSingleton<IValidateOptions<JobsWorkflowOptions>, JobsWorkflowOptionsValidator>();
         services.AddSingleton<IAppUserPasswordHasher, AppUserPasswordHasher>();
         services.AddTransient<IAppUserAuthenticationService, AppUserAuthenticationService>();
         services.AddSingleton<ISqlServerConnectionStringProvider, ConfiguredSqlServerConnectionStringProvider>();
@@ -81,7 +92,8 @@ public static class ServiceCollectionExtensions
         services.AddDbContextFactory<LinkedInJobScraperDbContext>(ConfigureSqlServerDbContext);
 
         services.AddHttpClient<ILinkedInApiClient, LinkedInApiClient>()
-            .ConfigurePrimaryHttpMessageHandler(CreateLinkedInHttpHandler);
+            .ConfigurePrimaryHttpMessageHandler(CreateLinkedInHttpHandler)
+            .AddStandardResilienceHandler();
 
         services.AddTransient<IOpenAiResponsesClient, OpenAiSdkResponsesClient>();
         services.AddTransient<IJobScoringGateway, OpenAiJobScoringGateway>();

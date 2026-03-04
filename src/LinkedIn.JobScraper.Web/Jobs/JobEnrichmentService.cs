@@ -8,6 +8,8 @@ namespace LinkedIn.JobScraper.Web.Jobs;
 
 public sealed class JobEnrichmentService : IJobEnrichmentService
 {
+    private const int EnrichmentCheckpointSize = 10;
+
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly ILinkedInJobDetailService _linkedInJobDetailService;
     private readonly LinkedInFetchDiagnosticsOptions _fetchDiagnosticsOptions;
@@ -84,6 +86,7 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
         var failedCount = 0;
         var warningCount = 0;
         var processedCount = 0;
+        var pendingPersistenceCount = 0;
         string? firstFailureMessage = null;
         int? firstFailureStatusCode = null;
         var originalAutoDetectChanges = dbContext.ChangeTracker.AutoDetectChangesEnabled;
@@ -172,6 +175,7 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
                 }
 
                 enrichedCount++;
+                pendingPersistenceCount++;
 
                 if (progressCallback is not null)
                 {
@@ -188,6 +192,23 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
                             failedCount),
                         cancellationToken);
                 }
+
+                if (pendingPersistenceCount < EnrichmentCheckpointSize)
+                {
+                    continue;
+                }
+
+                await PersistCheckpointAsync(
+                    dbContext,
+                    progressCallback,
+                    jobsToEnrich.Count,
+                    processedCount,
+                    enrichedCount,
+                    failedCount,
+                    pendingPersistenceCount,
+                    cancellationToken);
+
+                pendingPersistenceCount = 0;
             }
 
             if (enrichedCount == 0 && failedCount > 0)
@@ -203,20 +224,18 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
                     attemptedJobIds);
             }
 
-            if (progressCallback is not null)
+            if (pendingPersistenceCount > 0)
             {
-                await progressCallback(
-                    new JobStageProgress(
-                        $"Saving enrichment results for {enrichedCount} updated job(s).",
-                        jobsToEnrich.Count,
-                        processedCount,
-                        enrichedCount,
-                        failedCount),
+                await PersistCheckpointAsync(
+                    dbContext,
+                    progressCallback,
+                    jobsToEnrich.Count,
+                    processedCount,
+                    enrichedCount,
+                    failedCount,
+                    pendingPersistenceCount,
                     cancellationToken);
             }
-
-            dbContext.ChangeTracker.DetectChanges();
-            await dbContext.SaveChangesAsync(cancellationToken);
         }
         finally
         {
@@ -230,6 +249,32 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
             failedCount,
             warningCount,
             attemptedJobIds);
+    }
+
+    private static async Task PersistCheckpointAsync(
+        LinkedInJobScraperDbContext dbContext,
+        JobStageProgressCallback? progressCallback,
+        int totalQueued,
+        int processedCount,
+        int enrichedCount,
+        int failedCount,
+        int checkpointCount,
+        CancellationToken cancellationToken)
+    {
+        if (progressCallback is not null)
+        {
+            await progressCallback(
+                new JobStageProgress(
+                    $"Saving an enrichment checkpoint for {checkpointCount} updated job(s)...",
+                    totalQueued,
+                    processedCount,
+                    enrichedCount,
+                    failedCount),
+                cancellationToken);
+        }
+
+        dbContext.ChangeTracker.DetectChanges();
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private static string FormatWarnings(IReadOnlyList<string> warnings)

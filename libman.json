@@ -1,0 +1,53 @@
+{
+  "version": "1.0",
+  "defaultProvider": "unpkg",
+  "libraries": [
+    {
+      "library": "bootstrap@5.3.3",
+      "destination": "src/LinkedIn.JobScraper.Web/wwwroot/lib/bootstrap/",
+      "files": [
+        "dist/css/bootstrap.min.css",
+        "dist/js/bootstrap.bundle.min.js",
+        "LICENSE"
+      ]
+    },
+    {
+      "library": "jquery@3.7.1",
+      "destination": "src/LinkedIn.JobScraper.Web/wwwroot/lib/jquery/",
+      "files": [
+        "dist/jquery.min.js",
+        "dist/jquery.min.map",
+        "dist/jquery.slim.min.js",
+        "dist/jquery.slim.min.map",
+        "LICENSE.txt"
+      ]
+    },
+    {
+      "library": "jquery-validation@1.21.0",
+      "destination": "src/LinkedIn.JobScraper.Web/wwwroot/lib/jquery-validation/",
+      "files": [
+        "dist/jquery.validate.js",
+        "dist/jquery.validate.min.js",
+        "dist/additional-methods.js",
+        "dist/additional-methods.min.js",
+        "LICENSE.md"
+      ]
+    },
+    {
+      "library": "jquery-validation-unobtrusive@4.0.0",
+      "destination": "src/LinkedIn.JobScraper.Web/wwwroot/lib/jquery-validation-unobtrusive/",
+      "files": [
+        "dist/jquery.validate.unobtrusive.js",
+        "dist/jquery.validate.unobtrusive.min.js",
+        "LICENSE.txt"
+      ]
+    },
+    {
+      "library": "@microsoft/signalr@8.0.7",
+      "destination": "src/LinkedIn.JobScraper.Web/wwwroot/lib/microsoft-signalr/",
+      "files": [
+        "dist/browser/signalr.min.js"
+      ]
+    }
+  ]
+}

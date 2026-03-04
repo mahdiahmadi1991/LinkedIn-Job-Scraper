@@ -35,6 +35,11 @@ public sealed class JobsDashboardService : IJobsDashboardService
             LogLevel.Warning,
             new EventId(2005, nameof(LogWorkflowFailed)),
             "Fetch workflow failed early. WorkflowId={WorkflowId}, Reason={Reason}");
+    private static readonly Action<ILogger, string, string?, Exception?> LogWorkflowRejectedBecauseAnotherIsActive =
+        LoggerMessage.Define<string, string?>(
+            LogLevel.Warning,
+            new EventId(2006, nameof(LogWorkflowRejectedBecauseAnotherIsActive)),
+            "Fetch workflow rejected because another workflow is active. RequestedWorkflowId={RequestedWorkflowId}, ActiveWorkflowId={ActiveWorkflowId}");
 
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly IJobEnrichmentService _jobEnrichmentService;
@@ -179,6 +184,8 @@ public sealed class JobsDashboardService : IJobsDashboardService
         var workflowRegistration = _jobsWorkflowStateStore.RegisterWorkflow(workflowId, cancellationToken);
         if (!workflowRegistration.Accepted)
         {
+            LogWorkflowRejectedBecauseAnotherIsActive(_logger, workflowId, workflowRegistration.ActiveWorkflowId, null);
+
             var lockedImport = JobImportResult.Failed(
                 $"Another fetch workflow is already running (workflow id: {workflowRegistration.ActiveWorkflowId}). Wait for it to finish before starting a new one.",
                 StatusCodes.Status409Conflict);

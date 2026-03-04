@@ -10,6 +10,8 @@ namespace LinkedIn.JobScraper.Web.Jobs;
 
 public sealed class JobImportService : IJobImportService
 {
+    private const int ImportCheckpointSize = 100;
+
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly LinkedInFetchDiagnosticsOptions _fetchDiagnosticsOptions;
     private readonly ILinkedInJobSearchService _linkedInJobSearchService;
@@ -67,12 +69,12 @@ public sealed class JobImportService : IJobImportService
         var existingById = existingJobs.ToDictionary(
             static job => job.LinkedInJobId,
             StringComparer.Ordinal);
-        var insertedRecords = new List<JobRecord>(searchResult.Jobs.Count);
 
         var importedCount = 0;
         var updatedExistingCount = 0;
         var skippedCount = 0;
         var processedCount = 0;
+        var pendingPersistenceCount = 0;
         var originalAutoDetectChanges = dbContext.ChangeTracker.AutoDetectChangesEnabled;
         dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
 
@@ -149,7 +151,7 @@ public sealed class JobImportService : IJobImportService
                         CurrentStatus = JobWorkflowStatus.New
                     };
 
-                    insertedRecords.Add(record);
+                    dbContext.Jobs.Add(record);
                     existingById[job.LinkedInJobId] = record;
                     importedCount++;
                     progressMessage = $"Reconciled {processedCount + 1} of {searchResult.Jobs.Count}: added '{job.Title}'.";
@@ -166,6 +168,7 @@ public sealed class JobImportService : IJobImportService
                 }
 
                 processedCount++;
+                pendingPersistenceCount++;
 
                 if (progressCallback is not null)
                 {
@@ -178,49 +181,40 @@ public sealed class JobImportService : IJobImportService
                             0),
                         cancellationToken);
                 }
-            }
 
-            if (insertedRecords.Count > 0)
-            {
-                dbContext.Jobs.AddRange(insertedRecords);
-            }
+                if (pendingPersistenceCount < ImportCheckpointSize)
+                {
+                    continue;
+                }
 
-            if (canLogDiagnostics)
-            {
-                Log.JobImportDiagnosticsPersistingReconciliationResults(
-                    _logger,
-                    processedCount,
-                    importedCount,
-                    updatedExistingCount,
-                    insertedRecords.Count);
-            }
-
-            if (progressCallback is not null)
-            {
-                await progressCallback(
-                    new JobStageProgress(
-                        $"Persisting {importedCount + updatedExistingCount} reconciled records to the local database...",
-                        searchResult.Jobs.Count,
-                        processedCount,
-                        importedCount + updatedExistingCount,
-                        0),
-                    cancellationToken);
-            }
-
-            var saveStopwatch = Stopwatch.StartNew();
-            dbContext.ChangeTracker.DetectChanges();
-            await dbContext.SaveChangesAsync(cancellationToken);
-            saveStopwatch.Stop();
-
-            if (canLogDiagnostics)
-            {
-                Log.JobImportDiagnosticsCompletedPersistence(
-                    _logger,
+                await PersistCheckpointAsync(
+                    dbContext,
+                    canLogDiagnostics,
+                    progressCallback,
+                    searchResult.Jobs.Count,
                     processedCount,
                     importedCount,
                     updatedExistingCount,
                     skippedCount,
-                    saveStopwatch.ElapsedMilliseconds);
+                    pendingPersistenceCount,
+                    cancellationToken);
+
+                pendingPersistenceCount = 0;
+            }
+
+            if (pendingPersistenceCount > 0)
+            {
+                await PersistCheckpointAsync(
+                    dbContext,
+                    canLogDiagnostics,
+                    progressCallback,
+                    searchResult.Jobs.Count,
+                    processedCount,
+                    importedCount,
+                    updatedExistingCount,
+                    skippedCount,
+                    pendingPersistenceCount,
+                    cancellationToken);
             }
         }
         finally
@@ -236,6 +230,59 @@ public sealed class JobImportService : IJobImportService
             updatedExistingCount,
             skippedCount,
             searchResult.Message);
+    }
+
+    private async Task PersistCheckpointAsync(
+        LinkedInJobScraperDbContext dbContext,
+        bool canLogDiagnostics,
+        JobStageProgressCallback? progressCallback,
+        int totalJobs,
+        int processedCount,
+        int importedCount,
+        int updatedExistingCount,
+        int skippedCount,
+        int checkpointCount,
+        CancellationToken cancellationToken)
+    {
+        if (canLogDiagnostics)
+        {
+            Log.JobImportDiagnosticsPersistingCheckpoint(
+                _logger,
+                processedCount,
+                importedCount,
+                updatedExistingCount,
+                skippedCount,
+                checkpointCount);
+        }
+
+        if (progressCallback is not null)
+        {
+            await progressCallback(
+                new JobStageProgress(
+                    $"Saving a local checkpoint after {processedCount} reconciled job(s)...",
+                    totalJobs,
+                    processedCount,
+                    importedCount + updatedExistingCount,
+                    0),
+                cancellationToken);
+        }
+
+        var saveStopwatch = Stopwatch.StartNew();
+        dbContext.ChangeTracker.DetectChanges();
+        await dbContext.SaveChangesAsync(cancellationToken);
+        saveStopwatch.Stop();
+
+        if (canLogDiagnostics)
+        {
+            Log.JobImportDiagnosticsCompletedCheckpoint(
+                _logger,
+                processedCount,
+                importedCount,
+                updatedExistingCount,
+                skippedCount,
+                checkpointCount,
+                saveStopwatch.ElapsedMilliseconds);
+        }
     }
 }
 
@@ -274,23 +321,25 @@ internal static partial class Log
     [LoggerMessage(
         EventId = 2104,
         Level = LogLevel.Information,
-        Message = "Job import diagnostics persisting reconciliation results. ProcessedCount={ProcessedCount}, ImportedCount={ImportedCount}, RefreshedCount={RefreshedCount}, InsertBatchCount={InsertBatchCount}")]
-    public static partial void JobImportDiagnosticsPersistingReconciliationResults(
-        ILogger logger,
-        int processedCount,
-        int importedCount,
-        int refreshedCount,
-        int insertBatchCount);
-
-    [LoggerMessage(
-        EventId = 2105,
-        Level = LogLevel.Information,
-        Message = "Job import diagnostics completed persistence. ProcessedCount={ProcessedCount}, ImportedCount={ImportedCount}, RefreshedCount={RefreshedCount}, SkippedCount={SkippedCount}, SaveElapsedMilliseconds={SaveElapsedMilliseconds}")]
-    public static partial void JobImportDiagnosticsCompletedPersistence(
+        Message = "Job import diagnostics persisting reconciliation checkpoint. ProcessedCount={ProcessedCount}, ImportedCount={ImportedCount}, RefreshedCount={RefreshedCount}, SkippedCount={SkippedCount}, CheckpointCount={CheckpointCount}")]
+    public static partial void JobImportDiagnosticsPersistingCheckpoint(
         ILogger logger,
         int processedCount,
         int importedCount,
         int refreshedCount,
         int skippedCount,
+        int checkpointCount);
+
+    [LoggerMessage(
+        EventId = 2105,
+        Level = LogLevel.Information,
+        Message = "Job import diagnostics completed reconciliation checkpoint. ProcessedCount={ProcessedCount}, ImportedCount={ImportedCount}, RefreshedCount={RefreshedCount}, SkippedCount={SkippedCount}, CheckpointCount={CheckpointCount}, SaveElapsedMilliseconds={SaveElapsedMilliseconds}")]
+    public static partial void JobImportDiagnosticsCompletedCheckpoint(
+        ILogger logger,
+        int processedCount,
+        int importedCount,
+        int refreshedCount,
+        int skippedCount,
+        int checkpointCount,
         long saveElapsedMilliseconds);
 }

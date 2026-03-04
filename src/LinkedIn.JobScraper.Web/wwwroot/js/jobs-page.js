@@ -351,7 +351,6 @@
             const payload = await response.json();
             if (payload?.workflowFound === false) {
                 resetWorkflowUi({ hidePanel: true });
-                showToast("The previous fetch workflow is no longer active.", false);
                 return;
             }
 
@@ -471,7 +470,7 @@
                     state: "running",
                     stage: "fetch",
                     percent: 8,
-                    message: payload?.message || "Another fetch workflow is already running. Reattaching to the active workflow..."
+                    message: "A fetch workflow is already running. Connected to the active run automatically."
                 });
 
                 return;

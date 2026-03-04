@@ -10,6 +10,22 @@ namespace LinkedIn.JobScraper.Web.Tests.Configuration;
 public sealed class ConfigurationValidationTests
 {
     [Fact]
+    public void SqlServerOptionsValidatorReturnsFailureWhenConnectionStringIsMissing()
+    {
+        var validator = new SqlServerOptionsValidator();
+
+        var result = validator.Validate(
+            Options.DefaultName,
+            new SqlServerOptions
+            {
+                ConnectionString = ""
+            });
+
+        Assert.True(result.Failed);
+        Assert.Contains("SqlServer:ConnectionString", Assert.Single(result.Failures), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SqlServerOptionsThrowsActionableMessageWhenConnectionStringIsMissing()
     {
         var options = new SqlServerOptions
@@ -36,6 +52,73 @@ public sealed class ConfigurationValidationTests
         var exception = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredConnectionString());
 
         Assert.Contains("SqlServer:ConnectionString", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OpenAiSecurityOptionsValidatorAllowsMissingCredentialsButRejectsInvalidRuntimeValues()
+    {
+        var validator = new OpenAiSecurityOptionsValidator();
+
+        var validWithoutCredentials = validator.Validate(
+            Options.DefaultName,
+            new OpenAiSecurityOptions
+            {
+                ApiKey = "",
+                Model = "",
+                RequestTimeoutSeconds = 45
+            });
+
+        Assert.True(validWithoutCredentials.Succeeded);
+
+        var invalidTimeout = validator.Validate(
+            Options.DefaultName,
+            new OpenAiSecurityOptions
+            {
+                RequestTimeoutSeconds = 0
+            });
+
+        Assert.True(invalidTimeout.Failed);
+        Assert.Contains("OpenAI:Security:RequestTimeoutSeconds", Assert.Single(invalidTimeout.Failures), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LinkedInAndWorkflowOptionsValidatorsRejectInvalidConfiguredValues()
+    {
+        var diagnosticsValidation = new LinkedInFetchDiagnosticsOptionsValidator().Validate(
+            Options.DefaultName,
+            new LinkedInFetchDiagnosticsOptions
+            {
+                ResponseBodyMaxLength = 0
+            });
+
+        Assert.True(diagnosticsValidation.Failed);
+
+        var limitsValidation = new LinkedInFetchLimitsOptionsValidator().Validate(
+            Options.DefaultName,
+            new LinkedInFetchLimitsOptions
+            {
+                SearchPageCap = 0
+            });
+
+        Assert.True(limitsValidation.Failed);
+
+        var requestValidation = new LinkedInRequestOptionsValidator().Validate(
+            Options.DefaultName,
+            new LinkedInRequestOptions
+            {
+                GraphQlQueryId = ""
+            });
+
+        Assert.True(requestValidation.Failed);
+
+        var workflowValidation = new JobsWorkflowOptionsValidator().Validate(
+            Options.DefaultName,
+            new JobsWorkflowOptions
+            {
+                EnrichmentBatchSize = 0
+            });
+
+        Assert.True(workflowValidation.Failed);
     }
 
     [Fact]

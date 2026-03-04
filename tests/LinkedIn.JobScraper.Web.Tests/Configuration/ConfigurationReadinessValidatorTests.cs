@@ -8,11 +8,9 @@ public sealed class ConfigurationReadinessValidatorTests
     public void GetWarningsReturnsExpectedMessagesForMissingSettings()
     {
         var warnings = ConfigurationReadinessValidator.GetWarnings(
-            new SqlServerOptions(),
             new OpenAiSecurityOptions());
 
-        Assert.Equal(3, warnings.Count);
-        Assert.Contains(warnings, warning => warning.Contains("SQL Server connection string", StringComparison.Ordinal));
+        Assert.Equal(2, warnings.Count);
         Assert.Contains(warnings, warning => warning.Contains("OpenAI API key", StringComparison.Ordinal));
         Assert.Contains(warnings, warning => warning.Contains("OpenAI model", StringComparison.Ordinal));
     }
@@ -21,10 +19,6 @@ public sealed class ConfigurationReadinessValidatorTests
     public void GetWarningsReturnsNoMessagesWhenRequiredSettingsExist()
     {
         var warnings = ConfigurationReadinessValidator.GetWarnings(
-            new SqlServerOptions
-            {
-                ConnectionString = "Server=.;Database=LinkedInJobScraper;Trusted_Connection=True;"
-            },
             new OpenAiSecurityOptions
             {
                 ApiKey = "test-key",
