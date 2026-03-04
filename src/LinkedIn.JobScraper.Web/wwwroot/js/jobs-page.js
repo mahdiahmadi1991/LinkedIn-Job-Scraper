@@ -9,9 +9,12 @@
     const busyText = form.querySelector("[data-busy-text]");
     const progressPanel = document.querySelector("[data-fetch-progress]");
     const progressBar = document.querySelector("[data-progress-bar]");
+    const progressSpinner = document.querySelector("[data-progress-spinner]");
     const progressStatus = document.querySelector("[data-progress-status]");
     const progressLog = document.querySelector("[data-progress-log]");
     const progressLogEmpty = document.querySelector("[data-progress-log-empty]");
+    const progressLogContent = document.querySelector("[data-progress-log-content]");
+    const progressLogToggle = document.querySelector("[data-progress-log-toggle]");
     const cancelButton = document.querySelector("[data-fetch-cancel-button]");
     const stageNodes = Array.from(document.querySelectorAll("[data-progress-stage]"));
     const stageOrder = ["fetch", "enrichment"];
@@ -36,6 +39,28 @@
     let activeFetchPromise = null;
     let workflowRedirectUrl = null;
     let isPageUnloading = false;
+    let isProgressLogCollapsed = false;
+
+    const isCancelledAlertMessage = (message) =>
+        typeof message === "string" && /\bcancelled\b/i.test(message);
+
+    const syncProgressLogCollapseUi = () => {
+        if (progressLogContent) {
+            progressLogContent.classList.toggle("is-collapsed", isProgressLogCollapsed);
+        }
+
+        if (progressLogToggle) {
+            progressLogToggle.setAttribute("aria-expanded", isProgressLogCollapsed ? "false" : "true");
+            const toggleLabel = isProgressLogCollapsed ? "Expand workflow report" : "Collapse workflow report";
+            progressLogToggle.setAttribute("aria-label", toggleLabel);
+            progressLogToggle.setAttribute("title", toggleLabel);
+        }
+    };
+
+    const setProgressLogCollapsed = (collapsed) => {
+        isProgressLogCollapsed = collapsed;
+        syncProgressLogCollapseUi();
+    };
 
     const setBusyState = () => {
         if (button) {
@@ -44,6 +69,10 @@
 
         if (busySpinner) {
             busySpinner.classList.remove("d-none");
+        }
+
+        if (progressSpinner) {
+            progressSpinner.classList.remove("d-none");
         }
 
         if (idleText) {
@@ -73,6 +102,10 @@
             busySpinner.classList.add("d-none");
         }
 
+        if (progressSpinner) {
+            progressSpinner.classList.add("d-none");
+        }
+
         if (idleText) {
             idleText.classList.remove("d-none");
         }
@@ -82,12 +115,28 @@
         }
 
         if (cancelButton) {
+            setButtonLoading(cancelButton, false);
             cancelButton.classList.add("d-none");
             cancelButton.disabled = false;
         }
     };
 
-    const resetWorkflowUi = ({ hidePanel = false } = {}) => {
+    const isTerminalWorkflowUpdate = (update) => {
+        if (!update) {
+            return false;
+        }
+
+        const state = String(update.state || "");
+        const stage = String(update.stage || "");
+
+        if (state === "completed" || state === "failed" || state === "cancelled") {
+            return true;
+        }
+
+        return state === "warning" && stage === "completed";
+    };
+
+    const resetWorkflowUi = ({ hidePanel = false, preserveLogCollapse = false } = {}) => {
         stopPolling();
         isSubmitting = false;
         activeFetchPromise = null;
@@ -98,6 +147,9 @@
         lastLoggedMessage = null;
         clearActiveWorkflowId();
         setIdleState();
+        if (!preserveLogCollapse) {
+            setProgressLogCollapsed(false);
+        }
 
         if (hidePanel && progressPanel) {
             progressPanel.classList.add("d-none");
@@ -259,6 +311,10 @@
             return;
         }
 
+        if (activeWorkflowId && update.workflowId && update.workflowId !== activeWorkflowId) {
+            return;
+        }
+
         if (progressPanel) {
             progressPanel.classList.remove("d-none");
         }
@@ -297,9 +353,18 @@
         const shouldReloadAfterRestore = update.state === "completed" && !activeFetchPromise && workflowRedirectUrl;
         const completionRedirectUrl = shouldReloadAfterRestore ? workflowRedirectUrl : null;
 
-        if (["completed", "failed", "cancelled"].includes(update.state)) {
+        if (!isTerminalWorkflowUpdate(update)) {
+            setBusyState();
+        }
+
+        if (isTerminalWorkflowUpdate(update)) {
             workflowTerminalState = update.state;
-            resetWorkflowUi();
+            const wasCancelled = update.state === "cancelled";
+            if (wasCancelled) {
+                setProgressLogCollapsed(true);
+            }
+
+            resetWorkflowUi({ preserveLogCollapse: wasCancelled });
         }
 
         if (completionRedirectUrl) {
@@ -350,6 +415,10 @@
 
             const payload = await response.json();
             if (payload?.workflowFound === false) {
+                if (activeFetchPromise && !workflowTerminalState && lastSequence === 0) {
+                    return;
+                }
+
                 resetWorkflowUi({ hidePanel: true });
                 return;
             }
@@ -402,8 +471,14 @@
             progressLogEmpty.textContent = "Waiting for the first workflow event to appear...";
         }
 
+        setProgressLogCollapsed(false);
+
         void pollWorkflowProgress();
     };
+
+    progressLogToggle?.addEventListener("click", () => {
+        setProgressLogCollapsed(!isProgressLogCollapsed);
+    });
 
     window.addEventListener("pagehide", () => {
         isPageUnloading = true;
@@ -471,6 +546,18 @@
                     stage: "fetch",
                     percent: 8,
                     message: "A fetch workflow is already running. Connected to the active run automatically."
+                });
+
+                return;
+            }
+
+            if (response.status === 409 && payload?.severity === "warning" && !payload?.workflowId) {
+                applyProgressUpdate({
+                    workflowId: activeWorkflowId || workflowId,
+                    state: "cancelled",
+                    stage: "completed",
+                    percent: 100,
+                    message: payload.message || "Fetch Jobs was cancelled."
                 });
 
                 return;
@@ -559,7 +646,7 @@
         }
     });
 
-    if (pageAlertMessage) {
+    if (pageAlertMessage && !isCancelledAlertMessage(pageAlertMessage)) {
         const severity = String(pageAlertSeverity).toLowerCase();
         showToast(pageAlertMessage, severity !== "warning" && severity !== "danger");
     }

@@ -13,13 +13,16 @@ namespace LinkedIn.JobScraper.Web.Controllers;
 public class JobsController : Controller
 {
     private readonly IJobsDashboardService _jobsDashboardService;
+    private readonly IJobsWorkflowExecutor _jobsWorkflowExecutor;
     private readonly IJobsWorkflowStateStore _jobsWorkflowStateStore;
 
     public JobsController(
         IJobsDashboardService jobsDashboardService,
+        IJobsWorkflowExecutor jobsWorkflowExecutor,
         IJobsWorkflowStateStore jobsWorkflowStateStore)
     {
         _jobsDashboardService = jobsDashboardService;
+        _jobsWorkflowExecutor = jobsWorkflowExecutor;
         _jobsWorkflowStateStore = jobsWorkflowStateStore;
     }
 
@@ -68,11 +71,10 @@ public class JobsController : Controller
             ? Guid.NewGuid().ToString("N")
             : workflowId.Trim();
 
-        var result = await _jobsDashboardService.RunFetchAndScoreAsync(
+        var result = await _jobsWorkflowExecutor.RunFetchAndScoreAsync(
             progressConnectionId,
             effectiveWorkflowId,
-            HttpContext.TraceIdentifier,
-            CancellationToken.None);
+            HttpContext.TraceIdentifier);
         TempData["JobsAlertMessage"] = result.Message;
         TempData["JobsAlertSeverity"] = result.Severity;
         WriteWorkflowSummary(result);

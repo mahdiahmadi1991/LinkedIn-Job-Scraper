@@ -66,7 +66,7 @@
                     <div class="section-label">Fetch Workflow</div>
                     <div class="fw-semibold" data-progress-status>Preparing workflow...</div>
                 </div>
-                <div class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></div>
+                <div class="spinner-border spinner-border-sm text-primary d-none" role="status" aria-hidden="true" data-progress-spinner></div>
             </div>
             <div class="progress" role="progressbar" aria-label="Fetch and score progress" aria-valuemin="0" aria-valuemax="100">
                 <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 8%;" data-progress-bar></div>
@@ -77,12 +77,24 @@
                         <div class="small text-muted text-uppercase">Live Activity</div>
                         <div class="fw-semibold">Background workflow report</div>
                     </div>
-                    <span class="small text-muted">Latest events stream in at the bottom</span>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="small text-muted">Latest events stream in at the bottom</span>
+                        <button type="button"
+                                class="progress-log-toggle"
+                                data-progress-log-toggle
+                                aria-expanded="true"
+                                aria-label="Collapse workflow report"
+                                title="Collapse workflow report">
+                            <span class="progress-log-toggle-icon" aria-hidden="true"></span>
+                        </button>
+                    </div>
                 </div>
-                <div class="progress-activity-empty small text-muted" data-progress-log-empty>
-                    Waiting for the first workflow event to appear...
+                <div data-progress-log-content>
+                    <div class="progress-activity-empty small text-muted" data-progress-log-empty>
+                        Waiting for the first workflow event to appear...
+                    </div>
+                    <div class="progress-activity-list d-none" data-progress-log></div>
                 </div>
-                <div class="progress-activity-list d-none" data-progress-log></div>
             </div>
             <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
                     <div class="small text-muted">Live activity and progress advance continuously during the current fetch run.</div>

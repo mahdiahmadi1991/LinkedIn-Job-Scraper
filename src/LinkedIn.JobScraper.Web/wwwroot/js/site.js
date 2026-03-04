@@ -29,7 +29,7 @@
         toast.appendChild(shell);
         toastContainer.appendChild(toast);
 
-        const instance = bootstrap.Toast.getOrCreateInstance(toast, { delay: 4200 });
+        const instance = bootstrap.Toast.getOrCreateInstance(toast, { delay: 5000 });
         toast.addEventListener("hidden.bs.toast", () => toast.remove(), { once: true });
         instance.show();
     };

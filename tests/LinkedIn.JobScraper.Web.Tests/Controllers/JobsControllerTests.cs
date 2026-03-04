@@ -14,8 +14,9 @@ public sealed class JobsControllerTests
     public async Task FetchAndScoreReturnsJsonPayloadForAjaxRequests()
     {
         var service = new FakeJobsDashboardService();
+        var workflowExecutor = new FakeJobsWorkflowExecutor(service);
         var workflowStateStore = new FakeJobsWorkflowStateStore();
-        var controller = new JobsController(service, workflowStateStore)
+        var controller = new JobsController(service, workflowExecutor, workflowStateStore)
         {
             ControllerContext = new ControllerContext
             {
@@ -46,13 +47,16 @@ public sealed class JobsControllerTests
         Assert.Equal("connection-1", service.LastConnectionId);
         Assert.Equal("workflow-1", service.LastWorkflowId);
         Assert.False(string.IsNullOrWhiteSpace(service.LastCorrelationId));
-        Assert.Equal(CancellationToken.None, service.LastCancellationToken);
+        Assert.Equal("connection-1", workflowExecutor.LastConnectionId);
+        Assert.Equal("workflow-1", workflowExecutor.LastWorkflowId);
+        Assert.False(string.IsNullOrWhiteSpace(workflowExecutor.LastCorrelationId));
     }
 
     [Fact]
     public async Task FetchAndScoreReturnsProblemDetailsForAjaxFailures()
     {
-        var controller = new JobsController(new FailedJobsDashboardService(), new FakeJobsWorkflowStateStore())
+        var service = new FailedJobsDashboardService();
+        var controller = new JobsController(service, new FakeJobsWorkflowExecutor(service), new FakeJobsWorkflowStateStore())
         {
             ControllerContext = new ControllerContext
             {
@@ -79,7 +83,8 @@ public sealed class JobsControllerTests
     [Fact]
     public async Task FetchAndScoreReturnsWarningJsonPayloadForAjaxWarnings()
     {
-        var controller = new JobsController(new WarningJobsDashboardService(), new FakeJobsWorkflowStateStore())
+        var service = new WarningJobsDashboardService();
+        var controller = new JobsController(service, new FakeJobsWorkflowExecutor(service), new FakeJobsWorkflowStateStore())
         {
             ControllerContext = new ControllerContext
             {
@@ -108,7 +113,7 @@ public sealed class JobsControllerTests
     public async Task ScoreJobReturnsTypedJsonPayload()
     {
         var service = new FakeJobsDashboardService();
-        var controller = new JobsController(service, new FakeJobsWorkflowStateStore())
+        var controller = new JobsController(service, new FakeJobsWorkflowExecutor(service), new FakeJobsWorkflowStateStore())
         {
             ControllerContext = new ControllerContext
             {
@@ -213,6 +218,38 @@ public sealed class JobsControllerTests
         public Task<JobStatusChangeResult> UpdateStatusAsync(Guid jobId, JobWorkflowState status, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
+        }
+    }
+
+    private sealed class FakeJobsWorkflowExecutor : IJobsWorkflowExecutor
+    {
+        private readonly IJobsDashboardService _jobsDashboardService;
+
+        public FakeJobsWorkflowExecutor(IJobsDashboardService jobsDashboardService)
+        {
+            _jobsDashboardService = jobsDashboardService;
+        }
+
+        public string? LastConnectionId { get; private set; }
+
+        public string? LastWorkflowId { get; private set; }
+
+        public string? LastCorrelationId { get; private set; }
+
+        public Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(
+            string? progressConnectionId,
+            string workflowId,
+            string? correlationId)
+        {
+            LastConnectionId = progressConnectionId;
+            LastWorkflowId = workflowId;
+            LastCorrelationId = correlationId;
+
+            return _jobsDashboardService.RunFetchAndScoreAsync(
+                progressConnectionId,
+                workflowId,
+                correlationId,
+                CancellationToken.None);
         }
     }
 
