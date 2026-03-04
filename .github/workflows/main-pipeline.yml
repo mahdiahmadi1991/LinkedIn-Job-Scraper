@@ -94,7 +94,7 @@ jobs:
         run: |
           set -euo pipefail
           ssh -i ~/.ssh/id_ed25519 -p '${{ secrets.DEPLOY_SSH_PORT }}' '${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}' \
-            "sudo install -d -m 755 '${{ secrets.DEPLOY_APP_DIR }}' '${{ secrets.DEPLOY_APP_DIR }}/nginx' '${{ secrets.DEPLOY_APP_DIR }}/logs' && \
+            "sudo install -d -m 755 '${{ secrets.DEPLOY_APP_DIR }}' '${{ secrets.DEPLOY_APP_DIR }}/nginx' '${{ secrets.DEPLOY_APP_DIR }}/logs' '${{ secrets.DEPLOY_APP_DIR }}/data-protection-keys' && \
              sudo chown -R \$(id -u -n):\$(id -g -n) '${{ secrets.DEPLOY_APP_DIR }}'"
 
       - name: Upload Deploy Assets
@@ -121,11 +121,29 @@ jobs:
           OpenAI__Security__Model=${{ secrets.OPENAI__SECURITY__MODEL }}
           OpenAI__Security__BaseUrl=${{ secrets.OPENAI__SECURITY__BASEURL }}
           EOF
-          if [ -n '${{ secrets.APPAUTHENTICATION__SEEDUSERS__ENV }}' ]; then
-            ssh -i ~/.ssh/id_ed25519 -p '${{ secrets.DEPLOY_SSH_PORT }}' '${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}' \
-              "cat >> '${{ secrets.DEPLOY_APP_DIR }}/.env.runtime'" <<'EOF'
-          ${{ secrets.APPAUTHENTICATION__SEEDUSERS__ENV }}
+          if [ -n '${{ secrets.APPAUTHENTICATION__SEEDUSERS__JSON }}' ]; then
+            seed_env_file="$(mktemp)"
+            cat > "$seed_env_file" <<'EOF'
+          ${{ secrets.APPAUTHENTICATION__SEEDUSERS__JSON }}
           EOF
+            jq -r '
+              to_entries[]
+              | .key as $index
+              | .value
+              | [
+                  "AppAuthentication__SeedUsers__\($index)__DisplayName=\(.DisplayName)",
+                  "AppAuthentication__SeedUsers__\($index)__UserName=\(.UserName)",
+                  "AppAuthentication__SeedUsers__\($index)__Password=\(.Password)"
+                ]
+              | .[]
+            ' "$seed_env_file" > "${seed_env_file}.env"
+            scp -i ~/.ssh/id_ed25519 -P '${{ secrets.DEPLOY_SSH_PORT }}' \
+              "${seed_env_file}.env" \
+              '${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_APP_DIR }}/seed-users.env'
+            ssh -i ~/.ssh/id_ed25519 -p '${{ secrets.DEPLOY_SSH_PORT }}' '${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}' \
+              "cat '${{ secrets.DEPLOY_APP_DIR }}/seed-users.env' >> '${{ secrets.DEPLOY_APP_DIR }}/.env.runtime' && \
+               rm -f '${{ secrets.DEPLOY_APP_DIR }}/seed-users.env'"
+            rm -f "$seed_env_file" "${seed_env_file}.env"
           fi
 
       - name: Run Remote Deploy

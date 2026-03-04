@@ -1,10 +1,12 @@
 using System.Net;
+using System.IO;
 using System.Threading.RateLimiting;
 using LinkedIn.JobScraper.Web.Composition;
 using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Jobs;
 using LinkedIn.JobScraper.Web.Logging;
 using LinkedIn.JobScraper.Web.Middleware;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -14,8 +16,18 @@ var perRunLogFilePath = PerRunLogFilePath.Create(
     DateTimeOffset.UtcNow,
     Environment.ProcessId);
 var enableFetchDiagnostics = builder.Configuration.GetValue<bool>("LinkedIn:FetchDiagnostics:Enabled");
+var dataProtectionKeysDirectory = builder.Configuration["DataProtection:KeysDirectory"];
 
 builder.Logging.AddProvider(new PerRunFileLoggerProvider(perRunLogFilePath, enableFetchDiagnostics));
+
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysDirectory))
+{
+    Directory.CreateDirectory(dataProtectionKeysDirectory);
+
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysDirectory))
+        .SetApplicationName("LinkedIn.JobScraper");
+}
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();

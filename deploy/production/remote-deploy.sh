@@ -16,7 +16,7 @@ cert_dir="/etc/ssl/cloudflare/$DEPLOY_DOMAIN"
 cert_path="$cert_dir/origin.crt"
 key_path="$cert_dir/origin.key"
 
-mkdir -p "$DEPLOY_APP_DIR/logs" "$nginx_dir"
+mkdir -p "$DEPLOY_APP_DIR/logs" "$DEPLOY_APP_DIR/data-protection-keys" "$nginx_dir"
 
 printf '%s\n' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USERNAME" --password-stdin
 

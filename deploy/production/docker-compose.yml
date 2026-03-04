@@ -9,6 +9,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://127.0.0.1:5180
+      DataProtection__KeysDirectory: /app/data-protection-keys
       DOTNET_RUNNING_IN_CONTAINER: "true"
     volumes:
+      - ./data-protection-keys:/app/data-protection-keys
       - ./logs:/app/logs
