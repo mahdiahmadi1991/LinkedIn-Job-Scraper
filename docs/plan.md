@@ -86,11 +86,41 @@ Revisited and not reopened:
 
 - **No active implementation queue is open right now**
 
-This means:
+Latest completed queue:
 
-- there is no currently approved step sequence in progress
-- any new coding work should start by defining a fresh, small queue
-- each new queue must be approved before implementation continues
+- `docs/archive/ideas/ai-streaming-shortlist-page.md`
+
+Approved execution sequence:
+
+- State 1: Contracts + Execution Plan Lock
+- State 2: Backend Streaming Orchestration
+- State 3: Realtime Delivery Layer
+- State 4: Dedicated Page + UX
+- State 5: Cutover Cleanup + Tests + Ops Notes
+
+Decision lock for this queue:
+
+- UI <-> Server transport: SignalR.
+- Server <-> OpenAI path: structured Responses API, job-by-job.
+- OpenAI Realtime API is intentionally not the primary implementation path.
+- Candidate snapshot is frozen at run start.
+- Processing is sequential (`concurrency=1`) with configurable delay.
+- Stop/Resume requires persisted checkpoint semantics.
+- Mandatory audit fields: PromptVersion, Model, Latency, TokenUsage, ErrorCode.
+- Realtime table filters: Accepted, Rejected, NeedsReview.
+
+Current position:
+
+- State 1 is completed (documentation and scope lock, 2026-03-05).
+- State 2 is completed (backend orchestration and checkpoint execution, 2026-03-05).
+- State 3 is completed (realtime delivery layer over SignalR, 2026-03-05).
+- State 4 is completed (dedicated page UX and realtime table controls, 2026-03-05).
+- State 5 is completed (legacy cutover cleanup + operations notes, 2026-03-05).
+
+Queue closure state:
+
+- AI Streaming Shortlist Page queue is closed.
+- New implementation work requires a fresh approved queue.
 
 ## Activation Rule For Future Work
 

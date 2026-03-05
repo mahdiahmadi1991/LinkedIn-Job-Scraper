@@ -14,6 +14,7 @@ public sealed class JobImportService : IJobImportService
 
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly LinkedInFetchDiagnosticsOptions _fetchDiagnosticsOptions;
+    private readonly LinkedInIncrementalFetchOptions _incrementalFetchOptions;
     private readonly ILinkedInJobSearchService _linkedInJobSearchService;
     private readonly ILogger<JobImportService> _logger;
 
@@ -21,11 +22,13 @@ public sealed class JobImportService : IJobImportService
         IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
         ILinkedInJobSearchService linkedInJobSearchService,
         IOptions<LinkedInFetchDiagnosticsOptions> fetchDiagnosticsOptions,
+        IOptions<LinkedInIncrementalFetchOptions> incrementalFetchOptions,
         ILogger<JobImportService> logger)
     {
         _dbContextFactory = dbContextFactory;
         _linkedInJobSearchService = linkedInJobSearchService;
         _fetchDiagnosticsOptions = fetchDiagnosticsOptions.Value;
+        _incrementalFetchOptions = incrementalFetchOptions.Value;
         _logger = logger;
     }
 
@@ -35,7 +38,50 @@ public sealed class JobImportService : IJobImportService
     {
         var diagnosticsEnabled = _fetchDiagnosticsOptions.Enabled;
         var canLogDiagnostics = diagnosticsEnabled && _logger.IsEnabled(LogLevel.Information);
-        var searchResult = await _linkedInJobSearchService.FetchCurrentSearchAsync(cancellationToken);
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var incrementalState = await BuildIncrementalStopStateAsync(dbContext, cancellationToken);
+        if (canLogDiagnostics)
+        {
+            if (incrementalState is null)
+            {
+                Log.JobImportDiagnosticsIncrementalPolicyDisabled(_logger);
+            }
+            else
+            {
+                Log.JobImportDiagnosticsIncrementalPolicyConfigured(
+                    _logger,
+                    incrementalState.KnownJobCount,
+                    _incrementalFetchOptions.MinimumPagesBeforeStop,
+                    _incrementalFetchOptions.OverlapPageCount,
+                    _incrementalFetchOptions.KnownStreakThreshold);
+            }
+        }
+
+        var searchFetchRequest = incrementalState is null
+            ? null
+            : new LinkedInJobSearchFetchRequest(
+                stopContext =>
+                {
+                    var decision = incrementalState.EvaluatePage(stopContext);
+
+                    if (canLogDiagnostics)
+                    {
+                        Log.JobImportDiagnosticsIncrementalPolicyEvaluatedPage(
+                            _logger,
+                            stopContext.PageIndex,
+                            stopContext.PagesFetched,
+                            decision.KnownOnPage,
+                            decision.NewOnPage,
+                            decision.ConsecutiveKnownJobs,
+                            decision.ShouldStop,
+                            decision.Reason);
+                    }
+
+                    return decision.ShouldStop;
+                },
+                "LinkedIn job search stopped early after reaching the incremental known-job streak threshold.");
+        var searchResult = await _linkedInJobSearchService.FetchCurrentSearchAsync(cancellationToken, searchFetchRequest);
 
         if (!searchResult.Success)
         {
@@ -53,8 +99,6 @@ public sealed class JobImportService : IJobImportService
                 0,
                 searchResult.Message);
         }
-
-        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var seenAtUtc = DateTimeOffset.UtcNow;
         var jobIds = searchResult.Jobs
@@ -232,6 +276,23 @@ public sealed class JobImportService : IJobImportService
             searchResult.Message);
     }
 
+    private async Task<IncrementalStopState?> BuildIncrementalStopStateAsync(
+        LinkedInJobScraperDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!_incrementalFetchOptions.Enabled)
+        {
+            return null;
+        }
+
+        var knownIds = await dbContext.Jobs
+            .AsNoTracking()
+            .Select(static job => job.LinkedInJobId)
+            .ToListAsync(cancellationToken);
+
+        return new IncrementalStopState(_incrementalFetchOptions, knownIds);
+    }
+
     private async Task PersistCheckpointAsync(
         LinkedInJobScraperDbContext dbContext,
         bool canLogDiagnostics,
@@ -284,6 +345,81 @@ public sealed class JobImportService : IJobImportService
                 saveStopwatch.ElapsedMilliseconds);
         }
     }
+
+    private sealed class IncrementalStopState
+    {
+        private readonly HashSet<string> _knownJobIds;
+        private readonly LinkedInIncrementalFetchOptions _options;
+
+        private int _consecutiveKnownJobs;
+
+        public IncrementalStopState(
+            LinkedInIncrementalFetchOptions options,
+            IEnumerable<string> knownJobIds)
+        {
+            _options = options;
+            _knownJobIds = new HashSet<string>(knownJobIds, StringComparer.Ordinal);
+        }
+
+        public int KnownJobCount => _knownJobIds.Count;
+
+        public IncrementalStopDecision EvaluatePage(LinkedInJobSearchPageContext context)
+        {
+            var knownOnPage = 0;
+            var newOnPage = 0;
+
+            foreach (var job in context.UniqueJobsAdded)
+            {
+                if (_knownJobIds.Contains(job.LinkedInJobId))
+                {
+                    knownOnPage++;
+                    _consecutiveKnownJobs++;
+                }
+                else
+                {
+                    newOnPage++;
+                    _knownJobIds.Add(job.LinkedInJobId);
+                    _consecutiveKnownJobs = 0;
+                }
+            }
+
+            if (context.PagesFetched <= _options.OverlapPageCount)
+            {
+                return new IncrementalStopDecision(
+                    false,
+                    _consecutiveKnownJobs,
+                    knownOnPage,
+                    newOnPage,
+                    "WithinOverlapWindow");
+            }
+
+            if (context.PagesFetched < _options.MinimumPagesBeforeStop)
+            {
+                return new IncrementalStopDecision(
+                    false,
+                    _consecutiveKnownJobs,
+                    knownOnPage,
+                    newOnPage,
+                    "BelowMinimumPages");
+            }
+
+            var shouldStop = _consecutiveKnownJobs >= _options.KnownStreakThreshold;
+
+            return new IncrementalStopDecision(
+                shouldStop,
+                _consecutiveKnownJobs,
+                knownOnPage,
+                newOnPage,
+                shouldStop ? "KnownStreakThresholdReached" : "KnownStreakBelowThreshold");
+        }
+    }
+
+    private readonly record struct IncrementalStopDecision(
+        bool ShouldStop,
+        int ConsecutiveKnownJobs,
+        int KnownOnPage,
+        int NewOnPage,
+        string Reason);
 }
 
 internal static partial class Log
@@ -342,4 +478,35 @@ internal static partial class Log
         int skippedCount,
         int checkpointCount,
         long saveElapsedMilliseconds);
+
+    [LoggerMessage(
+        EventId = 2106,
+        Level = LogLevel.Information,
+        Message = "Job import diagnostics incremental policy is disabled. Reason=LinkedIn:IncrementalFetch:Enabled is false.")]
+    public static partial void JobImportDiagnosticsIncrementalPolicyDisabled(ILogger logger);
+
+    [LoggerMessage(
+        EventId = 2107,
+        Level = LogLevel.Information,
+        Message = "Job import diagnostics incremental policy configured. KnownJobCount={KnownJobCount}, MinimumPagesBeforeStop={MinimumPagesBeforeStop}, OverlapPageCount={OverlapPageCount}, KnownStreakThreshold={KnownStreakThreshold}")]
+    public static partial void JobImportDiagnosticsIncrementalPolicyConfigured(
+        ILogger logger,
+        int knownJobCount,
+        int minimumPagesBeforeStop,
+        int overlapPageCount,
+        int knownStreakThreshold);
+
+    [LoggerMessage(
+        EventId = 2108,
+        Level = LogLevel.Information,
+        Message = "Job import diagnostics incremental policy evaluated page. PageIndex={PageIndex}, PagesFetched={PagesFetched}, KnownOnPage={KnownOnPage}, NewOnPage={NewOnPage}, ConsecutiveKnownJobs={ConsecutiveKnownJobs}, ShouldStop={ShouldStop}, Reason={Reason}")]
+    public static partial void JobImportDiagnosticsIncrementalPolicyEvaluatedPage(
+        ILogger logger,
+        int pageIndex,
+        int pagesFetched,
+        int knownOnPage,
+        int newOnPage,
+        int consecutiveKnownJobs,
+        bool shouldStop,
+        string reason);
 }

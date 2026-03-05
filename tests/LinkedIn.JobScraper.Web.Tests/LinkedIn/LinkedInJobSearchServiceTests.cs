@@ -167,6 +167,47 @@ public sealed class LinkedInJobSearchServiceTests
         Assert.Equal(2, apiClient.CallCount);
     }
 
+    [Fact]
+    public async Task FetchCurrentSearchAsyncStopsEarlyWhenExternalPolicyRequestsStop()
+    {
+        var apiClient = new FakeLinkedInApiClient(
+            CreateSuccessfulSearchPage(pageIndex: 0, returnedCount: 100, totalCount: 1300),
+            CreateSuccessfulSearchPage(pageIndex: 1, returnedCount: 100, totalCount: 1300),
+            CreateSuccessfulSearchPage(pageIndex: 2, returnedCount: 100, totalCount: 1300));
+        var sessionStore = new FakeLinkedInSessionStore(
+            new LinkedInSessionSnapshot(
+                new Dictionary<string, string> { ["Cookie"] = "li_at=test" },
+                DateTimeOffset.UtcNow,
+                "Test"));
+        var service = new LinkedInJobSearchService(
+            apiClient,
+            sessionStore,
+            new FakeLinkedInSearchSettingsService(),
+            Options.Create(new LinkedInFetchDiagnosticsOptions()),
+            Options.Create(
+                new LinkedInFetchLimitsOptions
+                {
+                    SearchPageCap = 10,
+                    SearchJobCap = 1000
+                }),
+            NullLogger<LinkedInJobSearchService>.Instance);
+
+        var result = await service.FetchCurrentSearchAsync(
+            CancellationToken.None,
+            new LinkedInJobSearchFetchRequest(
+                stopContext => stopContext.PagesFetched >= 2,
+                "Stopped by test policy."));
+
+        Assert.True(result.Success);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(2, result.PagesFetched);
+        Assert.Equal(200, result.ReturnedCount);
+        Assert.Equal(200, result.Jobs.Count);
+        Assert.Equal(1300, result.TotalCount);
+        Assert.Equal(2, apiClient.CallCount);
+        Assert.Contains("Stopped by test policy.", result.Message, StringComparison.Ordinal);
+    }
+
     private sealed class FakeLinkedInApiClient : ILinkedInApiClient
     {
         private readonly LinkedInApiResponse[] _responses;

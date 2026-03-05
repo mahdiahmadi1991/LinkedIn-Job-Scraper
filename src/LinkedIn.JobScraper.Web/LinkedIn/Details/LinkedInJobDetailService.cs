@@ -253,7 +253,10 @@ public sealed class LinkedInJobDetailService : ILinkedInJobDetailService
             ReadNestedText(jobPostingNode, "description"),
             ReadString(jobPostingNode, "companyApplyUrl"),
             ReadUnixMilliseconds(jobPostingNode, "listedAt") ??
-            ReadUnixMilliseconds(jobPostingNode, "originalListedAt"));
+            ReadUnixMilliseconds(jobPostingNode, "originalListedAt"),
+            ReadUnixMilliseconds(jobPostingNode, "lastUpdatedAt") ??
+            ReadUnixMilliseconds(jobPostingNode, "updatedAt") ??
+            ReadUnixMilliseconds(jobPostingNode, "postingUpdateTime"));
 
         return true;
     }

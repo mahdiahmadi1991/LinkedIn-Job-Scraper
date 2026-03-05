@@ -299,6 +299,11 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 CancellationToken.None);
 
             var totalIncompleteJobs = await CountIncompleteJobsAsync(workflowCancellationToken);
+            var staleResyncRunCap = _jobsWorkflowOptions.GetStaleDetailRefreshRunCap();
+            var totalStaleResyncCandidates = staleResyncRunCap > 0
+                ? await CountStaleDetailJobsAsync(workflowCancellationToken)
+                : 0;
+            var totalEnrichmentCandidates = totalIncompleteJobs + Math.Min(totalStaleResyncCandidates, staleResyncRunCap);
             var configuredEnrichmentBatchSize = _jobsWorkflowOptions.GetEnrichmentBatchSize();
             var attemptedEnrichmentJobIds = new HashSet<Guid>();
             var totalEnrichmentRequestedCount = 0;
@@ -309,16 +314,17 @@ public sealed class JobsDashboardService : IJobsDashboardService
             string? firstEnrichmentFailureMessage = null;
             int? firstEnrichmentFailureStatusCode = null;
 
-            while (!workflowCancellationToken.IsCancellationRequested)
+            while (!workflowCancellationToken.IsCancellationRequested &&
+                   attemptedEnrichmentJobIds.Count < totalEnrichmentCandidates)
             {
-                var remainingIncompleteJobs = totalIncompleteJobs - attemptedEnrichmentJobIds.Count;
-                if (remainingIncompleteJobs <= 0)
-                {
-                    break;
-                }
-
-                var enrichmentBatchSize = Math.Min(configuredEnrichmentBatchSize, remainingIncompleteJobs);
+                var remainingEnrichmentCandidates = totalEnrichmentCandidates - attemptedEnrichmentJobIds.Count;
+                var enrichmentBatchSize = Math.Min(configuredEnrichmentBatchSize, remainingEnrichmentCandidates);
                 var currentBatchIndex = (totalEnrichmentRequestedCount / configuredEnrichmentBatchSize) + 1;
+                var stagePercentAtBatchStart = CalculateProgressPercent(
+                    54,
+                    74,
+                    totalEnrichmentProcessedCount,
+                    Math.Max(totalEnrichmentCandidates, 1));
 
                 await PublishProgressAsync(
                     progressConnectionId,
@@ -327,9 +333,9 @@ public sealed class JobsDashboardService : IJobsDashboardService
                         effectiveCorrelationId,
                         "running",
                         "enrichment",
-                        CalculateProgressPercent(48, 52, totalEnrichmentProcessedCount, Math.Max(totalIncompleteJobs, 1)),
+                        stagePercentAtBatchStart,
                         $"Preparing enrichment batch {currentBatchIndex}. Up to {enrichmentBatchSize} jobs will request LinkedIn detail payloads.",
-                        totalIncompleteJobs,
+                        totalEnrichmentCandidates,
                         totalEnrichmentProcessedCount,
                         totalEnrichmentEnrichedCount,
                         totalEnrichmentFailedCount),
@@ -342,7 +348,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                         effectiveCorrelationId,
                         "running",
                         "enrichment",
-                        CalculateProgressPercent(52, 54, totalEnrichmentProcessedCount, Math.Max(totalIncompleteJobs, 1)),
+                        stagePercentAtBatchStart,
                         $"Calling LinkedIn job detail endpoints for enrichment batch {currentBatchIndex}..."),
                     CancellationToken.None);
 
@@ -353,7 +359,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                     "enrichment",
                     54,
                     74,
-                    Math.Max(totalIncompleteJobs, 1),
+                    Math.Max(totalEnrichmentCandidates, 1),
                     totalEnrichmentProcessedCount,
                     totalEnrichmentEnrichedCount,
                     totalEnrichmentFailedCount);
@@ -629,20 +635,30 @@ public sealed class JobsDashboardService : IJobsDashboardService
         int failedBeforeBatch)
     {
         return (progress, _) =>
-            PublishProgressAsync(
+        {
+            var totalProcessedCount = processedBeforeBatch + progress.ProcessedCount;
+            var totalSucceededCount = succeededBeforeBatch + progress.SucceededCount;
+            var totalFailedCount = failedBeforeBatch + progress.FailedCount;
+            var baseMessage = string.IsNullOrWhiteSpace(progress.Message)
+                ? "Enrichment progress update."
+                : progress.Message;
+            var enrichedMessage = $"Enrichment {totalProcessedCount}/{totalRequestedCount}. {baseMessage}";
+
+            return PublishProgressAsync(
                 progressConnectionId,
                 new JobsWorkflowProgressUpdate(
                     workflowId,
                     correlationId,
                     "running",
                     stage,
-                    CalculateProgressPercent(startPercent, endPercent, processedBeforeBatch + progress.ProcessedCount, totalRequestedCount),
-                    progress.Message,
+                    CalculateProgressPercent(startPercent, endPercent, totalProcessedCount, totalRequestedCount),
+                    enrichedMessage,
                     totalRequestedCount,
-                    processedBeforeBatch + progress.ProcessedCount,
-                    succeededBeforeBatch + progress.SucceededCount,
-                    failedBeforeBatch + progress.FailedCount),
+                    totalProcessedCount,
+                    totalSucceededCount,
+                    totalFailedCount),
                 CancellationToken.None);
+        };
     }
 
     private static double CalculateProgressPercent(
@@ -793,6 +809,20 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 string.IsNullOrWhiteSpace(job.Description) ||
                 string.IsNullOrWhiteSpace(job.CompanyApplyUrl) ||
                 string.IsNullOrWhiteSpace(job.EmploymentStatus),
+            cancellationToken);
+    }
+
+    private async Task<int> CountStaleDetailJobsAsync(CancellationToken cancellationToken)
+    {
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var staleThresholdUtc = DateTimeOffset.UtcNow - _jobsWorkflowOptions.GetDetailResyncAfter();
+
+        return await dbContext.Jobs.CountAsync(
+            job =>
+                !string.IsNullOrWhiteSpace(job.Description) &&
+                !string.IsNullOrWhiteSpace(job.CompanyApplyUrl) &&
+                !string.IsNullOrWhiteSpace(job.EmploymentStatus) &&
+                (!job.LastDetailSyncedAtUtc.HasValue || job.LastDetailSyncedAtUtc.Value < staleThresholdUtc),
             cancellationToken);
     }
 

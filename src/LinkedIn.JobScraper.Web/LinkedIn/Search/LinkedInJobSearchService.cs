@@ -36,12 +36,15 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
         _logger = logger;
     }
 
-    public async Task<LinkedInJobSearchFetchResult> FetchCurrentSearchAsync(CancellationToken cancellationToken)
+    public async Task<LinkedInJobSearchFetchResult> FetchCurrentSearchAsync(
+        CancellationToken cancellationToken,
+        LinkedInJobSearchFetchRequest? request = null)
     {
         var diagnosticsEnabled = _fetchDiagnosticsOptions.Enabled;
         var canLogDiagnostics = diagnosticsEnabled && _logger.IsEnabled(LogLevel.Information);
         var searchPageCap = _fetchLimitsOptions.GetSearchPageCap();
         var searchJobCap = _fetchLimitsOptions.GetSearchJobCap();
+        var fetchRequest = request ?? new LinkedInJobSearchFetchRequest();
         var sessionSnapshot = await _sessionStore.GetCurrentAsync(cancellationToken);
 
         if (sessionSnapshot is null)
@@ -64,6 +67,7 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
         var seenJobIds = new HashSet<string>(StringComparer.Ordinal);
         var totalAvailableCount = 0;
         var pagesFetched = 0;
+        var stoppedByExternalPredicate = false;
 
         if (canLogDiagnostics)
         {
@@ -224,11 +228,14 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
 
             var aggregatedCountBeforeMerge = aggregatedJobs.Count;
 
+            var uniqueJobsAdded = new List<LinkedInJobSearchItem>(pageResult.Jobs.Count);
+
             foreach (var job in pageResult.Jobs)
             {
                 if (seenJobIds.Add(job.LinkedInJobId))
                 {
                     aggregatedJobs.Add(job);
+                    uniqueJobsAdded.Add(job);
                 }
             }
 
@@ -289,6 +296,34 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
                 break;
             }
 
+            if (fetchRequest.ShouldStopAfterPage is not null)
+            {
+                var stopContext = new LinkedInJobSearchPageContext(
+                    pageIndex,
+                    pagesFetched,
+                    pageResult.ReturnedCount,
+                    requestedCount,
+                    totalAvailableCount,
+                    aggregatedJobs.Count,
+                    uniqueJobsAdded);
+
+                if (fetchRequest.ShouldStopAfterPage(stopContext))
+                {
+                    stoppedByExternalPredicate = true;
+
+                    if (canLogDiagnostics)
+                    {
+                        Log.LinkedInFetchDiagnosticsStoppedAfterPageByExternalPolicy(
+                            _logger,
+                            pageIndex,
+                            pagesFetched,
+                            aggregatedJobs.Count);
+                    }
+
+                    break;
+                }
+            }
+
             if (canLogDiagnostics)
             {
                 Log.LinkedInFetchDiagnosticsDelayingBeforeNextPage(
@@ -309,12 +344,19 @@ public sealed class LinkedInJobSearchService : ILinkedInJobSearchService
                 totalAvailableCount);
         }
 
+        var successMessage = stoppedByExternalPredicate
+            ? string.IsNullOrWhiteSpace(fetchRequest.EarlyStopMessage)
+                ? "LinkedIn job search stopped early by incremental fetch policy."
+                : fetchRequest.EarlyStopMessage
+            : "LinkedIn search fetch succeeded.";
+
         return LinkedInJobSearchFetchResult.Succeeded(
             StatusCodes.Status200OK,
             pagesFetched,
             aggregatedJobs.Count,
             totalAvailableCount,
-            aggregatedJobs);
+            aggregatedJobs,
+            successMessage);
     }
 
     private static LinkedInJobSearchFetchResult? ValidateSearchSettingsForFetch(LinkedInSearchSettings searchSettings)
@@ -676,4 +718,14 @@ internal static partial class Log
         int pagesFetched,
         int aggregatedCount,
         int totalAvailableCount);
+
+    [LoggerMessage(
+        EventId = 3013,
+        Level = LogLevel.Information,
+        Message = "LinkedIn fetch diagnostics stopped after page. Reason=ExternalStopPolicy, PageIndex={PageIndex}, PagesFetched={PagesFetched}, AggregatedCount={AggregatedCount}")]
+    public static partial void LinkedInFetchDiagnosticsStoppedAfterPageByExternalPolicy(
+        ILogger logger,
+        int pageIndex,
+        int pagesFetched,
+        int aggregatedCount);
 }

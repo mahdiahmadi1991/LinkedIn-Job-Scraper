@@ -36,4 +36,5 @@ public sealed record LinkedInJobDetailData(
     string? EmploymentStatus,
     string? Description,
     string? CompanyApplyUrl,
-    DateTimeOffset? ListedAtUtc);
+    DateTimeOffset? ListedAtUtc,
+    DateTimeOffset? LinkedInUpdatedAtUtc);

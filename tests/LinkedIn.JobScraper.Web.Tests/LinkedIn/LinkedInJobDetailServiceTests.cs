@@ -106,6 +106,82 @@ public sealed class LinkedInJobDetailServiceTests
         Assert.Null(result.Job);
     }
 
+    [Fact]
+    public async Task FetchAsyncParsesSuccessfulPayloadIncludingUpdatedAt()
+    {
+        const long listedAt = 1735689600000;
+        const long updatedAt = 1735776000000;
+
+        const string responseBody =
+            """
+            {
+              "data": {
+                "data": {
+                  "*jobsDashJobPostingsById:dummy": "urn:li:fsd_jobPosting:4379963196"
+                }
+              },
+              "included": [
+                {
+                  "$type": "com.linkedin.voyager.dash.hiring.EmploymentStatus",
+                  "entityUrn": "urn:li:employmentStatus:FULL_TIME",
+                  "localizedName": "Full-time"
+                },
+                {
+                  "$type": "com.linkedin.voyager.dash.common.Geo",
+                  "entityUrn": "urn:li:geo:106394980",
+                  "defaultLocalizedName": "Limassol, Cyprus"
+                },
+                {
+                  "$type": "com.linkedin.voyager.dash.jobs.JobPosting",
+                  "entityUrn": "urn:li:fsd_jobPosting:4379963196",
+                  "title": "Senior .NET Engineer",
+                  "companyDetails": {
+                    "name": "Acme"
+                  },
+                  "*location": "urn:li:geo:106394980",
+                  "*employmentStatus": "urn:li:employmentStatus:FULL_TIME",
+                  "description": {
+                    "text": "Build APIs"
+                  },
+                  "companyApplyUrl": "https://example.com/apply",
+                  "listedAt": 1735689600000,
+                  "lastUpdatedAt": 1735776000000
+                }
+              ]
+            }
+            """;
+
+        var apiClient = new FakeLinkedInApiClient(
+            new LinkedInApiResponse(200, true, responseBody));
+        var sessionStore = new FakeLinkedInSessionStore(
+            new LinkedInSessionSnapshot(
+                new Dictionary<string, string> { ["Cookie"] = "li_at=test" },
+                DateTimeOffset.UtcNow,
+                "Test"));
+        var service = new LinkedInJobDetailService(
+            apiClient,
+            sessionStore,
+            new FakeLinkedInSearchSettingsService(),
+            Options.Create(new LinkedInRequestOptions()),
+            NullLogger<LinkedInJobDetailService>.Instance);
+
+        var result = await service.FetchAsync("4379963196", CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Empty(result.Warnings);
+        Assert.NotNull(result.Job);
+        Assert.Equal("4379963196", result.Job!.LinkedInJobId);
+        Assert.Equal("Senior .NET Engineer", result.Job.Title);
+        Assert.Equal("Acme", result.Job.CompanyName);
+        Assert.Equal("Limassol, Cyprus", result.Job.LocationName);
+        Assert.Equal("Full-time", result.Job.EmploymentStatus);
+        Assert.Equal("Build APIs", result.Job.Description);
+        Assert.Equal("https://example.com/apply", result.Job.CompanyApplyUrl);
+        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(listedAt), result.Job.ListedAtUtc);
+        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(updatedAt), result.Job.LinkedInUpdatedAtUtc);
+    }
+
     private sealed class FakeLinkedInApiClient : ILinkedInApiClient
     {
         private readonly LinkedInApiResponse _response;

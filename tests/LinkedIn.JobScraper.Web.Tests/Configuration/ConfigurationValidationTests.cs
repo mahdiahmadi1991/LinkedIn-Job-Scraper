@@ -102,6 +102,15 @@ public sealed class ConfigurationValidationTests
 
         Assert.True(limitsValidation.Failed);
 
+        var incrementalValidation = new LinkedInIncrementalFetchOptionsValidator().Validate(
+            Options.DefaultName,
+            new LinkedInIncrementalFetchOptions
+            {
+                MinimumPagesBeforeStop = 0
+            });
+
+        Assert.True(incrementalValidation.Failed);
+
         var requestValidation = new LinkedInRequestOptionsValidator().Validate(
             Options.DefaultName,
             new LinkedInRequestOptions
@@ -112,6 +121,15 @@ public sealed class ConfigurationValidationTests
 
         Assert.True(requestValidation.Failed);
 
+        var requestSafetyValidation = new LinkedInRequestSafetyOptionsValidator().Validate(
+            Options.DefaultName,
+            new LinkedInRequestSafetyOptions
+            {
+                MinimumDelayMilliseconds = 0
+            });
+
+        Assert.True(requestSafetyValidation.Failed);
+
         var workflowValidation = new JobsWorkflowOptionsValidator().Validate(
             Options.DefaultName,
             new JobsWorkflowOptions
@@ -120,6 +138,34 @@ public sealed class ConfigurationValidationTests
             });
 
         Assert.True(workflowValidation.Failed);
+
+        var staleRefreshValidation = new JobsWorkflowOptionsValidator().Validate(
+            Options.DefaultName,
+            new JobsWorkflowOptions
+            {
+                StaleDetailRefreshRunCap = -1
+            });
+
+        Assert.True(staleRefreshValidation.Failed);
+
+        var detailResyncValidation = new JobsWorkflowOptionsValidator().Validate(
+            Options.DefaultName,
+            new JobsWorkflowOptions
+            {
+                DetailResyncAfterHours = 0
+            });
+
+        Assert.True(detailResyncValidation.Failed);
+
+        var globalShortlistValidation = new AiGlobalShortlistOptionsValidator().Validate(
+            Options.DefaultName,
+            new AiGlobalShortlistOptions
+            {
+                BatchSize = 5,
+                MaxRecommendationsPerBatch = 6
+            });
+
+        Assert.True(globalShortlistValidation.Failed);
     }
 
     [Fact]

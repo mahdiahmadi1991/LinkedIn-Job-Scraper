@@ -12,6 +12,12 @@ public sealed class LinkedInJobScraperDbContext : DbContext
 
     public DbSet<AiBehaviorSettingsRecord> AiBehaviorSettings => Set<AiBehaviorSettingsRecord>();
 
+    public DbSet<AiGlobalShortlistRunCandidateRecord> AiGlobalShortlistRunCandidates => Set<AiGlobalShortlistRunCandidateRecord>();
+
+    public DbSet<AiGlobalShortlistItemRecord> AiGlobalShortlistItems => Set<AiGlobalShortlistItemRecord>();
+
+    public DbSet<AiGlobalShortlistRunRecord> AiGlobalShortlistRuns => Set<AiGlobalShortlistRunRecord>();
+
     public DbSet<AppUserRecord> AppUsers => Set<AppUserRecord>();
 
     public DbSet<JobRecord> Jobs => Set<JobRecord>();
@@ -38,6 +44,7 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.Property(static job => job.LocationName).HasMaxLength(256);
                 entity.Property(static job => job.EmploymentStatus).HasMaxLength(128);
                 entity.Property(static job => job.CompanyApplyUrl).HasMaxLength(2048);
+                entity.Property(static job => job.DetailContentFingerprint).HasMaxLength(128);
                 entity.Property(static job => job.AiLabel).HasMaxLength(64);
                 entity.Property(static job => job.RowVersion).IsRowVersion();
 
@@ -51,7 +58,9 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.HasIndex(static job => job.AiLabel);
                 entity.HasIndex(static job => job.AiScore);
                 entity.HasIndex(static job => job.LastSeenAtUtc);
+                entity.HasIndex(static job => job.LastDetailSyncedAtUtc);
                 entity.HasIndex(static job => job.ListedAtUtc);
+                entity.HasIndex(static job => job.LinkedInUpdatedAtUtc);
             });
 
         modelBuilder.Entity<AppUserRecord>(
@@ -127,6 +136,76 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.Property(static settings => settings.WorkplaceTypeCodesCsv).HasMaxLength(128).IsRequired();
                 entity.Property(static settings => settings.JobTypeCodesCsv).HasMaxLength(128).IsRequired();
                 entity.Property(static settings => settings.RowVersion).IsRowVersion();
+            });
+
+        modelBuilder.Entity<AiGlobalShortlistRunRecord>(
+            entity =>
+            {
+                entity.ToTable("AiGlobalShortlistRuns");
+                entity.HasKey(static run => run.Id);
+
+                entity.Property(static run => run.Status).HasMaxLength(32).IsRequired();
+                entity.Property(static run => run.PromptVersion).HasMaxLength(64);
+                entity.Property(static run => run.ModelName).HasMaxLength(128);
+                entity.Property(static run => run.Summary).HasMaxLength(2000);
+
+                entity.HasIndex(static run => run.CreatedAtUtc);
+                entity.HasIndex(static run => run.CompletedAtUtc);
+                entity.HasIndex(static run => run.Status);
+            });
+
+        modelBuilder.Entity<AiGlobalShortlistRunCandidateRecord>(
+            entity =>
+            {
+                entity.ToTable("AiGlobalShortlistRunCandidates");
+                entity.HasKey(static candidate => candidate.Id);
+
+                entity.Property(static candidate => candidate.Status).HasMaxLength(32).IsRequired();
+
+                entity.HasIndex(static candidate => candidate.RunId);
+                entity.HasIndex(static candidate => candidate.JobRecordId);
+                entity.HasIndex(static candidate => new { candidate.RunId, candidate.SequenceNumber }).IsUnique();
+                entity.HasIndex(static candidate => new { candidate.RunId, candidate.JobRecordId }).IsUnique();
+
+                entity.HasOne(static candidate => candidate.Run)
+                    .WithMany(static run => run.Candidates)
+                    .HasForeignKey(static candidate => candidate.RunId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(static candidate => candidate.JobRecord)
+                    .WithMany(static job => job.GlobalShortlistRunCandidates)
+                    .HasForeignKey(static candidate => candidate.JobRecordId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+        modelBuilder.Entity<AiGlobalShortlistItemRecord>(
+            entity =>
+            {
+                entity.ToTable("AiGlobalShortlistItems");
+                entity.HasKey(static item => item.Id);
+
+                entity.Property(static item => item.Decision).HasMaxLength(32).IsRequired();
+                entity.Property(static item => item.PromptVersion).HasMaxLength(64);
+                entity.Property(static item => item.ModelName).HasMaxLength(128);
+                entity.Property(static item => item.ErrorCode).HasMaxLength(128);
+                entity.Property(static item => item.RecommendationReason).HasMaxLength(2000);
+                entity.Property(static item => item.Concerns).HasMaxLength(2000);
+
+                entity.HasIndex(static item => item.RunId);
+                entity.HasIndex(static item => item.JobRecordId);
+                entity.HasIndex(static item => new { item.RunId, item.Decision });
+                entity.HasIndex(static item => new { item.RunId, item.Rank }).IsUnique();
+                entity.HasIndex(static item => new { item.RunId, item.JobRecordId }).IsUnique();
+
+                entity.HasOne(static item => item.Run)
+                    .WithMany(static run => run.Items)
+                    .HasForeignKey(static item => item.RunId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(static item => item.JobRecord)
+                    .WithMany(static job => job.GlobalShortlistItems)
+                    .HasForeignKey(static item => item.JobRecordId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
     }
 }

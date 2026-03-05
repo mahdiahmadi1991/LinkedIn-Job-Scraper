@@ -11,6 +11,7 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
     private const int EnrichmentCheckpointSize = 10;
 
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
+    private readonly JobsWorkflowOptions _jobsWorkflowOptions;
     private readonly ILinkedInJobDetailService _linkedInJobDetailService;
     private readonly LinkedInFetchDiagnosticsOptions _fetchDiagnosticsOptions;
     private readonly ILogger<JobEnrichmentService> _logger;
@@ -18,11 +19,13 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
     public JobEnrichmentService(
         IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
         ILinkedInJobDetailService linkedInJobDetailService,
+        IOptions<JobsWorkflowOptions> jobsWorkflowOptions,
         IOptions<LinkedInFetchDiagnosticsOptions> fetchDiagnosticsOptions,
         ILogger<JobEnrichmentService> logger)
     {
         _dbContextFactory = dbContextFactory;
         _linkedInJobDetailService = linkedInJobDetailService;
+        _jobsWorkflowOptions = jobsWorkflowOptions.Value;
         _fetchDiagnosticsOptions = fetchDiagnosticsOptions.Value;
         _logger = logger;
     }
@@ -43,23 +46,25 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
         var excludedIds = excludedJobIds is { Count: > 0 }
             ? excludedJobIds.ToArray()
             : null;
+        var canLogDiagnostics = _fetchDiagnosticsOptions.Enabled && _logger.IsEnabled(LogLevel.Information);
+        var selectionResult = await SelectCandidatesAsync(
+            dbContext,
+            maxCount,
+            excludedIds,
+            cancellationToken);
+        var jobsToEnrich = selectionResult.Jobs;
 
-        var jobsQuery = dbContext.Jobs
-            .Where(
-                static job =>
-                    string.IsNullOrWhiteSpace(job.Description) ||
-                    string.IsNullOrWhiteSpace(job.CompanyApplyUrl) ||
-                    string.IsNullOrWhiteSpace(job.EmploymentStatus));
-
-        if (excludedIds is not null)
+        if (canLogDiagnostics)
         {
-            jobsQuery = jobsQuery.Where(job => !excludedIds.Contains(job.Id));
+            Log.JobEnrichmentDiagnosticsCandidateSelection(
+                _logger,
+                maxCount,
+                excludedIds?.Length ?? 0,
+                selectionResult.IncompleteSelectedCount,
+                selectionResult.StaleSelectedCount,
+                jobsToEnrich.Count,
+                selectionResult.StaleThresholdUtc);
         }
-
-        var jobsToEnrich = await jobsQuery
-            .OrderByDescending(static job => job.LastSeenAtUtc)
-            .Take(maxCount)
-            .ToListAsync(cancellationToken);
 
         var attemptedJobIds = jobsToEnrich
             .Select(static job => job.Id)
@@ -74,7 +79,7 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
         {
             await progressCallback(
                 new JobStageProgress(
-                    $"Queued {jobsToEnrich.Count} jobs for LinkedIn detail enrichment.",
+                    "Queued selected jobs for LinkedIn detail enrichment.",
                     jobsToEnrich.Count,
                     0,
                     0,
@@ -111,7 +116,7 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
                     {
                         await progressCallback(
                             new JobStageProgress(
-                                $"Enrichment {processedCount}/{jobsToEnrich.Count} failed for '{displayTitle}': {detailResult.Message}",
+                                $"LinkedIn detail fetch failed for '{displayTitle}': {detailResult.Message}",
                                 jobsToEnrich.Count,
                                 processedCount,
                                 enrichedCount,
@@ -125,8 +130,7 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
                 warningCount += detailResult.Warnings.Count;
 
                 if (detailResult.Warnings.Count > 0 &&
-                    _fetchDiagnosticsOptions.Enabled &&
-                    _logger.IsEnabled(LogLevel.Information))
+                    canLogDiagnostics)
                 {
                     var sanitizedTitle = SensitiveDataRedaction.SanitizeForMessage(displayTitle, maxLength: 300);
                     var formattedWarnings = FormatWarnings(detailResult.Warnings);
@@ -142,36 +146,38 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
                 }
 
                 var detail = detailResult.Job;
-                job.Title = detail.Title;
+                var detailSyncedAtUtc = DateTimeOffset.UtcNow;
+                var mergedDetail = MergeDetailForPersistence(job, detail);
+                var detailFingerprint = JobDetailFingerprint.Compute(mergedDetail);
+                var detailChanged = !string.Equals(
+                    job.DetailContentFingerprint,
+                    detailFingerprint,
+                    StringComparison.Ordinal);
 
-                if (!string.IsNullOrWhiteSpace(detail.CompanyName))
+                if (detailChanged)
                 {
-                    job.CompanyName = detail.CompanyName;
+                    job.Title = mergedDetail.Title;
+                    job.CompanyName = mergedDetail.CompanyName;
+                    job.LocationName = mergedDetail.LocationName;
+                    job.EmploymentStatus = mergedDetail.EmploymentStatus;
+                    job.Description = mergedDetail.Description;
+                    job.CompanyApplyUrl = mergedDetail.CompanyApplyUrl;
+                    job.ListedAtUtc = mergedDetail.ListedAtUtc;
+                    job.LinkedInUpdatedAtUtc = mergedDetail.LinkedInUpdatedAtUtc;
                 }
 
-                if (!string.IsNullOrWhiteSpace(detail.LocationName))
-                {
-                    job.LocationName = detail.LocationName;
-                }
+                job.DetailContentFingerprint = detailFingerprint;
+                job.LastDetailSyncedAtUtc = detailSyncedAtUtc;
 
-                if (!string.IsNullOrWhiteSpace(detail.EmploymentStatus))
+                if (canLogDiagnostics)
                 {
-                    job.EmploymentStatus = detail.EmploymentStatus;
-                }
-
-                if (!string.IsNullOrWhiteSpace(detail.Description))
-                {
-                    job.Description = detail.Description;
-                }
-
-                if (!string.IsNullOrWhiteSpace(detail.CompanyApplyUrl))
-                {
-                    job.CompanyApplyUrl = detail.CompanyApplyUrl;
-                }
-
-                if (detail.ListedAtUtc.HasValue)
-                {
-                    job.ListedAtUtc = detail.ListedAtUtc;
+                    Log.JobEnrichmentDiagnosticsDetailSyncOutcome(
+                        _logger,
+                        processedCount,
+                        jobsToEnrich.Count,
+                        job.LinkedInJobId,
+                        detailChanged,
+                        detail.LinkedInUpdatedAtUtc.HasValue);
                 }
 
                 enrichedCount++;
@@ -185,7 +191,7 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
 
                     await progressCallback(
                         new JobStageProgress(
-                            $"Enrichment {processedCount}/{jobsToEnrich.Count} updated '{displayTitle}'{warningsSuffix}.",
+                            $"Updated '{displayTitle}' from LinkedIn detail payload{warningsSuffix}.",
                             jobsToEnrich.Count,
                             processedCount,
                             enrichedCount,
@@ -277,6 +283,104 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    private async Task<CandidateSelectionResult> SelectCandidatesAsync(
+        LinkedInJobScraperDbContext dbContext,
+        int maxCount,
+        Guid[]? excludedIds,
+        CancellationToken cancellationToken)
+    {
+        var selectedJobs = new List<Persistence.Entities.JobRecord>(maxCount);
+        var selectedIds = new HashSet<Guid>();
+
+        var incompleteQuery = dbContext.Jobs.Where(
+            static job =>
+                string.IsNullOrWhiteSpace(job.Description) ||
+                string.IsNullOrWhiteSpace(job.CompanyApplyUrl) ||
+                string.IsNullOrWhiteSpace(job.EmploymentStatus));
+
+        if (excludedIds is not null)
+        {
+            incompleteQuery = incompleteQuery.Where(job => !excludedIds.Contains(job.Id));
+        }
+
+        var incompleteJobs = await incompleteQuery
+            .OrderByDescending(static job => job.LastSeenAtUtc)
+            .Take(maxCount)
+            .ToListAsync(cancellationToken);
+
+        selectedJobs.AddRange(incompleteJobs);
+
+        foreach (var job in incompleteJobs)
+        {
+            selectedIds.Add(job.Id);
+        }
+
+        var remainingCapacity = maxCount - selectedJobs.Count;
+        if (remainingCapacity <= 0)
+        {
+            return new CandidateSelectionResult(
+                selectedJobs,
+                incompleteJobs.Count,
+                0,
+                DateTimeOffset.UtcNow - _jobsWorkflowOptions.GetDetailResyncAfter());
+        }
+
+        var staleThresholdUtc = DateTimeOffset.UtcNow - _jobsWorkflowOptions.GetDetailResyncAfter();
+        var staleQuery = dbContext.Jobs.Where(
+            job =>
+                !string.IsNullOrWhiteSpace(job.Description) &&
+                !string.IsNullOrWhiteSpace(job.CompanyApplyUrl) &&
+                !string.IsNullOrWhiteSpace(job.EmploymentStatus) &&
+                (!job.LastDetailSyncedAtUtc.HasValue || job.LastDetailSyncedAtUtc.Value < staleThresholdUtc));
+
+        if (excludedIds is not null)
+        {
+            staleQuery = staleQuery.Where(job => !excludedIds.Contains(job.Id));
+        }
+
+        if (selectedIds.Count > 0)
+        {
+            staleQuery = staleQuery.Where(job => !selectedIds.Contains(job.Id));
+        }
+
+        var staleJobs = await staleQuery
+            .OrderBy(static job => job.LastDetailSyncedAtUtc ?? DateTimeOffset.MinValue)
+            .ThenByDescending(static job => job.LastSeenAtUtc)
+            .Take(remainingCapacity)
+            .ToListAsync(cancellationToken);
+
+        selectedJobs.AddRange(staleJobs);
+
+        return new CandidateSelectionResult(
+            selectedJobs,
+            incompleteJobs.Count,
+            staleJobs.Count,
+            staleThresholdUtc);
+    }
+
+    private static LinkedInJobDetailData MergeDetailForPersistence(
+        Persistence.Entities.JobRecord existing,
+        LinkedInJobDetailData incoming)
+    {
+        return incoming with
+        {
+            CompanyName = Coalesce(existing.CompanyName, incoming.CompanyName),
+            LocationName = Coalesce(existing.LocationName, incoming.LocationName),
+            EmploymentStatus = Coalesce(existing.EmploymentStatus, incoming.EmploymentStatus),
+            Description = Coalesce(existing.Description, incoming.Description),
+            CompanyApplyUrl = Coalesce(existing.CompanyApplyUrl, incoming.CompanyApplyUrl),
+            ListedAtUtc = incoming.ListedAtUtc ?? existing.ListedAtUtc,
+            LinkedInUpdatedAtUtc = incoming.LinkedInUpdatedAtUtc ?? existing.LinkedInUpdatedAtUtc
+        };
+    }
+
+    private static string? Coalesce(string? existing, string? incoming)
+    {
+        return string.IsNullOrWhiteSpace(incoming)
+            ? existing
+            : incoming;
+    }
+
     private static string FormatWarnings(IReadOnlyList<string> warnings)
     {
         if (warnings.Count == 0)
@@ -298,6 +402,12 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
 
         return SensitiveDataRedaction.SanitizeForMessage(builder.ToString(), maxLength: 2000);
     }
+
+    private sealed record CandidateSelectionResult(
+        List<Persistence.Entities.JobRecord> Jobs,
+        int IncompleteSelectedCount,
+        int StaleSelectedCount,
+        DateTimeOffset StaleThresholdUtc);
 }
 
 internal static partial class Log
@@ -314,4 +424,29 @@ internal static partial class Log
         string title,
         int warningCount,
         string warnings);
+
+    [LoggerMessage(
+        EventId = 2202,
+        Level = LogLevel.Information,
+        Message = "Job enrichment diagnostics candidate selection. RequestedCount={RequestedCount}, ExcludedCount={ExcludedCount}, IncompleteSelectedCount={IncompleteSelectedCount}, StaleSelectedCount={StaleSelectedCount}, TotalSelectedCount={TotalSelectedCount}, StaleThresholdUtc={StaleThresholdUtc}")]
+    public static partial void JobEnrichmentDiagnosticsCandidateSelection(
+        ILogger logger,
+        int requestedCount,
+        int excludedCount,
+        int incompleteSelectedCount,
+        int staleSelectedCount,
+        int totalSelectedCount,
+        DateTimeOffset staleThresholdUtc);
+
+    [LoggerMessage(
+        EventId = 2203,
+        Level = LogLevel.Information,
+        Message = "Job enrichment diagnostics detail sync outcome. Sequence={Sequence}, TotalQueued={TotalQueued}, LinkedInJobId={LinkedInJobId}, DetailChanged={DetailChanged}, LinkedInUpdatedAtPresent={LinkedInUpdatedAtPresent}")]
+    public static partial void JobEnrichmentDiagnosticsDetailSyncOutcome(
+        ILogger logger,
+        int sequence,
+        int totalQueued,
+        string linkedInJobId,
+        bool detailChanged,
+        bool linkedInUpdatedAtPresent);
 }

@@ -31,6 +31,10 @@ public static class ServiceCollectionExtensions
             .Bind(configuration.GetSection(OpenAiSecurityOptions.SectionName))
             .ValidateOnStart();
 
+        services.AddOptions<AiGlobalShortlistOptions>()
+            .Bind(configuration.GetSection(AiGlobalShortlistOptions.SectionName))
+            .ValidateOnStart();
+
         services.AddOptions<LinkedInFetchDiagnosticsOptions>()
             .Bind(configuration.GetSection(LinkedInFetchDiagnosticsOptions.SectionName))
             .ValidateOnStart();
@@ -39,8 +43,16 @@ public static class ServiceCollectionExtensions
             .Bind(configuration.GetSection(LinkedInFetchLimitsOptions.SectionName))
             .ValidateOnStart();
 
+        services.AddOptions<LinkedInIncrementalFetchOptions>()
+            .Bind(configuration.GetSection(LinkedInIncrementalFetchOptions.SectionName))
+            .ValidateOnStart();
+
         services.AddOptions<LinkedInRequestOptions>()
             .Bind(configuration.GetSection(LinkedInRequestOptions.SectionName))
+            .ValidateOnStart();
+
+        services.AddOptions<LinkedInRequestSafetyOptions>()
+            .Bind(configuration.GetSection(LinkedInRequestSafetyOptions.SectionName))
             .ValidateOnStart();
 
         services.AddOptions<LinkedInBrowserAutomationOptions>()
@@ -68,9 +80,12 @@ public static class ServiceCollectionExtensions
         services.AddSignalR();
         services.AddSingleton<IValidateOptions<SqlServerOptions>, SqlServerOptionsValidator>();
         services.AddSingleton<IValidateOptions<OpenAiSecurityOptions>, OpenAiSecurityOptionsValidator>();
+        services.AddSingleton<IValidateOptions<AiGlobalShortlistOptions>, AiGlobalShortlistOptionsValidator>();
         services.AddSingleton<IValidateOptions<LinkedInFetchDiagnosticsOptions>, LinkedInFetchDiagnosticsOptionsValidator>();
         services.AddSingleton<IValidateOptions<LinkedInFetchLimitsOptions>, LinkedInFetchLimitsOptionsValidator>();
+        services.AddSingleton<IValidateOptions<LinkedInIncrementalFetchOptions>, LinkedInIncrementalFetchOptionsValidator>();
         services.AddSingleton<IValidateOptions<LinkedInRequestOptions>, LinkedInRequestOptionsValidator>();
+        services.AddSingleton<IValidateOptions<LinkedInRequestSafetyOptions>, LinkedInRequestSafetyOptionsValidator>();
         services.AddSingleton<IValidateOptions<JobsWorkflowOptions>, JobsWorkflowOptionsValidator>();
         services.AddSingleton<IAppUserPasswordHasher, AppUserPasswordHasher>();
         services.AddTransient<IAppUserAuthenticationService, AppUserAuthenticationService>();
@@ -81,6 +96,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ILinkedInSearchSettingsService, LinkedInSearchSettingsService>();
         services.AddSingleton<IJobsWorkflowStateStore, InMemoryJobsWorkflowStateStore>();
         services.AddSingleton<IJobsWorkflowProgressNotifier, SignalRJobsWorkflowProgressNotifier>();
+        services.AddSingleton<IAiGlobalShortlistProgressStateStore, InMemoryAiGlobalShortlistProgressStateStore>();
+        services.AddSingleton<IAiGlobalShortlistProgressNotifier, SignalRAiGlobalShortlistProgressNotifier>();
         services.AddTransient<ILinkedInSessionVerificationService, LinkedInSessionVerificationService>();
         services.AddTransient<IAiBehaviorSettingsService, AiBehaviorSettingsService>();
         services.AddTransient<ILinkedInLocationLookupService, LinkedInLocationLookupService>();
@@ -93,12 +110,24 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IJobsWorkflowExecutor, ScopedJobsWorkflowExecutor>();
         services.AddDbContextFactory<LinkedInJobScraperDbContext>(ConfigureSqlServerDbContext);
 
-        services.AddHttpClient<ILinkedInApiClient, LinkedInApiClient>()
-            .ConfigurePrimaryHttpMessageHandler(CreateLinkedInHttpHandler)
-            .AddStandardResilienceHandler();
+        var linkedInRequestSafety = configuration
+            .GetSection(LinkedInRequestSafetyOptions.SectionName)
+            .Get<LinkedInRequestSafetyOptions>() ?? new LinkedInRequestSafetyOptions();
+
+        var linkedInHttpClientBuilder = services.AddHttpClient<ILinkedInApiClient, LinkedInApiClient>()
+            .ConfigurePrimaryHttpMessageHandler(CreateLinkedInHttpHandler);
+
+        var maxRetryAttempts = linkedInRequestSafety.GetMaxRetryAttempts();
+        if (maxRetryAttempts > 0)
+        {
+            linkedInHttpClientBuilder.AddStandardResilienceHandler(
+                resilienceOptions => resilienceOptions.Retry.MaxRetryAttempts = maxRetryAttempts);
+        }
 
         services.AddTransient<IOpenAiResponsesClient, OpenAiSdkResponsesClient>();
         services.AddTransient<IJobScoringGateway, OpenAiJobScoringGateway>();
+        services.AddTransient<IAiGlobalShortlistGateway, OpenAiGlobalShortlistGateway>();
+        services.AddTransient<IAiGlobalShortlistService, AiGlobalShortlistService>();
 
         services.AddTransient<LinkedInFeasibilityProbe>();
 
