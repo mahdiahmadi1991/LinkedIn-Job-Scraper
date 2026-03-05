@@ -206,3 +206,97 @@ public sealed class JobsWorkflowOptionsValidator : IValidateOptions<JobsWorkflow
         return ValidateOptionsResult.Success;
     }
 }
+
+public sealed class AiGlobalShortlistOptionsValidator : IValidateOptions<AiGlobalShortlistOptions>
+{
+    public ValidateOptionsResult Validate(string? name, AiGlobalShortlistOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (options.MaxCandidateCount.HasValue && options.MaxCandidateCount.Value <= 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "AI global shortlist max candidate count must be greater than zero when configured. Set 'OpenAI:GlobalShortlist:MaxCandidateCount' to a positive integer value.");
+        }
+
+        if (options.InterCandidateDelayMilliseconds.HasValue && options.InterCandidateDelayMilliseconds.Value < 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "AI global shortlist inter-candidate delay must be zero or greater when configured. Set 'OpenAI:GlobalShortlist:InterCandidateDelayMilliseconds' to a non-negative integer value.");
+        }
+
+        if (options.AcceptedScoreThreshold.HasValue &&
+            (options.AcceptedScoreThreshold.Value < 0 || options.AcceptedScoreThreshold.Value > 100))
+        {
+            return ValidateOptionsResult.Fail(
+                "AI global shortlist accepted score threshold must be between 0 and 100 when configured. Set 'OpenAI:GlobalShortlist:AcceptedScoreThreshold' to a valid score.");
+        }
+
+        if (options.RejectedScoreThreshold.HasValue &&
+            (options.RejectedScoreThreshold.Value < 0 || options.RejectedScoreThreshold.Value > 100))
+        {
+            return ValidateOptionsResult.Fail(
+                "AI global shortlist rejected score threshold must be between 0 and 100 when configured. Set 'OpenAI:GlobalShortlist:RejectedScoreThreshold' to a valid score.");
+        }
+
+        if (options.TransientRetryAttempts.HasValue && options.TransientRetryAttempts.Value < 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "AI global shortlist transient retry attempts must be zero or greater when configured. Set 'OpenAI:GlobalShortlist:TransientRetryAttempts' to a non-negative integer.");
+        }
+
+        if (options.TransientRetryBaseDelayMilliseconds.HasValue && options.TransientRetryBaseDelayMilliseconds.Value < 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "AI global shortlist transient retry base delay must be zero or greater when configured. Set 'OpenAI:GlobalShortlist:TransientRetryBaseDelayMilliseconds' to a non-negative integer.");
+        }
+
+        if (options.BatchSize.HasValue && options.BatchSize.Value <= 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "AI global shortlist batch size must be greater than zero when configured. Set 'OpenAI:GlobalShortlist:BatchSize' to a positive integer value.");
+        }
+
+        if (options.MaxRecommendationsPerBatch.HasValue && options.MaxRecommendationsPerBatch.Value <= 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "AI global shortlist max recommendations per batch must be greater than zero when configured. Set 'OpenAI:GlobalShortlist:MaxRecommendationsPerBatch' to a positive integer value.");
+        }
+
+        if (options.MaxRecommendationsPerRun.HasValue && options.MaxRecommendationsPerRun.Value <= 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "AI global shortlist max recommendations per run must be greater than zero when configured. Set 'OpenAI:GlobalShortlist:MaxRecommendationsPerRun' to a positive integer value.");
+        }
+
+        if (options.InterBatchDelayMilliseconds.HasValue && options.InterBatchDelayMilliseconds.Value < 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "AI global shortlist inter-batch delay must be zero or greater when configured. Set 'OpenAI:GlobalShortlist:InterBatchDelayMilliseconds' to a non-negative integer value.");
+        }
+
+        if (options.FallbackPerItemCap.HasValue && options.FallbackPerItemCap.Value < 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "AI global shortlist fallback per-item cap must be zero or greater when configured. Set 'OpenAI:GlobalShortlist:FallbackPerItemCap' to a non-negative integer value.");
+        }
+
+        if (options.BatchSize.HasValue &&
+            options.MaxRecommendationsPerBatch.HasValue &&
+            options.MaxRecommendationsPerBatch.Value > options.BatchSize.Value)
+        {
+            return ValidateOptionsResult.Fail(
+                "AI global shortlist max recommendations per batch cannot exceed batch size. Ensure 'OpenAI:GlobalShortlist:MaxRecommendationsPerBatch' is less than or equal to 'OpenAI:GlobalShortlist:BatchSize'.");
+        }
+
+        if (options.AcceptedScoreThreshold.HasValue &&
+            options.RejectedScoreThreshold.HasValue &&
+            options.AcceptedScoreThreshold.Value < options.RejectedScoreThreshold.Value)
+        {
+            return ValidateOptionsResult.Fail(
+                "AI global shortlist accepted score threshold must be greater than or equal to rejected score threshold.");
+        }
+
+        return ValidateOptionsResult.Success;
+    }
+}

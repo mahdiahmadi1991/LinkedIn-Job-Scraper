@@ -137,19 +137,19 @@
                         <h2 class="h5">AI Review</h2>
                         <p class="mb-2 job-summary @(string.IsNullOrWhiteSpace(Model.AiSummary) ? "d-none" : null)"
                            data-job-ai-summary-text
-                           dir="@Model.AiOutputDirection"
+                           dir="auto"
                            lang="@Model.AiOutputLanguageCode">@Model.AiSummary</p>
                         <p class="text-muted mb-2 @(string.IsNullOrWhiteSpace(Model.AiSummary) ? null : "d-none")" data-job-ai-summary-empty>This job has not been scored yet.</p>
                     </div>
 
                     <div class="details-review-block match @(string.IsNullOrWhiteSpace(Model.AiWhyMatched) ? "d-none" : null)" data-job-why-section>
                         <div class="small text-success fw-semibold text-uppercase mb-1">Why Matched</div>
-                        <div data-job-why-text dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@Model.AiWhyMatched</div>
+                        <div data-job-why-text dir="auto" lang="@Model.AiOutputLanguageCode">@Model.AiWhyMatched</div>
                     </div>
 
                     <div class="details-review-block concern @(string.IsNullOrWhiteSpace(Model.AiConcerns) ? "d-none" : null)" data-job-concerns-section>
                         <div class="small text-warning-emphasis fw-semibold text-uppercase mb-1">Concerns</div>
-                        <div data-job-concerns-text dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@Model.AiConcerns</div>
+                        <div data-job-concerns-text dir="auto" lang="@Model.AiOutputLanguageCode">@Model.AiConcerns</div>
                     </div>
                 </div>
             </div>
@@ -167,7 +167,7 @@
             }
             else
             {
-                <div class="details-description">@Model.Description</div>
+                <div class="details-description" dir="auto">@Model.Description</div>
             }
         </div>
     </section>

@@ -1,6 +1,7 @@
 using System.Net;
 using System.IO;
 using System.Threading.RateLimiting;
+using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Composition;
 using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Jobs;
@@ -85,6 +86,7 @@ app.MapHealthChecks(
     });
 app.MapStaticAssets();
 app.MapHub<JobsWorkflowProgressHub>("/hubs/jobs-workflow-progress");
+app.MapHub<AiGlobalShortlistProgressHub>("/hubs/ai-global-shortlist-progress");
 
 app.MapControllerRoute(
     name: "default",

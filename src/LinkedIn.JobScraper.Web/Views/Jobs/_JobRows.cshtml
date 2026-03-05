@@ -148,7 +148,7 @@
                         <div class="job-detail-label">AI Summary</div>
                         <div class="job-summary line-clamp-3 @(string.IsNullOrWhiteSpace(job.AiSummary) ? "d-none" : null)"
                              data-job-ai-summary-text
-                             dir="@Model.AiOutputDirection"
+                             dir="auto"
                              lang="@Model.AiOutputLanguageCode">
                             @job.AiSummary
                         </div>
@@ -160,11 +160,11 @@
                              data-job-ai-signals>
                             <div class="job-signal-item @(string.IsNullOrWhiteSpace(job.AiWhyMatched) ? "d-none" : null)" data-job-why-section>
                                 <span class="job-signal-label match">Match</span>
-                                <span class="text-body-secondary" data-job-why-text dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@job.AiWhyMatched</span>
+                                <span class="text-body-secondary" data-job-why-text dir="auto" lang="@Model.AiOutputLanguageCode">@job.AiWhyMatched</span>
                             </div>
                             <div class="job-signal-item @(string.IsNullOrWhiteSpace(job.AiConcerns) ? "d-none" : null)" data-job-concerns-section>
                                 <span class="job-signal-label concern">Concern</span>
-                                <span class="text-body-secondary" data-job-concerns-text dir="@Model.AiOutputDirection" lang="@Model.AiOutputLanguageCode">@job.AiConcerns</span>
+                                <span class="text-body-secondary" data-job-concerns-text dir="auto" lang="@Model.AiOutputLanguageCode">@job.AiConcerns</span>
                             </div>
                         </div>
                         <div class="text-muted small @((string.IsNullOrWhiteSpace(job.AiWhyMatched) && string.IsNullOrWhiteSpace(job.AiConcerns)) ? null : "d-none")" data-job-ai-signals-empty>No AI rationale is stored yet.</div>

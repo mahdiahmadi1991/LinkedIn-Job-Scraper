@@ -156,6 +156,16 @@ public sealed class ConfigurationValidationTests
             });
 
         Assert.True(detailResyncValidation.Failed);
+
+        var globalShortlistValidation = new AiGlobalShortlistOptionsValidator().Validate(
+            Options.DefaultName,
+            new AiGlobalShortlistOptions
+            {
+                BatchSize = 5,
+                MaxRecommendationsPerBatch = 6
+            });
+
+        Assert.True(globalShortlistValidation.Failed);
     }
 
     [Fact]

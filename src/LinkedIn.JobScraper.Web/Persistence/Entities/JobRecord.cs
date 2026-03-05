@@ -138,4 +138,15 @@ public sealed class JobRecord
     /// Historical status transitions for audit and timeline display.
     /// </summary>
     public ICollection<JobStatusHistoryRecord> StatusHistory { get; set; } = new List<JobStatusHistoryRecord>();
+
+    /// <summary>
+    /// Snapshot rows linking this job to frozen candidate sets in shortlist runs.
+    /// </summary>
+    public ICollection<AiGlobalShortlistRunCandidateRecord> GlobalShortlistRunCandidates { get; set; } =
+        new List<AiGlobalShortlistRunCandidateRecord>();
+
+    /// <summary>
+    /// Historical appearances of this job in AI global shortlist runs.
+    /// </summary>
+    public ICollection<AiGlobalShortlistItemRecord> GlobalShortlistItems { get; set; } = new List<AiGlobalShortlistItemRecord>();
 }

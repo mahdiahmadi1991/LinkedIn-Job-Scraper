@@ -4,6 +4,7 @@ using LinkedIn.JobScraper.Web.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LinkedIn.JobScraper.Web.Persistence.Migrations
 {
     [DbContext(typeof(LinkedInJobScraperDbContext))]
-    partial class LinkedInJobScraperDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260305191756_AddAiGlobalShortlistPersistence")]
+    partial class AddAiGlobalShortlistPersistence
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -79,37 +82,8 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                     b.Property<int?>("Confidence")
                         .HasColumnType("int");
 
-                    b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("Decision")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.Property<string>("ErrorCode")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<int?>("InputTokenCount")
-                        .HasColumnType("int");
-
                     b.Property<Guid>("JobRecordId")
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<int?>("LatencyMilliseconds")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ModelName")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<int?>("OutputTokenCount")
-                        .HasColumnType("int");
-
-                    b.Property<string>("PromptVersion")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
 
                     b.Property<int>("Rank")
                         .HasColumnType("int");
@@ -124,16 +98,11 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                     b.Property<int?>("Score")
                         .HasColumnType("int");
 
-                    b.Property<int?>("TotalTokenCount")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
                     b.HasIndex("JobRecordId");
 
                     b.HasIndex("RunId");
-
-                    b.HasIndex("RunId", "Decision");
 
                     b.HasIndex("RunId", "JobRecordId")
                         .IsUnique();
@@ -144,52 +113,11 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                     b.ToTable("AiGlobalShortlistItems", (string)null);
                 });
 
-            modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.AiGlobalShortlistRunCandidateRecord", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("JobRecordId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset?>("ProcessedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid>("RunId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("SequenceNumber")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("JobRecordId");
-
-                    b.HasIndex("RunId");
-
-                    b.HasIndex("RunId", "JobRecordId")
-                        .IsUnique();
-
-                    b.HasIndex("RunId", "SequenceNumber")
-                        .IsUnique();
-
-                    b.ToTable("AiGlobalShortlistRunCandidates", (string)null);
-                });
-
             modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.AiGlobalShortlistRunRecord", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset?>("CancellationRequestedAtUtc")
-                        .HasColumnType("datetimeoffset");
 
                     b.Property<int>("CandidateCount")
                         .HasColumnType("int");
@@ -200,25 +128,9 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<int>("FailedCount")
-                        .HasColumnType("int");
-
                     b.Property<string>("ModelName")
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
-
-                    b.Property<int>("NeedsReviewCount")
-                        .HasColumnType("int");
-
-                    b.Property<int>("NextSequenceNumber")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ProcessedCount")
-                        .HasColumnType("int");
-
-                    b.Property<string>("PromptVersion")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
 
                     b.Property<int>("ShortlistedCount")
                         .HasColumnType("int");
@@ -552,25 +464,6 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                     b.Navigation("Run");
                 });
 
-            modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.AiGlobalShortlistRunCandidateRecord", b =>
-                {
-                    b.HasOne("LinkedIn.JobScraper.Web.Persistence.Entities.JobRecord", "JobRecord")
-                        .WithMany("GlobalShortlistRunCandidates")
-                        .HasForeignKey("JobRecordId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("LinkedIn.JobScraper.Web.Persistence.Entities.AiGlobalShortlistRunRecord", "Run")
-                        .WithMany("Candidates")
-                        .HasForeignKey("RunId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("JobRecord");
-
-                    b.Navigation("Run");
-                });
-
             modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.JobStatusHistoryRecord", b =>
                 {
                     b.HasOne("LinkedIn.JobScraper.Web.Persistence.Entities.JobRecord", "JobRecord")
@@ -584,16 +477,12 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
 
             modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.AiGlobalShortlistRunRecord", b =>
                 {
-                    b.Navigation("Candidates");
-
                     b.Navigation("Items");
                 });
 
             modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.JobRecord", b =>
                 {
                     b.Navigation("GlobalShortlistItems");
-
-                    b.Navigation("GlobalShortlistRunCandidates");
 
                     b.Navigation("StatusHistory");
                 });

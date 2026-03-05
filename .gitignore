@@ -5,6 +5,7 @@ obj/
 .vscode/
 .idea/
 .secrets/
+.playwright-cli/
 
 TestResults/
 coverage/

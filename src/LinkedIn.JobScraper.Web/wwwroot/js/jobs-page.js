@@ -29,6 +29,9 @@
     const busySpinner = form.querySelector("[data-busy-spinner]");
     const workflowStorageKey = "jobs.activeWorkflow";
     const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+    const maxProgressLogItems = 140;
+    const workflowHeartbeatIntervalMs = 3500;
+    const workflowHeartbeatSilenceMs = 6500;
     let signalRConnection = null;
     let isSubmitting = false;
     let lastLoggedMessage = null;
@@ -36,10 +39,12 @@
     let lastSequence = 0;
     let workflowTerminalState = null;
     let workflowPollingTimer = null;
+    let workflowHeartbeatTimer = null;
     let activeFetchPromise = null;
     let workflowRedirectUrl = null;
     let isPageUnloading = false;
     let isProgressLogCollapsed = false;
+    let lastProgressEventAt = 0;
 
     const isCancelledAlertMessage = (message) =>
         typeof message === "string" && /\bcancelled\b/i.test(message);
@@ -138,6 +143,7 @@
 
     const resetWorkflowUi = ({ hidePanel = false, preserveLogCollapse = false } = {}) => {
         stopPolling();
+        stopHeartbeat();
         isSubmitting = false;
         activeFetchPromise = null;
         activeWorkflowId = null;
@@ -145,6 +151,7 @@
         workflowRedirectUrl = null;
         lastSequence = 0;
         lastLoggedMessage = null;
+        lastProgressEventAt = 0;
         clearActiveWorkflowId();
         setIdleState();
         if (!preserveLogCollapse) {
@@ -163,6 +170,118 @@
 
         window.clearTimeout(workflowPollingTimer);
         workflowPollingTimer = null;
+    };
+
+    const appendProgressLog = (update, occurredAtUtc, options = {}) => {
+        if (!progressLog || !update || !update.message) {
+            return;
+        }
+
+        const bypassDedupe = Boolean(options.bypassDedupe);
+        const dedupeKey = `${update.state}|${update.stage}|${update.message}|${update.requestedCount}|${update.processedCount}|${update.succeededCount}|${update.failedCount}`;
+        if (!bypassDedupe && lastLoggedMessage === dedupeKey) {
+            return;
+        }
+
+        lastLoggedMessage = dedupeKey;
+        lastProgressEventAt = Date.now();
+
+        if (progressLogEmpty) {
+            progressLogEmpty.classList.add("d-none");
+        }
+
+        progressLog.classList.remove("d-none");
+
+        const item = document.createElement("div");
+        item.className = "progress-activity-item";
+
+        const state = String(update.state || "running");
+        if (state === "completed") {
+            item.classList.add("completed");
+        } else if (state === "warning" || state === "cancelled") {
+            item.classList.add("warning");
+        } else if (state === "failed") {
+            item.classList.add("failed");
+        }
+
+        const timestamp = occurredAtUtc ? new Date(occurredAtUtc) : new Date();
+        const timeLabel = new Intl.DateTimeFormat([], {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit"
+        }).format(timestamp);
+
+        const detailParts = [];
+        if (Number.isFinite(Number(update.requestedCount)) && Number(update.requestedCount) > 0) {
+            detailParts.push(`Requested: ${update.requestedCount}`);
+        }
+        if (Number.isFinite(Number(update.processedCount)) && Number(update.processedCount) > 0) {
+            detailParts.push(`Processed: ${update.processedCount}`);
+        }
+        if (Number.isFinite(Number(update.succeededCount)) && Number(update.succeededCount) > 0) {
+            detailParts.push(`Succeeded: ${update.succeededCount}`);
+        }
+        if (Number.isFinite(Number(update.failedCount)) && Number(update.failedCount) > 0) {
+            detailParts.push(`Failed: ${update.failedCount}`);
+        }
+
+        const detailsMarkup = detailParts.length > 0
+            ? `<div class="progress-activity-details">${detailParts.join(" · ")}</div>`
+            : "";
+
+        item.innerHTML = `
+            <div class="progress-activity-meta">
+                <span class="progress-activity-time">${timeLabel}</span>
+                <span class="progress-activity-state">${state}</span>
+            </div>
+            <div class="progress-activity-message">${update.message}</div>
+            ${detailsMarkup}
+        `;
+
+        progressLog.append(item);
+        while (progressLog.children.length > maxProgressLogItems) {
+            progressLog.removeChild(progressLog.firstElementChild);
+        }
+
+        window.requestAnimationFrame(() => {
+            item.classList.add("is-visible");
+            scrollProgressLogToLatest();
+        });
+    };
+
+    const stopHeartbeat = () => {
+        if (!workflowHeartbeatTimer) {
+            return;
+        }
+
+        window.clearInterval(workflowHeartbeatTimer);
+        workflowHeartbeatTimer = null;
+    };
+
+    const startHeartbeat = () => {
+        stopHeartbeat();
+        lastProgressEventAt = Date.now();
+
+        workflowHeartbeatTimer = window.setInterval(() => {
+            if (!activeWorkflowId || workflowTerminalState) {
+                return;
+            }
+
+            const silentDurationMs = Date.now() - lastProgressEventAt;
+            if (silentDurationMs < workflowHeartbeatSilenceMs) {
+                return;
+            }
+
+            const silentSeconds = Math.max(1, Math.floor(silentDurationMs / 1000));
+            appendProgressLog(
+                {
+                    state: "running",
+                    stage: "fetch",
+                    message: `Workflow is active. Waiting for next server update (${silentSeconds}s idle)...`
+                },
+                new Date().toISOString(),
+                { bypassDedupe: true });
+        }, workflowHeartbeatIntervalMs);
     };
 
     const storeActiveWorkflowState = (workflowId, redirectUrl) => {
@@ -232,78 +351,6 @@
         }
 
         progressLog.scrollTop = top;
-    };
-
-    const appendProgressLog = (update, occurredAtUtc) => {
-        if (!progressLog || !update || !update.message) {
-            return;
-        }
-
-        const dedupeKey = `${update.state}|${update.stage}|${update.message}|${update.requestedCount}|${update.processedCount}|${update.succeededCount}|${update.failedCount}`;
-        if (lastLoggedMessage === dedupeKey) {
-            return;
-        }
-
-        lastLoggedMessage = dedupeKey;
-
-        if (progressLogEmpty) {
-            progressLogEmpty.classList.add("d-none");
-        }
-
-        progressLog.classList.remove("d-none");
-
-        const item = document.createElement("div");
-        item.className = "progress-activity-item";
-
-        const state = String(update.state || "running");
-        if (state === "completed") {
-            item.classList.add("completed");
-        } else if (state === "warning" || state === "cancelled") {
-            item.classList.add("warning");
-        } else if (state === "failed") {
-            item.classList.add("failed");
-        }
-
-        const timestamp = occurredAtUtc ? new Date(occurredAtUtc) : new Date();
-        const timeLabel = new Intl.DateTimeFormat([], {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit"
-        }).format(timestamp);
-
-        const detailParts = [];
-        if (Number.isFinite(Number(update.requestedCount)) && Number(update.requestedCount) > 0) {
-            detailParts.push(`Requested: ${update.requestedCount}`);
-        }
-        if (Number.isFinite(Number(update.processedCount)) && Number(update.processedCount) > 0) {
-            detailParts.push(`Processed: ${update.processedCount}`);
-        }
-        if (Number.isFinite(Number(update.succeededCount)) && Number(update.succeededCount) > 0) {
-            detailParts.push(`Succeeded: ${update.succeededCount}`);
-        }
-        if (Number.isFinite(Number(update.failedCount)) && Number(update.failedCount) > 0) {
-            detailParts.push(`Failed: ${update.failedCount}`);
-        }
-
-        const detailsMarkup = detailParts.length > 0
-            ? `<div class="progress-activity-details">${detailParts.join(" · ")}</div>`
-            : "";
-
-        item.innerHTML = `
-            <div class="progress-activity-meta">
-                <span class="progress-activity-time">${timeLabel}</span>
-                <span class="progress-activity-state">${state}</span>
-            </div>
-            <div class="progress-activity-message">${update.message}</div>
-            ${detailsMarkup}
-        `;
-
-        progressLog.append(item);
-
-        window.requestAnimationFrame(() => {
-            item.classList.add("is-visible");
-            scrollProgressLogToLatest();
-        });
     };
 
     const applyProgressUpdate = (update, occurredAtUtc) => {
@@ -472,6 +519,7 @@
         }
 
         setProgressLogCollapsed(false);
+        startHeartbeat();
 
         void pollWorkflowProgress();
     };
@@ -998,7 +1046,7 @@
         }
     };
 
-    const updateSignalSection = (root, sectionSelector, textSelector, value) => {
+    const updateSignalSection = (root, sectionSelector, textSelector, value, languageCode) => {
         const section = root.querySelector(sectionSelector);
         const text = root.querySelector(textSelector);
 
@@ -1007,6 +1055,12 @@
         }
 
         text.textContent = value || "";
+        text.setAttribute("dir", "auto");
+        if (languageCode) {
+            text.setAttribute("lang", languageCode);
+        } else {
+            text.removeAttribute("lang");
+        }
         section.classList.toggle("d-none", !value);
     };
 
@@ -1052,11 +1106,11 @@
             if (summaryText instanceof HTMLElement) {
                 summaryText.textContent = job.aiSummary || "";
                 summaryText.classList.toggle("d-none", !job.aiSummary);
-                if (job.aiOutputDirection) {
-                    summaryText.setAttribute("dir", job.aiOutputDirection);
-                }
+                summaryText.setAttribute("dir", "auto");
                 if (job.aiOutputLanguageCode) {
                     summaryText.setAttribute("lang", job.aiOutputLanguageCode);
+                } else {
+                    summaryText.removeAttribute("lang");
                 }
             }
 
@@ -1064,8 +1118,8 @@
                 summaryEmpty.classList.toggle("d-none", Boolean(job.aiSummary));
             }
 
-            updateSignalSection(root, "[data-job-why-section]", "[data-job-why-text]", job.aiWhyMatched);
-            updateSignalSection(root, "[data-job-concerns-section]", "[data-job-concerns-text]", job.aiConcerns);
+            updateSignalSection(root, "[data-job-why-section]", "[data-job-why-text]", job.aiWhyMatched, job.aiOutputLanguageCode);
+            updateSignalSection(root, "[data-job-concerns-section]", "[data-job-concerns-text]", job.aiConcerns, job.aiOutputLanguageCode);
 
             const hasSignals = Boolean(job.aiWhyMatched) || Boolean(job.aiConcerns);
             if (signalsStack instanceof HTMLElement) {

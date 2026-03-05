@@ -8,6 +8,8 @@
 - Work in small, reviewable steps.
 - Before editing files for a step, restate the exact outputs for that step.
 - After each approved implementation step, stop and wait for explicit user approval before continuing.
+- For every newly approved feature idea, create a dedicated `docs/ideas/<idea-name>.md` file before implementation starts.
+- The idea file must contain state-based execution steps, acceptance criteria, assumptions, and out-of-scope items; implementation must continuously reference that file to avoid drift.
 
 ## Product Direction
 

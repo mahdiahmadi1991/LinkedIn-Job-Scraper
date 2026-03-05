@@ -1,0 +1,186 @@
+@using LinkedIn.JobScraper.Web.Configuration
+@inject Microsoft.Extensions.Options.IOptions<AiGlobalShortlistOptions> GlobalShortlistOptions
+@{
+    ViewData["Title"] = "AI Live Review";
+    var showRunSnapshotSizeMetric = GlobalShortlistOptions.Value.GetMaxCandidateCount().HasValue;
+}
+
+<div class="ai-live-review-page d-flex flex-column gap-4"
+     data-ai-live-review
+     data-show-run-candidates-metric="@showRunSnapshotSizeMetric.ToString().ToLowerInvariant()"
+     data-start-url="@Url.Action("Start", "AiGlobalShortlist")"
+     data-latest-url="@Url.Action("Latest", "AiGlobalShortlist")"
+     data-overview-url="@Url.Action("Overview", "AiGlobalShortlist")"
+     data-run-url-template="@Url.Content("~/ai-global-shortlist/runs/__RUN_ID__")"
+     data-resume-url-template="@Url.Content("~/ai-global-shortlist/runs/__RUN_ID__/resume")"
+     data-cancel-url-template="@Url.Content("~/ai-global-shortlist/runs/__RUN_ID__/cancel")"
+     data-progress-url-template="@Url.Content("~/ai-global-shortlist/runs/__RUN_ID__/progress")"
+     data-progress-hub-url="/hubs/ai-global-shortlist-progress"
+     data-job-details-url="@Url.Action("Details", "Jobs")">
+
+    <section class="ai-live-review-hero card">
+        <div class="card-body d-flex flex-column gap-3">
+            <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-3">
+                <div>
+                    <div class="section-label">AI Live Review</div>
+                    <h1 class="h3 mb-1">Realtime shortlist orchestration</h1>
+                    <p class="dashboard-lead mb-0">
+                        Start, stop, or resume one shortlist run and watch candidate decisions arrive row-by-row.
+                    </p>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-outline-secondary" data-live-review-load-latest>
+                        Load latest run
+                    </button>
+                    <button type="button" class="btn btn-outline-primary" data-live-review-resume disabled>
+                        Resume
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" data-live-review-stop disabled>
+                        Stop
+                    </button>
+                </div>
+            </div>
+
+            <form method="post" class="d-inline-flex" data-live-review-start-form>
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-primary btn-lg disabled" data-live-review-start disabled>
+                    Start live review
+                </button>
+            </form>
+
+            <div class="ai-live-review-status small text-muted" data-live-review-status>
+                Idle. Click <strong>Start live review</strong> to begin.
+            </div>
+        </div>
+    </section>
+
+    <section class="card ai-live-review-overview">
+        <div class="card-body d-flex flex-column gap-3">
+            <div class="d-flex flex-wrap gap-3 ai-live-review-metrics">
+                <div class="ai-live-review-metric">
+                    <span class="ai-live-review-metric-label">Eligible Total</span>
+                    <span class="ai-live-review-metric-value" data-live-review-eligible-total>0</span>
+                </div>
+                <div class="ai-live-review-metric">
+                    <span class="ai-live-review-metric-label">Already Reviewed</span>
+                    <span class="ai-live-review-metric-value" data-live-review-already-reviewed>0</span>
+                </div>
+                <div class="ai-live-review-metric">
+                    <span class="ai-live-review-metric-label">Queue Remaining</span>
+                    <span class="ai-live-review-metric-value" data-live-review-queue-remaining>0</span>
+                </div>
+                <div class="ai-live-review-metric">
+                    <span class="ai-live-review-metric-label">State</span>
+                    <span class="ai-live-review-metric-value" data-live-review-state>Idle</span>
+                </div>
+                @if (showRunSnapshotSizeMetric)
+                {
+                    <div class="ai-live-review-metric">
+                        <span class="ai-live-review-metric-label">Run Snapshot Size</span>
+                        <span class="ai-live-review-metric-value" data-live-review-candidates>0</span>
+                    </div>
+                }
+                <div class="ai-live-review-metric">
+                    <span class="ai-live-review-metric-label">Run Processed</span>
+                    <span class="ai-live-review-metric-value" data-live-review-processed>0</span>
+                </div>
+                <div class="ai-live-review-metric">
+                    <span class="ai-live-review-metric-label">Run Shortlisted</span>
+                    <span class="ai-live-review-metric-value" data-live-review-accepted>0</span>
+                </div>
+                <div class="ai-live-review-metric">
+                    <span class="ai-live-review-metric-label">Run Needs Review</span>
+                    <span class="ai-live-review-metric-value" data-live-review-needs-review>0</span>
+                </div>
+                <div class="ai-live-review-metric">
+                    <span class="ai-live-review-metric-label">Run Failed</span>
+                    <span class="ai-live-review-metric-value" data-live-review-failed>0</span>
+                </div>
+            </div>
+            <div class="small text-muted">
+                Eligible/Reviewed/Remaining are global queue metrics. Run metrics belong to the latest run snapshot.
+            </div>
+        </div>
+    </section>
+
+    <section class="card ai-live-review-report-panel">
+        <div class="card-body d-flex flex-column gap-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                    <div class="section-label">Live Activity Report</div>
+                    <div class="fw-semibold">Step-by-step events from the running review</div>
+                </div>
+                <button type="button"
+                        class="btn progress-log-toggle"
+                        data-live-review-log-toggle
+                        aria-expanded="true"
+                        aria-controls="AiLiveReviewLogContent"
+                        aria-label="Collapse live activity report"
+                        title="Collapse live activity report">
+                    <span class="progress-log-toggle-icon" aria-hidden="true"></span>
+                </button>
+            </div>
+
+            <div id="AiLiveReviewLogContent" data-live-review-log-content>
+                <div class="ai-live-review-log-empty" data-live-review-log-empty>
+                    No live events yet. Start or load a run to stream detailed activity.
+                </div>
+                <div class="progress-activity-list d-none" data-live-review-log aria-live="polite"></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card ai-live-review-table-panel">
+        <div class="card-body d-flex flex-column gap-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <div class="section-label">Results Stream</div>
+                    <div class="fw-semibold">Newest decisions appear in realtime</div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <label class="small text-muted" for="FitLevelFilter">Filter</label>
+                    <select id="FitLevelFilter" class="form-select form-select-sm" data-live-review-filter>
+                        <option value="high" selected>High Fit (Special Suggestions)</option>
+                        <option value="medium">Medium Fit</option>
+                        <option value="low">Low Fit</option>
+                        <option value="all">All</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="ai-live-review-empty" data-live-review-empty>
+                No streamed results yet.
+            </div>
+
+            <div class="table-responsive d-none" data-live-review-table-shell>
+                <table class="table align-middle ai-live-review-table">
+                    <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Job</th>
+                        <th scope="col">Fit Level</th>
+                        <th scope="col">Score</th>
+                        <th scope="col">Confidence</th>
+                        <th scope="col">Reason</th>
+                        <th scope="col">Error</th>
+                    </tr>
+                    </thead>
+                    <tbody data-live-review-rows></tbody>
+                </table>
+            </div>
+
+            <div class="ai-live-review-pagination d-none" data-live-review-pagination>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-live-review-load-more>
+                    Load 10 more
+                </button>
+                <div class="small text-muted" data-live-review-pagination-status></div>
+            </div>
+        </div>
+    </section>
+</div>
+
+@section Scripts
+{
+    <script src="~/lib/microsoft-signalr/dist/browser/signalr.min.js"></script>
+    <script src="~/js/ai-live-review-page.js" asp-append-version="true"></script>
+}

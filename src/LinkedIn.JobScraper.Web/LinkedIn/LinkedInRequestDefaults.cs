@@ -121,7 +121,7 @@ public static class LinkedInRequestDefaults
         var safeKeywords = Uri.EscapeDataString(keywords);
         var selectedFilters = new List<string>
         {
-            "sortBy:List(DD)"
+            "sortBy:List(R)"
         };
 
         if (easyApply)

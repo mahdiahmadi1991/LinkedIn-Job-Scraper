@@ -31,6 +31,10 @@ public static class ServiceCollectionExtensions
             .Bind(configuration.GetSection(OpenAiSecurityOptions.SectionName))
             .ValidateOnStart();
 
+        services.AddOptions<AiGlobalShortlistOptions>()
+            .Bind(configuration.GetSection(AiGlobalShortlistOptions.SectionName))
+            .ValidateOnStart();
+
         services.AddOptions<LinkedInFetchDiagnosticsOptions>()
             .Bind(configuration.GetSection(LinkedInFetchDiagnosticsOptions.SectionName))
             .ValidateOnStart();
@@ -76,6 +80,7 @@ public static class ServiceCollectionExtensions
         services.AddSignalR();
         services.AddSingleton<IValidateOptions<SqlServerOptions>, SqlServerOptionsValidator>();
         services.AddSingleton<IValidateOptions<OpenAiSecurityOptions>, OpenAiSecurityOptionsValidator>();
+        services.AddSingleton<IValidateOptions<AiGlobalShortlistOptions>, AiGlobalShortlistOptionsValidator>();
         services.AddSingleton<IValidateOptions<LinkedInFetchDiagnosticsOptions>, LinkedInFetchDiagnosticsOptionsValidator>();
         services.AddSingleton<IValidateOptions<LinkedInFetchLimitsOptions>, LinkedInFetchLimitsOptionsValidator>();
         services.AddSingleton<IValidateOptions<LinkedInIncrementalFetchOptions>, LinkedInIncrementalFetchOptionsValidator>();
@@ -91,6 +96,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ILinkedInSearchSettingsService, LinkedInSearchSettingsService>();
         services.AddSingleton<IJobsWorkflowStateStore, InMemoryJobsWorkflowStateStore>();
         services.AddSingleton<IJobsWorkflowProgressNotifier, SignalRJobsWorkflowProgressNotifier>();
+        services.AddSingleton<IAiGlobalShortlistProgressStateStore, InMemoryAiGlobalShortlistProgressStateStore>();
+        services.AddSingleton<IAiGlobalShortlistProgressNotifier, SignalRAiGlobalShortlistProgressNotifier>();
         services.AddTransient<ILinkedInSessionVerificationService, LinkedInSessionVerificationService>();
         services.AddTransient<IAiBehaviorSettingsService, AiBehaviorSettingsService>();
         services.AddTransient<ILinkedInLocationLookupService, LinkedInLocationLookupService>();
@@ -119,6 +126,8 @@ public static class ServiceCollectionExtensions
 
         services.AddTransient<IOpenAiResponsesClient, OpenAiSdkResponsesClient>();
         services.AddTransient<IJobScoringGateway, OpenAiJobScoringGateway>();
+        services.AddTransient<IAiGlobalShortlistGateway, OpenAiGlobalShortlistGateway>();
+        services.AddTransient<IAiGlobalShortlistService, AiGlobalShortlistService>();
 
         services.AddTransient<LinkedInFeasibilityProbe>();
 
