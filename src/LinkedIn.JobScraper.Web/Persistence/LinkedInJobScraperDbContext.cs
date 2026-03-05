@@ -38,6 +38,7 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.Property(static job => job.LocationName).HasMaxLength(256);
                 entity.Property(static job => job.EmploymentStatus).HasMaxLength(128);
                 entity.Property(static job => job.CompanyApplyUrl).HasMaxLength(2048);
+                entity.Property(static job => job.DetailContentFingerprint).HasMaxLength(128);
                 entity.Property(static job => job.AiLabel).HasMaxLength(64);
                 entity.Property(static job => job.RowVersion).IsRowVersion();
 
@@ -51,7 +52,9 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.HasIndex(static job => job.AiLabel);
                 entity.HasIndex(static job => job.AiScore);
                 entity.HasIndex(static job => job.LastSeenAtUtc);
+                entity.HasIndex(static job => job.LastDetailSyncedAtUtc);
                 entity.HasIndex(static job => job.ListedAtUtc);
+                entity.HasIndex(static job => job.LinkedInUpdatedAtUtc);
             });
 
         modelBuilder.Entity<AppUserRecord>(

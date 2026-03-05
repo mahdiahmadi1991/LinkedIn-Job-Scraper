@@ -66,6 +66,12 @@ public sealed class JobRecord
     public DateTimeOffset? ListedAtUtc { get; set; }
 
     /// <summary>
+    /// Last known LinkedIn-side "updated/modified" timestamp (UTC), when exposed by payloads.
+    /// Null means LinkedIn did not provide an explicit update time.
+    /// </summary>
+    public DateTimeOffset? LinkedInUpdatedAtUtc { get; set; }
+
+    /// <summary>
     /// First time this job was observed by this local application (UTC).
     /// </summary>
     public DateTimeOffset FirstDiscoveredAtUtc { get; set; }
@@ -74,6 +80,18 @@ public sealed class JobRecord
     /// Most recent fetch cycle in which this job was seen (UTC).
     /// </summary>
     public DateTimeOffset LastSeenAtUtc { get; set; }
+
+    /// <summary>
+    /// UTC timestamp of the last successful local detail-sync pass for this job.
+    /// Used to understand freshness of local detail fields versus LinkedIn.
+    /// </summary>
+    public DateTimeOffset? LastDetailSyncedAtUtc { get; set; }
+
+    /// <summary>
+    /// Deterministic hash fingerprint of normalized job-detail content.
+    /// Changes indicate detail payload drift and trigger local updates.
+    /// </summary>
+    public string? DetailContentFingerprint { get; set; }
 
     /// <summary>
     /// Current manual-review workflow status selected by the user.

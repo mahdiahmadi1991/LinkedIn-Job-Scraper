@@ -8,6 +8,9 @@ namespace LinkedIn.JobScraper.Web.LinkedIn.Api;
 
 public sealed class LinkedInApiClient : ILinkedInApiClient
 {
+    private static readonly SemaphoreSlim RequestThrottleGate = new(1, 1);
+    private static DateTimeOffset _nextAllowedRequestUtc = DateTimeOffset.MinValue;
+
     private static readonly HashSet<string> SkippedHeaders = new(StringComparer.OrdinalIgnoreCase)
     {
         "Accept-Encoding",
@@ -18,15 +21,18 @@ public sealed class LinkedInApiClient : ILinkedInApiClient
 
     private readonly HttpClient _httpClient;
     private readonly LinkedInFetchDiagnosticsOptions _fetchDiagnosticsOptions;
+    private readonly LinkedInRequestSafetyOptions _requestSafetyOptions;
     private readonly ILogger<LinkedInApiClient> _logger;
 
     public LinkedInApiClient(
         HttpClient httpClient,
         IOptions<LinkedInFetchDiagnosticsOptions> fetchDiagnosticsOptions,
+        IOptions<LinkedInRequestSafetyOptions> requestSafetyOptions,
         ILogger<LinkedInApiClient> logger)
     {
         _httpClient = httpClient;
         _fetchDiagnosticsOptions = fetchDiagnosticsOptions.Value;
+        _requestSafetyOptions = requestSafetyOptions.Value;
         _logger = logger;
     }
 
@@ -40,6 +46,8 @@ public sealed class LinkedInApiClient : ILinkedInApiClient
         requestMessage.VersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
         var diagnosticsEnabled = _fetchDiagnosticsOptions.Enabled;
         string? requestPathAndQuery = null;
+        var minimumDelayMilliseconds = _requestSafetyOptions.GetMinimumDelayMilliseconds();
+        var maxJitterMilliseconds = _requestSafetyOptions.GetMaxJitterMilliseconds();
 
         foreach (var header in headers)
         {
@@ -60,6 +68,24 @@ public sealed class LinkedInApiClient : ILinkedInApiClient
                 _logger,
                 requestPathAndQuery,
                 headers.Count);
+        }
+
+        var throttleDelay = await WaitForSafetyWindowAsync(
+            minimumDelayMilliseconds,
+            maxJitterMilliseconds,
+            cancellationToken);
+
+        if (diagnosticsEnabled && _logger.IsEnabled(LogLevel.Information))
+        {
+            requestPathAndQuery ??= SensitiveDataRedaction.SanitizeForMessage(
+                requestUri.PathAndQuery,
+                maxLength: 1200);
+            Log.LinkedInApiSafetyThrottleApplied(
+                _logger,
+                requestPathAndQuery,
+                (int)throttleDelay.TotalMilliseconds,
+                minimumDelayMilliseconds,
+                maxJitterMilliseconds);
         }
 
         var stopwatch = Stopwatch.StartNew();
@@ -97,6 +123,42 @@ public sealed class LinkedInApiClient : ILinkedInApiClient
 
         return new LinkedInApiResponse((int)response.StatusCode, response.IsSuccessStatusCode, body);
     }
+
+    private async Task<TimeSpan> WaitForSafetyWindowAsync(
+        int minimumDelayMilliseconds,
+        int maxJitterMilliseconds,
+        CancellationToken cancellationToken)
+    {
+        if (!_requestSafetyOptions.Enabled)
+        {
+            return TimeSpan.Zero;
+        }
+
+        await RequestThrottleGate.WaitAsync(cancellationToken);
+
+        try
+        {
+            var nowUtc = DateTimeOffset.UtcNow;
+            var delay = _nextAllowedRequestUtc - nowUtc;
+
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay, cancellationToken);
+            }
+
+            var jitter = maxJitterMilliseconds == 0
+                ? 0
+                : Random.Shared.Next(0, maxJitterMilliseconds + 1);
+
+            _nextAllowedRequestUtc = DateTimeOffset.UtcNow.AddMilliseconds(minimumDelayMilliseconds + jitter);
+
+            return delay > TimeSpan.Zero ? delay : TimeSpan.Zero;
+        }
+        finally
+        {
+            RequestThrottleGate.Release();
+        }
+    }
 }
 
 internal static partial class Log
@@ -124,4 +186,15 @@ internal static partial class Log
         Level = LogLevel.Information,
         Message = "LinkedIn API GET response body sample. RequestPathAndQuery={RequestPathAndQuery}, BodySample={BodySample}")]
     public static partial void LinkedInApiResponseBodySample(ILogger logger, string requestPathAndQuery, string bodySample);
+
+    [LoggerMessage(
+        EventId = 3104,
+        Level = LogLevel.Information,
+        Message = "LinkedIn API safety throttle applied. RequestPathAndQuery={RequestPathAndQuery}, WaitMilliseconds={WaitMilliseconds}, MinimumDelayMilliseconds={MinimumDelayMilliseconds}, MaxJitterMilliseconds={MaxJitterMilliseconds}")]
+    public static partial void LinkedInApiSafetyThrottleApplied(
+        ILogger logger,
+        string requestPathAndQuery,
+        int waitMilliseconds,
+        int minimumDelayMilliseconds,
+        int maxJitterMilliseconds);
 }

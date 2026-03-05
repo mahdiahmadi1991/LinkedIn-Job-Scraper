@@ -95,6 +95,40 @@ public sealed class LinkedInFetchLimitsOptionsValidator : IValidateOptions<Linke
     }
 }
 
+public sealed class LinkedInIncrementalFetchOptionsValidator : IValidateOptions<LinkedInIncrementalFetchOptions>
+{
+    public ValidateOptionsResult Validate(string? name, LinkedInIncrementalFetchOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (options.MinimumPagesBeforeStop <= 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "LinkedIn incremental minimum pages before stop must be greater than zero. Set 'LinkedIn:IncrementalFetch:MinimumPagesBeforeStop' to a positive integer value.");
+        }
+
+        if (options.OverlapPageCount < 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "LinkedIn incremental overlap page count must be zero or greater. Set 'LinkedIn:IncrementalFetch:OverlapPageCount' to a non-negative integer value.");
+        }
+
+        if (options.KnownStreakThreshold <= 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "LinkedIn incremental known streak threshold must be greater than zero. Set 'LinkedIn:IncrementalFetch:KnownStreakThreshold' to a positive integer value.");
+        }
+
+        if (options.DeepSyncEveryNthRun < 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "LinkedIn incremental deep sync interval must be zero or greater. Set 'LinkedIn:IncrementalFetch:DeepSyncEveryNthRun' to a non-negative integer value.");
+        }
+
+        return ValidateOptionsResult.Success;
+    }
+}
+
 public sealed class LinkedInRequestOptionsValidator : IValidateOptions<LinkedInRequestOptions>
 {
     public ValidateOptionsResult Validate(string? name, LinkedInRequestOptions options)
@@ -117,6 +151,34 @@ public sealed class LinkedInRequestOptionsValidator : IValidateOptions<LinkedInR
     }
 }
 
+public sealed class LinkedInRequestSafetyOptionsValidator : IValidateOptions<LinkedInRequestSafetyOptions>
+{
+    public ValidateOptionsResult Validate(string? name, LinkedInRequestSafetyOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (options.MinimumDelayMilliseconds <= 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "LinkedIn request safety minimum delay must be greater than zero. Set 'LinkedIn:RequestSafety:MinimumDelayMilliseconds' to a positive integer value.");
+        }
+
+        if (options.MaxJitterMilliseconds < 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "LinkedIn request safety max jitter must be zero or greater. Set 'LinkedIn:RequestSafety:MaxJitterMilliseconds' to a non-negative integer value.");
+        }
+
+        if (options.MaxRetryAttempts < 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "LinkedIn request safety max retry attempts must be zero or greater. Set 'LinkedIn:RequestSafety:MaxRetryAttempts' to a non-negative integer value.");
+        }
+
+        return ValidateOptionsResult.Success;
+    }
+}
+
 public sealed class JobsWorkflowOptionsValidator : IValidateOptions<JobsWorkflowOptions>
 {
     public ValidateOptionsResult Validate(string? name, JobsWorkflowOptions options)
@@ -127,6 +189,18 @@ public sealed class JobsWorkflowOptionsValidator : IValidateOptions<JobsWorkflow
         {
             return ValidateOptionsResult.Fail(
                 "Jobs workflow enrichment batch size must be greater than zero when configured. Set 'Jobs:Workflow:EnrichmentBatchSize' to a positive integer value.");
+        }
+
+        if (options.DetailResyncAfterHours.HasValue && options.DetailResyncAfterHours.Value <= 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "Jobs workflow detail resync window must be greater than zero when configured. Set 'Jobs:Workflow:DetailResyncAfterHours' to a positive integer value.");
+        }
+
+        if (options.StaleDetailRefreshRunCap.HasValue && options.StaleDetailRefreshRunCap.Value < 0)
+        {
+            return ValidateOptionsResult.Fail(
+                "Jobs workflow stale detail refresh run cap must be zero or greater when configured. Set 'Jobs:Workflow:StaleDetailRefreshRunCap' to a non-negative integer value.");
         }
 
         return ValidateOptionsResult.Success;

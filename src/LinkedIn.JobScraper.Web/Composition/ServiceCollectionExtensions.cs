@@ -39,8 +39,16 @@ public static class ServiceCollectionExtensions
             .Bind(configuration.GetSection(LinkedInFetchLimitsOptions.SectionName))
             .ValidateOnStart();
 
+        services.AddOptions<LinkedInIncrementalFetchOptions>()
+            .Bind(configuration.GetSection(LinkedInIncrementalFetchOptions.SectionName))
+            .ValidateOnStart();
+
         services.AddOptions<LinkedInRequestOptions>()
             .Bind(configuration.GetSection(LinkedInRequestOptions.SectionName))
+            .ValidateOnStart();
+
+        services.AddOptions<LinkedInRequestSafetyOptions>()
+            .Bind(configuration.GetSection(LinkedInRequestSafetyOptions.SectionName))
             .ValidateOnStart();
 
         services.AddOptions<LinkedInBrowserAutomationOptions>()
@@ -70,7 +78,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IValidateOptions<OpenAiSecurityOptions>, OpenAiSecurityOptionsValidator>();
         services.AddSingleton<IValidateOptions<LinkedInFetchDiagnosticsOptions>, LinkedInFetchDiagnosticsOptionsValidator>();
         services.AddSingleton<IValidateOptions<LinkedInFetchLimitsOptions>, LinkedInFetchLimitsOptionsValidator>();
+        services.AddSingleton<IValidateOptions<LinkedInIncrementalFetchOptions>, LinkedInIncrementalFetchOptionsValidator>();
         services.AddSingleton<IValidateOptions<LinkedInRequestOptions>, LinkedInRequestOptionsValidator>();
+        services.AddSingleton<IValidateOptions<LinkedInRequestSafetyOptions>, LinkedInRequestSafetyOptionsValidator>();
         services.AddSingleton<IValidateOptions<JobsWorkflowOptions>, JobsWorkflowOptionsValidator>();
         services.AddSingleton<IAppUserPasswordHasher, AppUserPasswordHasher>();
         services.AddTransient<IAppUserAuthenticationService, AppUserAuthenticationService>();
@@ -93,9 +103,19 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IJobsWorkflowExecutor, ScopedJobsWorkflowExecutor>();
         services.AddDbContextFactory<LinkedInJobScraperDbContext>(ConfigureSqlServerDbContext);
 
-        services.AddHttpClient<ILinkedInApiClient, LinkedInApiClient>()
-            .ConfigurePrimaryHttpMessageHandler(CreateLinkedInHttpHandler)
-            .AddStandardResilienceHandler();
+        var linkedInRequestSafety = configuration
+            .GetSection(LinkedInRequestSafetyOptions.SectionName)
+            .Get<LinkedInRequestSafetyOptions>() ?? new LinkedInRequestSafetyOptions();
+
+        var linkedInHttpClientBuilder = services.AddHttpClient<ILinkedInApiClient, LinkedInApiClient>()
+            .ConfigurePrimaryHttpMessageHandler(CreateLinkedInHttpHandler);
+
+        var maxRetryAttempts = linkedInRequestSafety.GetMaxRetryAttempts();
+        if (maxRetryAttempts > 0)
+        {
+            linkedInHttpClientBuilder.AddStandardResilienceHandler(
+                resilienceOptions => resilienceOptions.Retry.MaxRetryAttempts = maxRetryAttempts);
+        }
 
         services.AddTransient<IOpenAiResponsesClient, OpenAiSdkResponsesClient>();
         services.AddTransient<IJobScoringGateway, OpenAiJobScoringGateway>();

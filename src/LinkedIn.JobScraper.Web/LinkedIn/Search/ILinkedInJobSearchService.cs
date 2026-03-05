@@ -2,8 +2,23 @@ namespace LinkedIn.JobScraper.Web.LinkedIn.Search;
 
 public interface ILinkedInJobSearchService
 {
-    Task<LinkedInJobSearchFetchResult> FetchCurrentSearchAsync(CancellationToken cancellationToken);
+    Task<LinkedInJobSearchFetchResult> FetchCurrentSearchAsync(
+        CancellationToken cancellationToken,
+        LinkedInJobSearchFetchRequest? request = null);
 }
+
+public sealed record LinkedInJobSearchFetchRequest(
+    Func<LinkedInJobSearchPageContext, bool>? ShouldStopAfterPage = null,
+    string? EarlyStopMessage = null);
+
+public sealed record LinkedInJobSearchPageContext(
+    int PageIndex,
+    int PagesFetched,
+    int ReturnedCount,
+    int RequestedCount,
+    int TotalAvailableCount,
+    int AggregatedCount,
+    IReadOnlyList<LinkedInJobSearchItem> UniqueJobsAdded);
 
 public sealed record LinkedInJobSearchFetchResult(
     bool Success,
