@@ -10,6 +10,8 @@
 - After each approved implementation step, stop and wait for explicit user approval before continuing.
 - For every newly approved feature idea, create a dedicated `docs/ideas/<idea-name>.md` file before implementation starts.
 - The idea file must contain state-based execution steps, acceptance criteria, assumptions, and out-of-scope items; implementation must continuously reference that file to avoid drift.
+- Never create commits on `main` directly; all code changes must be committed on a non-`main` branch and merged via PR.
+- Never watch GitHub pipelines by default. After triggering CI/CD, ask the user to check status unless the user explicitly asks for monitoring.
 
 ## Product Direction
 
