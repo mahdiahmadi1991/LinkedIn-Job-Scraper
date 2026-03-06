@@ -42,9 +42,9 @@ The app is not meant to automate applying. It is a decision-support tool for:
 
 ### Business constraints
 
-- Single-user only
 - Local-only for now
-- No internal app authentication in MVP
+- Lightweight local app authentication is active for per-user data isolation
+- Personal-use scope; no hosted multi-tenant deployment
 - Simplicity is preferred over complex architecture
 - Safety and stability matter more than aggressive automation
 - Avoid behavior that is likely to trigger LinkedIn anti-abuse or account issues
@@ -286,7 +286,7 @@ Location lookup uses a LinkedIn typeahead-like endpoint to resolve free-text loc
 The import flow:
 
 - calls LinkedIn search
-- fetches up to 5 pages and at most 125 jobs by default
+- currently configured to fetch up to 10 pages and at most 1000 jobs (`LinkedIn:FetchLimits`)
 - uses a small delay between page requests
 - maps job-card data into local job rows
 - inserts only new jobs
@@ -526,7 +526,7 @@ This means local EF optimization helps, but external network round-trips still d
 - user remains in the loop for login
 - fetch pacing is conservative
 - no aggressive parallel scraping has been introduced
-- the app is local-only and single-user, reducing deployment complexity
+- the app is local-only with per-user-isolated data ownership, reducing deployment complexity
 
 ## 15. Deferred Technical Debt
 
@@ -558,7 +558,7 @@ When onboarding another AI model, these files should be treated as primary conte
 
 If a new AI assistant takes over this repository, the most important truths are:
 
-- this is a local, single-user job-triage tool
+- this is a local, per-user-isolated job-triage tool
 - `Jobs` is the core page and default business entry point
 - LinkedIn integration depends on browser-backed session reuse, not official partner APIs
 - controllers are intentionally thin; keep logic in services

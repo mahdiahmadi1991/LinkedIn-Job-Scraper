@@ -11,6 +11,16 @@ public sealed class LinkedInSessionRecord
     public Guid Id { get; set; } = Guid.NewGuid();
 
     /// <summary>
+    /// Owning local application user identifier.
+    /// </summary>
+    public int AppUserId { get; set; }
+
+    /// <summary>
+    /// Navigation to the owning local application user.
+    /// </summary>
+    public AppUserRecord AppUser { get; set; } = null!;
+
+    /// <summary>
     /// Logical key for selecting the active session profile.
     /// Current design uses a single primary key value ("primary").
     /// </summary>

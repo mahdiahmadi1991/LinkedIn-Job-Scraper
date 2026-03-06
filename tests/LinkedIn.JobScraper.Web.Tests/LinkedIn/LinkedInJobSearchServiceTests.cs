@@ -49,7 +49,6 @@ public sealed class LinkedInJobSearchServiceTests
             sessionStore,
             new FakeLinkedInSearchSettingsService(
                 new LinkedInSearchSettings(
-                    "Default",
                     string.Empty,
                     null,
                     null,
@@ -97,6 +96,43 @@ public sealed class LinkedInJobSearchServiceTests
         Assert.True(sessionStore.InvalidateCalled);
         Assert.Equal(1, apiClient.CallCount);
         Assert.Contains("expired", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task FetchCurrentSearchAsyncKeepsPartialResultsWhenSessionExpiresAfterFirstPage()
+    {
+        var apiClient = new FakeLinkedInApiClient(
+            CreateSuccessfulSearchPage(pageIndex: 0, returnedCount: 100, totalCount: 1300),
+            new LinkedInApiResponse(401, false, "{}"));
+        var sessionStore = new FakeLinkedInSessionStore(
+            new LinkedInSessionSnapshot(
+                new Dictionary<string, string> { ["Cookie"] = "li_at=test" },
+                DateTimeOffset.UtcNow,
+                "Test"));
+        var service = new LinkedInJobSearchService(
+            apiClient,
+            sessionStore,
+            new FakeLinkedInSearchSettingsService(),
+            Options.Create(new LinkedInFetchDiagnosticsOptions()),
+            Options.Create(
+                new LinkedInFetchLimitsOptions
+                {
+                    SearchPageCap = 5,
+                    SearchJobCap = 500
+                }),
+            NullLogger<LinkedInJobSearchService>.Instance);
+
+        var result = await service.FetchCurrentSearchAsync(CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(401, result.StatusCode);
+        Assert.Equal(1, result.PagesFetched);
+        Assert.Equal(100, result.ReturnedCount);
+        Assert.Equal(100, result.Jobs.Count);
+        Assert.True(sessionStore.InvalidateCalled);
+        Assert.Equal(2, apiClient.CallCount);
+        Assert.Contains("Partial results", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Connect Session", result.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -237,7 +273,6 @@ public sealed class LinkedInJobSearchServiceTests
         public FakeLinkedInSearchSettingsService(LinkedInSearchSettings? settings = null)
         {
             _settings = settings ?? new LinkedInSearchSettings(
-                "Default",
                 "C# .Net",
                 "Limassol, Cyprus",
                 "Limassol, Cyprus",

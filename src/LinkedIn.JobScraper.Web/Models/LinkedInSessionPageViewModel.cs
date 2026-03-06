@@ -2,6 +2,8 @@ namespace LinkedIn.JobScraper.Web.Models;
 
 public sealed class LinkedInSessionPageViewModel
 {
+    public bool IsAutoCaptureRunning => AutoCaptureActive && BrowserOpen;
+
     public bool BrowserOpen { get; set; }
 
     public string? CurrentPageUrl { get; set; }
@@ -24,20 +26,20 @@ public sealed class LinkedInSessionPageViewModel
 
     public bool ShowManualCaptureAction =>
         !StoredSessionAvailable &&
-        !AutoCaptureActive &&
+        !IsAutoCaptureRunning &&
         !string.IsNullOrWhiteSpace(AutoCaptureStatusMessage);
 
     public string PrimaryActionLabel => StoredSessionAvailable ? "Refresh Session" : "Connect Session";
 
     public string SessionIndicatorLabel =>
-        AutoCaptureActive
+        IsAutoCaptureRunning
             ? "Connecting"
             : StoredSessionAvailable
                 ? "Connected"
                 : "Missing";
 
     public string SessionIndicatorClass =>
-        AutoCaptureActive
+        IsAutoCaptureRunning
             ? "session-state-connecting"
             : StoredSessionAvailable
                 ? "session-state-connected"

@@ -13,7 +13,6 @@ public static class AiSettingsViewModelAdapter
         return new AiSettingsPageViewModel
         {
             ConcurrencyToken = profile.ConcurrencyToken,
-            ProfileName = profile.ProfileName,
             BehavioralInstructions = profile.BehavioralInstructions,
             PrioritySignals = profile.PrioritySignals,
             ExclusionSignals = profile.ExclusionSignals,

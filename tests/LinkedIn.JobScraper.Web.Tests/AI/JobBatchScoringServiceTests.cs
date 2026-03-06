@@ -2,6 +2,7 @@ using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Persistence;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
+using LinkedIn.JobScraper.Web.Tests.Authentication;
 using LinkedIn.JobScraper.Web.Tests.Persistence;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -163,12 +164,60 @@ public sealed class JobBatchScoringServiceTests
         Assert.Equal(77, result.Snapshot?.AiScore);
     }
 
+    [Fact]
+    public async Task ScoreJobAsyncReturnsNotFoundForCrossUserAccess()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var options = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+
+        Guid targetJobId;
+        await using (var seedContext = new LinkedInJobScraperDbContext(options))
+        {
+            var job = new JobRecord
+            {
+                AppUserId = 2,
+                LinkedInJobId = "job-cross-user",
+                LinkedInJobPostingUrn = "urn:li:jobPosting:cross-user",
+                Title = "Cross User Job",
+                Description = "Description",
+                FirstDiscoveredAtUtc = DateTimeOffset.UtcNow.AddMinutes(-5),
+                LastSeenAtUtc = DateTimeOffset.UtcNow
+            };
+
+            seedContext.Jobs.Add(job);
+            await seedContext.SaveChangesAsync();
+            targetJobId = job.Id;
+        }
+
+        var gateway = new CountingJobScoringGateway();
+        var service = CreateService(
+            options,
+            gateway,
+            new OpenAiSecurityOptions
+            {
+                ApiKey = "test-key",
+                Model = "gpt-5-mini",
+                MaxConcurrentScoringRequests = 2
+            },
+            userId: 1);
+
+        var result = await service.ScoreJobAsync(targetJobId, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(StatusCodes.Status404NotFound, result.StatusCode);
+        Assert.Equal(0, gateway.CallCount);
+    }
+
     private static JobBatchScoringService CreateService(
         DbContextOptions<LinkedInJobScraperDbContext> dbContextOptions,
         IJobScoringGateway jobScoringGateway,
-        OpenAiSecurityOptions options)
+        OpenAiSecurityOptions options,
+        int userId = 1)
     {
         return new JobBatchScoringService(
+            new TestCurrentAppUserContext(userId),
             new TestDbContextFactory(dbContextOptions),
             jobScoringGateway,
             new FakeAiBehaviorSettingsService(),
@@ -186,6 +235,7 @@ public sealed class JobBatchScoringServiceTests
             dbContext.Jobs.Add(
                 new JobRecord
                 {
+                    AppUserId = 1,
                     LinkedInJobId = $"job-{index}",
                     LinkedInJobPostingUrn = $"urn:li:jobPosting:{index}",
                     Title = $"Job {index}",
@@ -204,7 +254,6 @@ public sealed class JobBatchScoringServiceTests
         {
             return Task.FromResult(
                 new AiBehaviorProfile(
-                    "Default",
                     "Behavior",
                     "Priority",
                     "Exclusion",

@@ -40,6 +40,7 @@ public sealed class AppUserAuthenticationServiceTests
         Assert.NotNull(result.User);
         Assert.Equal("owner", result.User!.UserName);
         Assert.Equal("Local Owner", result.User.DisplayName);
+        Assert.False(result.User.IsSuperAdmin);
     }
 
     [Fact]
@@ -111,6 +112,41 @@ public sealed class AppUserAuthenticationServiceTests
     }
 
     [Fact]
+    public async Task AuthenticateAsyncReturnsFailureForSoftDeletedUser()
+    {
+        var dbContextOptions = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+
+        await using (var seedContext = new LinkedInJobScraperDbContext(dbContextOptions))
+        {
+            var passwordHasher = new AppUserPasswordHasher();
+            seedContext.AppUsers.Add(
+                new AppUserRecord
+                {
+                    UserName = "owner",
+                    DisplayName = "Local Owner",
+                    PasswordHash = passwordHasher.HashPassword("Passw0rd!"),
+                    IsActive = true,
+                    IsDeleted = true,
+                    DeletedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+                    CreatedAtUtc = DateTimeOffset.UtcNow,
+                    UpdatedAtUtc = DateTimeOffset.UtcNow
+                });
+            await seedContext.SaveChangesAsync();
+        }
+
+        var service = new AppUserAuthenticationService(
+            new TestDbContextFactory(dbContextOptions),
+            new AppUserPasswordHasher());
+
+        var result = await service.AuthenticateAsync("owner", "Passw0rd!", CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Null(result.User);
+    }
+
+    [Fact]
     public void CreatePrincipalAddsExpectedIdentityClaims()
     {
         var service = new AppUserAuthenticationService(
@@ -120,11 +156,12 @@ public sealed class AppUserAuthenticationServiceTests
                     .Options),
             new AppUserPasswordHasher());
 
-        var principal = service.CreatePrincipal(new AppUserIdentity(42, "owner", "Local Owner"));
+        var principal = service.CreatePrincipal(new AppUserIdentity(42, "owner", "Local Owner", true));
 
         Assert.Equal("owner", principal.Identity?.Name);
         Assert.Equal("42", principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
-        Assert.Equal("Local Owner", principal.FindFirst("display_name")?.Value);
+        Assert.Equal("Local Owner", principal.FindFirst(AppUserClaimTypes.DisplayName)?.Value);
+        Assert.Equal("true", principal.FindFirst(AppUserClaimTypes.IsSuperAdmin)?.Value);
         Assert.Equal(AppAuthenticationDefaults.CookieScheme, principal.Identity?.AuthenticationType);
     }
 

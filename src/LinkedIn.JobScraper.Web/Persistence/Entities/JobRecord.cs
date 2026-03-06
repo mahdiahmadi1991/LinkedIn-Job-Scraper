@@ -11,6 +11,16 @@ public sealed class JobRecord
     public Guid Id { get; set; } = Guid.NewGuid();
 
     /// <summary>
+    /// Owning local application user identifier.
+    /// </summary>
+    public int AppUserId { get; set; }
+
+    /// <summary>
+    /// Navigation to the owning local application user.
+    /// </summary>
+    public AppUserRecord AppUser { get; set; } = null!;
+
+    /// <summary>
     /// Stable LinkedIn numeric job identifier (for example, "4379963196").
     /// </summary>
     public string LinkedInJobId { get; set; } = string.Empty;

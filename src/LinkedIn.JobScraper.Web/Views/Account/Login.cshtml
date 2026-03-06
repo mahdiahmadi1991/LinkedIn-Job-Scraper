@@ -22,14 +22,16 @@
         <div class="auth-shell">
             <section class="auth-panel">
                 <div class="auth-brand">
-                    <span class="brand-mark">in</span>
+                    <span class="auth-brand-logo" aria-hidden="true">
+                        <img src="~/favicon.svg" asp-append-version="true" alt="" class="auth-brand-logo-image" />
+                    </span>
                     <div>
                         <h1 class="auth-title">Sign in to continue</h1>
-                        <p class="auth-subtitle">Use one of the seeded local accounts to access your private LinkedIn job workspace.</p>
+                        <p class="auth-subtitle">Use your local account to access your private LinkedIn job workspace.</p>
                     </div>
                 </div>
 
-                <form asp-action="Login" method="post" class="auth-form" novalidate>
+                <form asp-action="Login" method="post" class="auth-form" novalidate data-login-form>
                     @Html.AntiForgeryToken()
                     <input asp-for="ReturnUrl" type="hidden" />
 
@@ -48,7 +50,21 @@
 
                     <div class="mb-3">
                         <label asp-for="Password" class="form-label"></label>
-                        <input asp-for="Password" class="form-control form-control-lg" autocomplete="current-password" />
+                        <div class="auth-password-field">
+                            <input asp-for="Password" class="form-control form-control-lg auth-password-input" autocomplete="current-password" data-login-password-input />
+                            <button
+                                type="button"
+                                class="btn auth-password-peek"
+                                data-login-password-peek
+                                aria-label="Press and hold to show password"
+                                title="Press and hold to show password">
+                                <svg class="admin-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                    <path d="M2 12C3.73 8.5 7.46 6 12 6C16.54 6 20.27 8.5 22 12C20.27 15.5 16.54 18 12 18C7.46 18 3.73 15.5 2 12Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8" />
+                                </svg>
+                                <span class="visually-hidden">Press and hold to show password</span>
+                            </button>
+                        </div>
                         <span asp-validation-for="Password" class="text-danger small"></span>
                     </div>
 
@@ -60,10 +76,12 @@
                         <span class="auth-remember-copy">Keeps your local session active across browser restarts on this machine.</span>
                     </div>
 
-                    <button type="submit" class="btn btn-primary btn-lg w-100 mt-3">Sign in</button>
+                    <button type="submit" class="btn btn-primary btn-lg w-100 mt-3" data-login-submit-button data-loading-text="Signing in...">Sign in</button>
                 </form>
             </section>
         </div>
     </main>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/login-page.js" asp-append-version="true"></script>
 </body>
 </html>

@@ -79,7 +79,7 @@ What to do:
 1. Review search settings.
 2. Confirm the selected keywords, location, job types, and workplace types.
 3. Check the optional `LinkedIn:FetchLimits:SearchPageCap` and `LinkedIn:FetchLimits:SearchJobCap` overrides.
-4. If no overrides are configured, the service falls back to conservative defaults (`5` pages and `125` jobs) to reduce request pressure.
+4. Tracked appsettings currently sets overrides to `10` pages and `1000` jobs; if overrides are removed, the service fallback remains conservative (`5` pages and `125` jobs).
 
 ### Symptom: You need detailed fetch-stage diagnostics
 
@@ -247,3 +247,32 @@ Pause and revalidate before changing behavior if:
 - new automation ideas would reduce human-in-the-loop safeguards
 
 In those cases, prefer a safe diagnostic check first, not a broad runtime refactor.
+
+## 8. Per-User Isolation and Ownership Migration
+
+### Symptom: After signing in with another user, no old data is visible
+
+Likely cause:
+
+- expected behavior after per-user data isolation
+- data is now scoped by authenticated `AppUser`
+
+What to do:
+
+1. Capture a LinkedIn session for that user.
+2. Save search settings for that user.
+3. Run `Fetch & Score` to populate that user's jobs.
+
+### Symptom: Ownership migration fails with SQL error `51000`, `51001`, or `51002`
+
+Likely cause:
+
+- `51000`: `AppUsers` has no row
+- `51001`: duplicate legacy rows in `LinkedInSearchSettings`
+- `51002`: duplicate legacy rows in `AiBehaviorSettings`
+
+What to do:
+
+1. Use the runbook in `docs/per-user-data-isolation-operations.md`.
+2. Fix the pre-check issue and rerun migration.
+3. If rollback is required, prefer DB backup restore over down-migration.

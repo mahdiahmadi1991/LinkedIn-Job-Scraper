@@ -32,7 +32,7 @@
                     </div>
                 </div>
 
-                <div class="session-modal-waiting @(Model.AutoCaptureActive ? string.Empty : "d-none")" data-session-waiting>
+                <div class="session-modal-waiting @(Model.IsAutoCaptureRunning ? string.Empty : "d-none")" data-session-waiting>
                     <span class="session-modal-spinner" aria-hidden="true"></span>
                     <div class="session-modal-waiting-copy">
                         <div class="fw-semibold">Waiting for LinkedIn login...</div>
@@ -102,7 +102,7 @@
                     </button>
                     <button
                         type="button"
-                        class="btn btn-outline-secondary @(!Model.StoredSessionAvailable || Model.AutoCaptureActive ? "d-none" : string.Empty)"
+                        class="btn btn-outline-secondary @(!Model.StoredSessionAvailable || Model.IsAutoCaptureRunning ? "d-none" : string.Empty)"
                         data-loading-text="Revoking session..."
                         data-session-revoke>
                         Revoke Session

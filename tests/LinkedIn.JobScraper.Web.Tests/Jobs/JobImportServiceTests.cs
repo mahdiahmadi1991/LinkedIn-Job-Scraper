@@ -3,6 +3,7 @@ using LinkedIn.JobScraper.Web.Jobs;
 using LinkedIn.JobScraper.Web.LinkedIn.Search;
 using LinkedIn.JobScraper.Web.Persistence;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
+using LinkedIn.JobScraper.Web.Tests.Authentication;
 using LinkedIn.JobScraper.Web.Tests.Persistence;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -83,6 +84,7 @@ public sealed class JobImportServiceTests
         LinkedInIncrementalFetchOptions incrementalFetchOptions)
     {
         return new JobImportService(
+            new TestCurrentAppUserContext(),
             new TestDbContextFactory(dbContextOptions),
             linkedInJobSearchService,
             Options.Create(new LinkedInFetchDiagnosticsOptions()),
@@ -108,6 +110,7 @@ public sealed class JobImportServiceTests
             dbContext.Jobs.Add(
                 new JobRecord
                 {
+                    AppUserId = 1,
                     LinkedInJobId = linkedInJobId,
                     LinkedInJobPostingUrn = $"urn:li:fsd_jobPosting:{linkedInJobId}",
                     LinkedInJobCardUrn = $"urn:li:fsd_jobCard:{linkedInJobId}",

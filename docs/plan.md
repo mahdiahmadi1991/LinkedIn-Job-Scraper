@@ -28,8 +28,8 @@ If there is tension between broad roadmap intent and step-by-step execution:
 
 ## Current Product Guardrails
 
-- Local-only, single-user application
-- No internal app authentication
+- Local-only personal-use application (not a hosted SaaS product)
+- Lightweight local app-user authentication is active and required for per-user data ownership
 - Controlled-browser, user-in-the-loop LinkedIn session capture remains the default
 - No direct credential-post login as the primary LinkedIn path
 - No aggressive scraping patterns
@@ -49,6 +49,30 @@ The current implemented baseline already includes:
 - post-MVP hardening for configuration, diagnostics, and logging safety
 
 ## Latest Completed Execution Queues
+
+### Remove Settings ProfileName Queue
+
+This queue was completed and is now closed for the current phase.
+
+Completed items:
+
+- `ProfileName` was removed from AI settings and LinkedIn search settings runtime contracts and UI forms
+- persistence model dropped `ProfileName` from both settings entities and EF configuration
+- migration `20260306094245_RemoveSettingsProfileName` was added and snapshot updated
+- controller/service/test paths were updated and full test suite passed without regression
+
+### Per-User Data Isolation Queue
+
+This queue was completed and is now closed for the current phase.
+
+Completed items:
+
+- direct-owner tables now enforce `AppUserId` ownership with user-scoped constraints
+- service-layer reads/writes are scoped to authenticated user context
+- in-memory workflow/progress channels are user-scoped to prevent cross-user leakage/blocking
+- resource-id endpoints enforce safe non-disclosing ownership behavior (`404` for non-owned resources)
+- isolation safety tests now cover per-user visibility, cross-user denial, uniqueness, and workflow/realtime isolation
+- architecture/project/operations docs were updated, including migration/backfill and rollback runbook
 
 ### Deferred Backlog Activation Queue
 
@@ -82,13 +106,80 @@ Revisited and not reopened:
 - CI follow-up, because the current quality gate already covered the targeted baseline
 - documentation follow-up, because reviewer-facing coverage was already sufficient after the latest ADR and diagram passes
 
+### Admin Users Soft Delete Queue
+
+This queue was completed and is now closed for the current phase.
+
+Completed items:
+
+- `AppUsers` soft-delete persistence markers were added (`IsDeleted`, `DeletedAtUtc`) with migration `20260306152700_AddAppUserSoftDelete`
+- super-admin-only soft-delete operation was added to admin user-management service
+- deleted users are excluded from admin user listing and login authentication paths
+- administration UI now supports row-level Ajax soft-delete with in-place table/pagination updates
+- service/controller/UI-contract/auth tests were extended and full suite passed
+
+### Admin Soft Delete Confirmation Modal Queue
+
+This queue was completed and is now closed for the current phase.
+
+Completed items:
+
+- browser-native delete confirmation was removed from admin user soft-delete flow
+- an in-app confirmation modal was added with focused minimal styling and explicit confirm/cancel actions
+- admin users page JS now uses modal-driven confirmation lifecycle before Ajax delete
+- UI contract tests were updated to enforce modal wiring and absence of `window.confirm`
+
+### Admin Create User Expiry Date-Only Queue
+
+This queue was completed and is now closed for the current phase.
+
+Completed items:
+
+- create-user expiry input was changed from datetime to date-only
+- create-form client mapping now converts selected local date to UTC at local end-of-day
+- existing expiry persistence contract (`ExpiresAtUtc`) was preserved
+- admin users UI contract tests were updated and targeted test run passed
+
+### Admin Create User Button Loading Consistency Queue
+
+This queue was completed and is now closed for the current phase.
+
+Completed items:
+
+- create-user submit button was aligned to the standard primary-action style
+- busy state was wired to shared `window.appButtons.setLoading` helper for spinner + loading text
+- create submit flow now restores button state through the shared loading helper
+- admin users UI contract tests were updated and targeted test run passed
+
+### Admin Users Table Edit Expiry Date-Only Queue
+
+This queue was completed and is now closed for the current phase.
+
+Completed items:
+
+- users-table edit-mode expiry input was changed from datetime to date-only
+- row edit mapping now converts selected date to UTC at local end-of-day before submit
+- row baseline normalization was added to avoid false profile changes from legacy datetime values
+- admin users UI contract tests were updated and targeted test run passed
+
+### Login Page Button Consistency And Password Peek Queue
+
+This queue was completed and is now closed for the current phase.
+
+Completed items:
+
+- login submit button was aligned to shared loading contract with `data-loading-text`
+- login submit flow now uses shared `window.appButtons.setLoading` spinner/loading behavior
+- login password input received overlay eye control with press-hold reveal and release-to-hide behavior
+- login UI contract tests were added and targeted test run passed
+
 ## Current Queue Status
 
 - **No active implementation queue is open right now**
 
 Latest completed queue:
 
-- `docs/archive/ideas/ai-streaming-shortlist-page.md`
+- `docs/archive/ideas/login-page-button-and-password-peek.md`
 
 Approved execution sequence:
 
@@ -131,6 +222,19 @@ Open a new execution queue only when at least one of these is true:
 - it fixes a concrete bug or maintainability issue observed in the current codebase
 
 Do not open a queue for cleanup-only refactors.
+
+## Execution Discipline Additions
+
+The following rules are locked for every new approved idea:
+
+- Every idea plan must include a final explicit state for implementation-review validation against approved scope.
+- That final validation state must confirm:
+  - implemented behavior matches the idea contract
+  - no critical regression or side effect remains
+  - required verification evidence is captured (tests/smoke/manual checks as applicable)
+- After an idea is fully completed, move its file from `docs/ideas/` to `docs/archive/ideas/`.
+- After archiving, update `docs/plan.md` so the latest completed queue reference points to the archived path.
+- UI consistency is mandatory: new button/interaction patterns must align with existing project design contracts; introducing a new pattern requires harmonizing related surfaces.
 
 ## Historical Note
 

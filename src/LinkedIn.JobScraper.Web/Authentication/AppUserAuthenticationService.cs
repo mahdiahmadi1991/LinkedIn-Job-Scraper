@@ -34,7 +34,7 @@ public sealed class AppUserAuthenticationService : IAppUserAuthenticationService
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
         var activeUsers = await dbContext.AppUsers
             .AsNoTracking()
-            .Where(static appUser => appUser.IsActive)
+            .Where(static appUser => appUser.IsActive && !appUser.IsDeleted)
             .ToListAsync(cancellationToken);
 
         var user = activeUsers.FirstOrDefault(
@@ -56,7 +56,7 @@ public sealed class AppUserAuthenticationService : IAppUserAuthenticationService
         return new AppUserAuthenticationResult(
             true,
             "Authentication succeeded.",
-            new AppUserIdentity(user.Id, user.UserName, user.DisplayName));
+            new AppUserIdentity(user.Id, user.UserName, user.DisplayName, user.IsSuperAdmin));
     }
 
     public ClaimsPrincipal CreatePrincipal(AppUserIdentity user)
@@ -67,7 +67,8 @@ public sealed class AppUserAuthenticationService : IAppUserAuthenticationService
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString(CultureInfo.InvariantCulture)),
             new(ClaimTypes.Name, user.UserName),
-            new("display_name", user.DisplayName)
+            new(AppUserClaimTypes.DisplayName, user.DisplayName),
+            new(AppUserClaimTypes.IsSuperAdmin, user.IsSuperAdmin ? "true" : "false")
         };
 
         var identity = new ClaimsIdentity(claims, AppAuthenticationDefaults.CookieScheme);

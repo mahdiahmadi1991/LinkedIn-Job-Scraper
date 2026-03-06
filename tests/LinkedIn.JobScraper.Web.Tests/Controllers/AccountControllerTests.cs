@@ -161,10 +161,10 @@ public sealed class AccountControllerTests
             }
 
             return Task.FromResult(
-                new AppUserAuthenticationResult(
-                    true,
-                    "Authentication succeeded.",
-                    new AppUserIdentity(1, userName, "Local Owner")));
+                    new AppUserAuthenticationResult(
+                        true,
+                        "Authentication succeeded.",
+                        new AppUserIdentity(1, userName, "Local Owner", false)));
         }
 
         public ClaimsPrincipal CreatePrincipal(AppUserIdentity user)

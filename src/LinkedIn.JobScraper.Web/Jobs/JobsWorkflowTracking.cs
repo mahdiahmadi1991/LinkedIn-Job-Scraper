@@ -10,6 +10,7 @@ public sealed class JobsWorkflowProgressHub : Hub
 public interface IJobsWorkflowProgressNotifier
 {
     Task PublishAsync(
+        int userId,
         string? connectionId,
         JobsWorkflowProgressUpdate update,
         CancellationToken cancellationToken);
@@ -17,15 +18,15 @@ public interface IJobsWorkflowProgressNotifier
 
 public interface IJobsWorkflowStateStore
 {
-    JobsWorkflowRegistrationResult RegisterWorkflow(string workflowId, CancellationToken outerCancellationToken);
+    JobsWorkflowRegistrationResult RegisterWorkflow(int userId, string workflowId, CancellationToken outerCancellationToken);
 
-    bool RequestCancellation(string workflowId);
+    bool RequestCancellation(int userId, string workflowId);
 
-    void Append(JobsWorkflowProgressUpdate update);
+    void Append(int userId, JobsWorkflowProgressUpdate update);
 
-    void ReleaseWorkflow(string workflowId);
+    void ReleaseWorkflow(int userId, string workflowId);
 
-    JobsWorkflowProgressBatch GetBatch(string workflowId, long afterSequence);
+    JobsWorkflowProgressBatch GetBatch(int userId, string workflowId, long afterSequence);
 }
 
 public sealed class SignalRJobsWorkflowProgressNotifier : IJobsWorkflowProgressNotifier
@@ -42,11 +43,12 @@ public sealed class SignalRJobsWorkflowProgressNotifier : IJobsWorkflowProgressN
     }
 
     public Task PublishAsync(
+        int userId,
         string? connectionId,
         JobsWorkflowProgressUpdate update,
         CancellationToken cancellationToken)
     {
-        _workflowStateStore.Append(update);
+        _workflowStateStore.Append(userId, update);
 
         if (string.IsNullOrWhiteSpace(connectionId))
         {
@@ -89,29 +91,34 @@ public sealed record JobsWorkflowRegistrationResult(
 public sealed class InMemoryJobsWorkflowStateStore : IJobsWorkflowStateStore
 {
     private readonly ConcurrentDictionary<string, WorkflowState> _workflows = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<int, string> _activeWorkflowIds = new();
     private readonly object _registrationSync = new();
-    private string? _activeWorkflowId;
 
-    public JobsWorkflowRegistrationResult RegisterWorkflow(string workflowId, CancellationToken outerCancellationToken)
+    public JobsWorkflowRegistrationResult RegisterWorkflow(
+        int userId,
+        string workflowId,
+        CancellationToken outerCancellationToken)
     {
         lock (_registrationSync)
         {
-            if (!string.IsNullOrWhiteSpace(_activeWorkflowId))
+            if (_activeWorkflowIds.TryGetValue(userId, out var activeWorkflowId) &&
+                !string.IsNullOrWhiteSpace(activeWorkflowId))
             {
-                return new JobsWorkflowRegistrationResult(false, _activeWorkflowId, CancellationToken.None);
+                return new JobsWorkflowRegistrationResult(false, activeWorkflowId, CancellationToken.None);
             }
 
+            var key = ToWorkflowKey(userId, workflowId);
             var state = new WorkflowState();
             state.ReplaceCancellationSource(outerCancellationToken);
-            _workflows.AddOrUpdate(workflowId, state, (_, _) => state);
-            _activeWorkflowId = workflowId;
+            _workflows.AddOrUpdate(key, state, (_, _) => state);
+            _activeWorkflowIds[userId] = workflowId;
             return new JobsWorkflowRegistrationResult(true, null, state.Token);
         }
     }
 
-    public bool RequestCancellation(string workflowId)
+    public bool RequestCancellation(int userId, string workflowId)
     {
-        if (!_workflows.TryGetValue(workflowId, out var state))
+        if (!_workflows.TryGetValue(ToWorkflowKey(userId, workflowId), out var state))
         {
             return false;
         }
@@ -120,9 +127,9 @@ public sealed class InMemoryJobsWorkflowStateStore : IJobsWorkflowStateStore
         return true;
     }
 
-    public JobsWorkflowProgressBatch GetBatch(string workflowId, long afterSequence)
+    public JobsWorkflowProgressBatch GetBatch(int userId, string workflowId, long afterSequence)
     {
-        if (!_workflows.TryGetValue(workflowId, out var state))
+        if (!_workflows.TryGetValue(ToWorkflowKey(userId, workflowId), out var state))
         {
             return new JobsWorkflowProgressBatch([], 1, false, false);
         }
@@ -130,26 +137,39 @@ public sealed class InMemoryJobsWorkflowStateStore : IJobsWorkflowStateStore
         return state.GetBatch(afterSequence);
     }
 
-    public void Append(JobsWorkflowProgressUpdate update)
+    public void Append(int userId, JobsWorkflowProgressUpdate update)
     {
-        var state = _workflows.GetOrAdd(update.WorkflowId, static _ => new WorkflowState());
+        var workflowKey = ToWorkflowKey(userId, update.WorkflowId);
+        var state = _workflows.GetOrAdd(workflowKey, static _ => new WorkflowState());
         state.Append(update);
 
         if (IsTerminalState(update.State))
         {
-            ReleaseWorkflow(update.WorkflowId);
+            ReleaseWorkflow(userId, update.WorkflowId);
         }
     }
 
-    public void ReleaseWorkflow(string workflowId)
+    public void ReleaseWorkflow(int userId, string workflowId)
     {
         lock (_registrationSync)
         {
-            if (string.Equals(_activeWorkflowId, workflowId, StringComparison.OrdinalIgnoreCase))
+            if (!_activeWorkflowIds.TryGetValue(userId, out var activeWorkflowId))
             {
-                _activeWorkflowId = null;
+                return;
             }
+
+            if (!string.Equals(activeWorkflowId, workflowId, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _activeWorkflowIds.TryRemove(userId, out _);
         }
+    }
+
+    private static string ToWorkflowKey(int userId, string workflowId)
+    {
+        return $"{userId}:{workflowId}";
     }
 
     private static bool IsTerminalState(string? state)

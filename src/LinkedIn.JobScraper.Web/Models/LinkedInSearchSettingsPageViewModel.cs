@@ -7,10 +7,6 @@ public sealed class LinkedInSearchSettingsPageViewModel
     public string? ConcurrencyToken { get; set; }
 
     [Required]
-    [Display(Name = "Profile Name")]
-    public string ProfileName { get; set; } = string.Empty;
-
-    [Required]
     [Display(Name = "Search By Title, Skill, Or Company")]
     public string Keywords { get; set; } = string.Empty;
 

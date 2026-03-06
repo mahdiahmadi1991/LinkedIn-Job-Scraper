@@ -9,6 +9,7 @@ using LinkedIn.JobScraper.Web.LinkedIn.Details;
 using LinkedIn.JobScraper.Web.LinkedIn.Search;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using LinkedIn.JobScraper.Web.Persistence;
+using LinkedIn.JobScraper.Web.Users;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -23,9 +24,6 @@ public static class ServiceCollectionExtensions
         services.AddOptions<SqlServerOptions>()
             .Bind(configuration.GetSection(SqlServerOptions.SectionName))
             .ValidateOnStart();
-
-        services.AddOptions<AppAuthenticationOptions>()
-            .Bind(configuration.GetSection(AppAuthenticationOptions.SectionName));
 
         services.AddOptions<OpenAiSecurityOptions>()
             .Bind(configuration.GetSection(OpenAiSecurityOptions.SectionName))
@@ -63,6 +61,7 @@ public static class ServiceCollectionExtensions
             .ValidateOnStart();
 
         services.AddHostedService<AppUserSeedingStartupService>();
+        services.AddHttpContextAccessor();
         services.AddAuthentication(AppAuthenticationDefaults.CookieScheme)
             .AddCookie(
                 AppAuthenticationDefaults.CookieScheme,
@@ -77,6 +76,18 @@ public static class ServiceCollectionExtensions
                     options.Cookie.IsEssential = true;
                     options.Cookie.SameSite = SameSiteMode.Lax;
                 });
+        services.AddAuthorization(
+            options =>
+            {
+                options.AddPolicy(
+                    AppAuthorizationPolicies.SuperAdminOnly,
+                    policy =>
+                    {
+                        policy.AuthenticationSchemes.Add(AppAuthenticationDefaults.CookieScheme);
+                        policy.RequireAuthenticatedUser();
+                        policy.RequireClaim(AppUserClaimTypes.IsSuperAdmin, "true");
+                    });
+            });
         services.AddSignalR();
         services.AddSingleton<IValidateOptions<SqlServerOptions>, SqlServerOptionsValidator>();
         services.AddSingleton<IValidateOptions<OpenAiSecurityOptions>, OpenAiSecurityOptionsValidator>();
@@ -88,7 +99,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IValidateOptions<LinkedInRequestSafetyOptions>, LinkedInRequestSafetyOptionsValidator>();
         services.AddSingleton<IValidateOptions<JobsWorkflowOptions>, JobsWorkflowOptionsValidator>();
         services.AddSingleton<IAppUserPasswordHasher, AppUserPasswordHasher>();
+        services.AddSingleton<ICurrentAppUserContext, HttpContextCurrentAppUserContext>();
         services.AddTransient<IAppUserAuthenticationService, AppUserAuthenticationService>();
+        services.AddTransient<IAdminUserManagementService, AdminUserManagementService>();
         services.AddSingleton<ISqlServerConnectionStringProvider, ConfiguredSqlServerConnectionStringProvider>();
         services.AddSingleton<ILinkedInSessionStore, DatabaseLinkedInSessionStore>();
         services.AddSingleton<ILinkedInBrowserLoginService, PlaywrightLinkedInBrowserLoginService>();

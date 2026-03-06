@@ -37,6 +37,23 @@ public sealed class AppUserRecord
     public bool IsSeeded { get; set; }
 
     /// <summary>
+    /// Indicates whether the account has super-admin capability.
+    /// </summary>
+    public bool IsSuperAdmin { get; set; }
+
+    /// <summary>
+    /// Indicates whether this account has been soft-deleted.
+    /// Soft-deleted users are retained in storage but excluded from active app usage.
+    /// </summary>
+    public bool IsDeleted { get; set; }
+
+    /// <summary>
+    /// UTC timestamp when this account was soft-deleted.
+    /// Null means the account has not been soft-deleted.
+    /// </summary>
+    public DateTimeOffset? DeletedAtUtc { get; set; }
+
+    /// <summary>
     /// Optional UTC expiration instant for temporary access accounts.
     /// Null means no expiry limit.
     /// </summary>
@@ -51,4 +68,32 @@ public sealed class AppUserRecord
     /// UTC timestamp of the most recent account update.
     /// </summary>
     public DateTimeOffset UpdatedAtUtc { get; set; }
+
+    /// <summary>
+    /// Jobs owned by this app user.
+    /// </summary>
+    public ICollection<JobRecord> Jobs { get; set; } = new List<JobRecord>();
+
+    /// <summary>
+    /// LinkedIn session snapshots owned by this app user.
+    /// </summary>
+    public ICollection<LinkedInSessionRecord> LinkedInSessions { get; set; } = new List<LinkedInSessionRecord>();
+
+    /// <summary>
+    /// LinkedIn search settings rows owned by this app user.
+    /// </summary>
+    public ICollection<LinkedInSearchSettingsRecord> LinkedInSearchSettings { get; set; } =
+        new List<LinkedInSearchSettingsRecord>();
+
+    /// <summary>
+    /// AI behavior settings rows owned by this app user.
+    /// </summary>
+    public ICollection<AiBehaviorSettingsRecord> AiBehaviorSettings { get; set; } =
+        new List<AiBehaviorSettingsRecord>();
+
+    /// <summary>
+    /// AI global shortlist runs owned by this app user.
+    /// </summary>
+    public ICollection<AiGlobalShortlistRunRecord> AiGlobalShortlistRuns { get; set; } =
+        new List<AiGlobalShortlistRunRecord>();
 }

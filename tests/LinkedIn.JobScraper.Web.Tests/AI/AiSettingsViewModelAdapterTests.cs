@@ -9,7 +9,6 @@ public sealed class AiSettingsViewModelAdapterTests
     public void ToViewModelMapsProfileAndStatus()
     {
         var profile = new AiBehaviorProfile(
-            "Default",
             "Behavior",
             "Priority",
             "Exclusion",
@@ -18,7 +17,6 @@ public sealed class AiSettingsViewModelAdapterTests
 
         var model = AiSettingsViewModelAdapter.ToViewModel(profile, "Saved.", true);
 
-        Assert.Equal("Default", model.ProfileName);
         Assert.Equal("Behavior", model.BehavioralInstructions);
         Assert.Equal("Priority", model.PrioritySignals);
         Assert.Equal("Exclusion", model.ExclusionSignals);

@@ -9,7 +9,7 @@ This is intentionally a **modular monolith MVC** application:
 - one deployable web application
 - explicit module boundaries by folder and service seams
 - no distributed services
-- no internal multi-user auth
+- local cookie authentication with per-user data ownership on business records
 
 ## High-Level Shape
 
@@ -90,6 +90,26 @@ This layer owns:
 - connection string access
 
 Views and controllers should not directly depend on EF entities for behavior decisions beyond already-shaped view data.
+
+### Ownership and isolation boundary
+
+User-owned business data is scoped by authenticated `AppUser` identity:
+
+- Direct-owned roots store `AppUserId`:
+  - `LinkedInSessions`
+  - `LinkedInSearchSettings`
+  - `AiBehaviorSettings`
+  - `Jobs`
+  - `AiGlobalShortlistRuns`
+- Child entities inherit ownership from their parent aggregate:
+  - `JobStatusHistory` via `JobRecordId`
+  - shortlist items/candidates via `RunId`
+- In-memory workflow/realtime state is keyed per user, preventing cross-user blocking and progress leakage.
+- Resource-id endpoints enforce ownership and return safe non-disclosing `404` responses for non-owned ids.
+
+Operational migration/backfill and rollback notes for this boundary are documented in:
+
+- `docs/per-user-data-isolation-operations.md`
 
 ## Main Runtime Flows
 

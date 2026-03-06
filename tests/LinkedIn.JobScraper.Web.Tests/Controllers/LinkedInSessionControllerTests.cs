@@ -40,6 +40,61 @@ public sealed class LinkedInSessionControllerTests
     }
 
     [Fact]
+    public async Task StateReturnsMissingSessionShapeWhenNoStoredSessionExists()
+    {
+        var controller = new LinkedInSessionController(
+            new MissingSessionLinkedInBrowserLoginService(),
+            new FakeLinkedInSessionCurlImportService(),
+            new FakeLinkedInSessionStore(),
+            new FakeLinkedInSessionVerificationService())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
+        };
+
+        var result = await controller.State(CancellationToken.None);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var payload = Assert.IsType<LinkedInSessionActionResponse>(json.Value);
+
+        Assert.False(payload.Success);
+        Assert.False(payload.State.StoredSessionAvailable);
+        Assert.Equal("Connect Session", payload.State.PrimaryActionLabel);
+        Assert.Equal("Missing", payload.State.SessionIndicatorLabel);
+        Assert.Equal("session-state-missing", payload.State.SessionIndicatorClass);
+    }
+
+    [Fact]
+    public async Task StateTreatsAutoCaptureAsStoppedWhenBrowserIsClosed()
+    {
+        var controller = new LinkedInSessionController(
+            new AutoCaptureStaleLinkedInBrowserLoginService(),
+            new FakeLinkedInSessionCurlImportService(),
+            new FakeLinkedInSessionStore(),
+            new FakeLinkedInSessionVerificationService())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
+        };
+
+        var result = await controller.State(CancellationToken.None);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var payload = Assert.IsType<LinkedInSessionActionResponse>(json.Value);
+
+        Assert.False(payload.State.AutoCaptureActive);
+        Assert.Equal("Missing", payload.State.SessionIndicatorLabel);
+        Assert.Equal("session-state-missing", payload.State.SessionIndicatorClass);
+        Assert.True(payload.State.ShowManualCaptureAction);
+    }
+
+    [Fact]
     public async Task VerifyReturnsProblemDetailsForAjaxFailures()
     {
         var controller = new LinkedInSessionController(
@@ -166,6 +221,60 @@ public sealed class LinkedInSessionControllerTests
         public Task<LinkedInBrowserLoginActionResult> LaunchLoginAsync(CancellationToken cancellationToken)
         {
             return Task.FromResult(new LinkedInBrowserLoginActionResult(false, "Browser launch failed."));
+        }
+    }
+
+    private sealed class MissingSessionLinkedInBrowserLoginService : ILinkedInBrowserLoginService
+    {
+        public Task<LinkedInBrowserLoginActionResult> CaptureAndSaveAsync(CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<LinkedInBrowserLoginState> GetStateAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                new LinkedInBrowserLoginState(
+                    BrowserOpen: false,
+                    CurrentPageUrl: null,
+                    StoredSessionAvailable: false,
+                    StoredSessionCapturedAtUtc: null,
+                    StoredSessionSource: null,
+                    AutoCaptureActive: false,
+                    AutoCaptureStatusMessage: null,
+                    AutoCaptureCompletedSuccessfully: false));
+        }
+
+        public Task<LinkedInBrowserLoginActionResult> LaunchLoginAsync(CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private sealed class AutoCaptureStaleLinkedInBrowserLoginService : ILinkedInBrowserLoginService
+    {
+        public Task<LinkedInBrowserLoginActionResult> CaptureAndSaveAsync(CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<LinkedInBrowserLoginState> GetStateAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                new LinkedInBrowserLoginState(
+                    BrowserOpen: false,
+                    CurrentPageUrl: null,
+                    StoredSessionAvailable: false,
+                    StoredSessionCapturedAtUtc: null,
+                    StoredSessionSource: null,
+                    AutoCaptureActive: true,
+                    AutoCaptureStatusMessage: "Waiting for LinkedIn login...",
+                    AutoCaptureCompletedSuccessfully: false));
+        }
+
+        public Task<LinkedInBrowserLoginActionResult> LaunchLoginAsync(CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
         }
     }
 

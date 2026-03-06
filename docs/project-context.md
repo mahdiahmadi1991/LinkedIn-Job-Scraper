@@ -6,7 +6,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 
 ## Confirmed Decisions
 
-- Single-user application for personal use only
+- Local personal-use application with per-user-isolated workspaces
 - Primary goal is fastest path to an MVP, not heavy architecture
 - Local execution only for now
 - SQL Server is the target database
@@ -31,7 +31,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The LinkedIn session flow now starts an automatic background capture watcher after browser launch so the user usually does not need a separate capture click
 - The main search and job-detail runtime flows now use in-code request builders instead of reading onboarding samples from `docs/api-sample`
 - LinkedIn fetch settings are now persisted in SQL Server, editable in the UI, and include real LinkedIn location lookup that resolves free-text input to a stored geoId
-- LinkedIn search import now fetches multiple pages conservatively, capped at 5 pages / 125 jobs with a small delay between requests to reduce burstiness
+- LinkedIn search import now fetches multiple pages conservatively, with current tracked defaults capped at 10 pages / 1000 jobs and a small delay between requests to reduce burstiness
 - The `Fetch & Score` workflow now publishes server-driven real-time progress updates over SignalR so the jobs page can reflect actual stage transitions while the request is running
 - The UI is now being refreshed toward a LinkedIn-inspired visual signature with denser cards, cleaner navigation, and a more compact jobs review table without changing the underlying workflow logic
 - The job details page is now being aligned with the same LinkedIn-inspired visual language so drill-down review feels consistent with the dashboard
@@ -104,6 +104,9 @@ Build a simple local web application for personal use that helps collect LinkedI
 - Seeded local app users now support password rotation during startup synchronization. `OpenAI` placeholder values were removed from tracked `appsettings` files, and local seeded users can be defined in development config when explicitly desired.
 - Seeded local app users now also support an optional `ExpiresAtUtc` value. Startup synchronization keeps that expiry in sync, and expired local users are blocked at login with a user-facing message instead of being authenticated.
 - Every application startup now creates a per-run log file under `src/LinkedIn.JobScraper.Web/logs/`. This gives each manual test run a separate inspectable log artifact, and sensitive token-like strings are sanitized before they are written there.
+- All persisted business data is now isolated per authenticated `AppUser` (`LinkedInSessions`, `LinkedInSearchSettings`, `AiBehaviorSettings`, `Jobs`, and AI shortlist runs), with child records inheriting ownership from parent aggregates.
+- Workflow/realtime stores now isolate state per user, and resource-id endpoints return non-disclosing `404` for non-owned records so cross-user probing does not reveal existence.
+- The ownership migration/backfill behavior and rollback options are now documented for operators in `docs/per-user-data-isolation-operations.md`.
 
 ## Product Intent
 

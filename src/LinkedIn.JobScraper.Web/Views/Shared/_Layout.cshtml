@@ -1,8 +1,10 @@
-﻿@using LinkedIn.JobScraper.Web.Models
+﻿@using LinkedIn.JobScraper.Web.Authentication
+@using LinkedIn.JobScraper.Web.Models
 @using LinkedIn.JobScraper.Web.LinkedIn.Session
 @inject ILinkedInBrowserLoginService LinkedInBrowserLoginService
 @{
     LinkedInSessionPageViewModel linkedInSessionViewModel;
+    var isSuperAdmin = User.HasClaim(AppUserClaimTypes.IsSuperAdmin, "true");
 
     try
     {
@@ -92,6 +94,14 @@
                             <li>
                                 <a class="dropdown-item app-menu-item" asp-area="" asp-controller="SearchSettings" asp-action="Index">Search Settings</a>
                             </li>
+                            @if (isSuperAdmin)
+                            {
+                                <li><hr class="dropdown-divider" /></li>
+                                <li class="dropdown-item-text app-menu-user-label">Admin</li>
+                                <li>
+                                    <a class="dropdown-item app-menu-item" asp-area="" asp-controller="Admin" asp-action="Index" asp-route-tab="users">Administration</a>
+                                </li>
+                            }
                             <li><hr class="dropdown-divider" /></li>
                             <li>
                                 <form asp-area="" asp-controller="Account" asp-action="Logout" method="post">

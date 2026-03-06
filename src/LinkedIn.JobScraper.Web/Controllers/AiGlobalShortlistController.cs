@@ -12,13 +12,16 @@ namespace LinkedIn.JobScraper.Web.Controllers;
 [Route("ai-global-shortlist")]
 public sealed class AiGlobalShortlistController : Controller
 {
+    private readonly ICurrentAppUserContext _currentAppUserContext;
     private readonly IAiGlobalShortlistService _globalShortlistService;
     private readonly IAiGlobalShortlistProgressStateStore _globalShortlistProgressStateStore;
 
     public AiGlobalShortlistController(
+        ICurrentAppUserContext currentAppUserContext,
         IAiGlobalShortlistService globalShortlistService,
         IAiGlobalShortlistProgressStateStore globalShortlistProgressStateStore)
     {
+        _currentAppUserContext = currentAppUserContext;
         _globalShortlistService = globalShortlistService;
         _globalShortlistProgressStateStore = globalShortlistProgressStateStore;
     }
@@ -95,9 +98,20 @@ public sealed class AiGlobalShortlistController : Controller
     }
 
     [HttpGet("runs/{runId:guid}/progress")]
-    public IActionResult Progress(Guid runId, [FromQuery] long afterSequence = 0)
+    public async Task<IActionResult> Progress(
+        Guid runId,
+        [FromQuery] long afterSequence = 0,
+        CancellationToken cancellationToken = default)
     {
-        return Json(_globalShortlistProgressStateStore.GetBatch(runId, afterSequence));
+        var userId = _currentAppUserContext.GetRequiredUserId();
+        var run = await _globalShortlistService.GetRunAsync(runId, cancellationToken);
+        if (run is null)
+        {
+            return NotFound();
+        }
+
+        var batch = _globalShortlistProgressStateStore.GetBatch(userId, runId, afterSequence);
+        return Json(batch.RunFound ? batch : batch with { RunFound = true });
     }
 
     [HttpGet("runs/overview")]

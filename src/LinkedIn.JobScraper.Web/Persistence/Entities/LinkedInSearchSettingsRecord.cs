@@ -12,9 +12,14 @@ public sealed class LinkedInSearchSettingsRecord
     public int Id { get; set; }
 
     /// <summary>
-    /// User-facing profile name for this saved filter configuration.
+    /// Owning local application user identifier.
     /// </summary>
-    public string ProfileName { get; set; } = string.Empty;
+    public int AppUserId { get; set; }
+
+    /// <summary>
+    /// Navigation to the owning local application user.
+    /// </summary>
+    public AppUserRecord AppUser { get; set; } = null!;
 
     /// <summary>
     /// LinkedIn keywords expression used in search query construction.

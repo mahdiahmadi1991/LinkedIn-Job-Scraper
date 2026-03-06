@@ -17,7 +17,7 @@ That creates a few hard constraints:
 - LinkedIn request behavior can change without notice
 - direct credential-post login is brittle and high-risk
 - aggressive automation would undermine the intended safety posture
-- the application is local-only and single-user, not a hosted multi-user product
+- the application is local-only for personal use, with lightweight local authentication and per-user data isolation
 
 The project also uses OpenAI for job triage, which introduces separate secret-handling concerns.
 
@@ -25,7 +25,7 @@ The project also uses OpenAI for job triage, which introduces separate secret-ha
 
 The repository will follow these operating decisions:
 
-1. The app remains **local-only** and **single-user**.
+1. The app remains **local-only** with **lightweight local app-user authentication** and **per-user data isolation**.
 2. LinkedIn authentication is handled through a **controlled browser + user-in-the-loop login**.
 3. The application stores a **reusable captured session**, but keeps it minimal and invalidates it on `401`.
 4. Sensitive runtime configuration such as OpenAI and SQL credentials stays in **user-secrets or environment variables**, not tracked config.

@@ -8,7 +8,6 @@ public interface IAiBehaviorSettingsService
 }
 
 public sealed record AiBehaviorProfile(
-    string ProfileName,
     string BehavioralInstructions,
     string PrioritySignals,
     string ExclusionSignals,
