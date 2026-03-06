@@ -6,7 +6,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 
 ## Confirmed Decisions
 
-- Single-user application for personal use only
+- Local personal-use application with per-user-isolated workspaces
 - Primary goal is fastest path to an MVP, not heavy architecture
 - Local execution only for now
 - SQL Server is the target database
@@ -31,7 +31,7 @@ Build a simple local web application for personal use that helps collect LinkedI
 - The LinkedIn session flow now starts an automatic background capture watcher after browser launch so the user usually does not need a separate capture click
 - The main search and job-detail runtime flows now use in-code request builders instead of reading onboarding samples from `docs/api-sample`
 - LinkedIn fetch settings are now persisted in SQL Server, editable in the UI, and include real LinkedIn location lookup that resolves free-text input to a stored geoId
-- LinkedIn search import now fetches multiple pages conservatively, capped at 5 pages / 125 jobs with a small delay between requests to reduce burstiness
+- LinkedIn search import now fetches multiple pages conservatively, with current tracked defaults capped at 10 pages / 1000 jobs and a small delay between requests to reduce burstiness
 - The `Fetch & Score` workflow now publishes server-driven real-time progress updates over SignalR so the jobs page can reflect actual stage transitions while the request is running
 - The UI is now being refreshed toward a LinkedIn-inspired visual signature with denser cards, cleaner navigation, and a more compact jobs review table without changing the underlying workflow logic
 - The job details page is now being aligned with the same LinkedIn-inspired visual language so drill-down review feels consistent with the dashboard

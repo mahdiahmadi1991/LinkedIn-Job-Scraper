@@ -28,8 +28,8 @@ If there is tension between broad roadmap intent and step-by-step execution:
 
 ## Current Product Guardrails
 
-- Local-only, single-user application
-- No internal app authentication
+- Local-only personal-use application (not a hosted SaaS product)
+- Lightweight local app-user authentication is active and required for per-user data ownership
 - Controlled-browser, user-in-the-loop LinkedIn session capture remains the default
 - No direct credential-post login as the primary LinkedIn path
 - No aggressive scraping patterns
