@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using LinkedIn.JobScraper.Web.Authentication;
 using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Jobs;
 using LinkedIn.JobScraper.Web.Persistence;
@@ -21,6 +22,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
     private const string DecisionNeedsReview = "NeedsReview";
     private const string CandidateStatusPending = "Pending";
 
+    private readonly ICurrentAppUserContext _currentAppUserContext;
     private readonly IAiBehaviorSettingsService _behaviorSettingsService;
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly IAiGlobalShortlistGateway _globalShortlistGateway;
@@ -32,6 +34,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
     private readonly IOptions<OpenAiSecurityOptions> _openAiSecurityOptions;
 
     public AiGlobalShortlistService(
+        ICurrentAppUserContext currentAppUserContext,
         IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
         IAiGlobalShortlistGateway globalShortlistGateway,
         IAiGlobalShortlistProgressNotifier progressNotifier,
@@ -42,6 +45,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
         IOptions<OpenAiSecurityOptions> openAiSecurityOptions,
         ILogger<AiGlobalShortlistService> logger)
     {
+        _currentAppUserContext = currentAppUserContext;
         _dbContextFactory = dbContextFactory;
         _globalShortlistGateway = globalShortlistGateway;
         _progressNotifier = progressNotifier;
@@ -58,11 +62,13 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
         string? progressConnectionId = null,
         JobStageProgressCallback? progressCallback = null)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await RecoverOrphanedActiveRunsAsync(dbContext, cancellationToken);
+        await RecoverOrphanedActiveRunsAsync(dbContext, userId, cancellationToken);
 
         var activeRun = await dbContext.AiGlobalShortlistRuns
             .AsNoTracking()
+            .Where(run => run.AppUserId == userId)
             .Where(run => run.Status == RunStatusPending || run.Status == RunStatusRunning)
             .OrderByDescending(run => run.CreatedAtUtc)
             .Select(
@@ -95,9 +101,14 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
         var promptVersion = options.GetPromptVersion();
         var modelName = _openAiSecurityOptions.Value.Model;
 
-        var candidates = await SelectCandidatesAsync(dbContext, options.GetMaxCandidateCount(), cancellationToken);
+        var candidates = await SelectCandidatesAsync(
+            dbContext,
+            userId,
+            options.GetMaxCandidateCount(),
+            cancellationToken);
         var run = new AiGlobalShortlistRunRecord
         {
+            AppUserId = userId,
             CreatedAtUtc = DateTimeOffset.UtcNow,
             Status = RunStatusPending,
             CandidateCount = candidates.Count,
@@ -132,6 +143,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await PublishProgressSafeAsync(
+            userId,
             progressConnectionId,
             new AiGlobalShortlistProgressUpdate(
                 run.Id,
@@ -153,6 +165,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
             await dbContext.SaveChangesAsync(cancellationToken);
 
             await PublishProgressSafeAsync(
+                userId,
                 progressConnectionId,
                 new AiGlobalShortlistProgressUpdate(
                     run.Id,
@@ -190,10 +203,11 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
         string? progressConnectionId = null,
         JobStageProgressCallback? progressCallback = null)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var run = await dbContext.AiGlobalShortlistRuns
-            .SingleOrDefaultAsync(candidate => candidate.Id == runId, cancellationToken);
+            .SingleOrDefaultAsync(candidate => candidate.Id == runId && candidate.AppUserId == userId, cancellationToken);
 
         if (run is null)
         {
@@ -231,6 +245,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await PublishProgressSafeAsync(
+            userId,
             progressConnectionId,
             new AiGlobalShortlistProgressUpdate(
                 run.Id,
@@ -267,6 +282,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
                 {
                     await MarkRunCancelledAsync(dbContext, run, cancellationToken);
                     await PublishProgressSafeAsync(
+                        userId,
                         progressConnectionId,
                         new AiGlobalShortlistProgressUpdate(
                             run.Id,
@@ -305,6 +321,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
                 }
 
                 await PublishProgressSafeAsync(
+                    userId,
                     progressConnectionId,
                     new AiGlobalShortlistProgressUpdate(
                         run.Id,
@@ -325,6 +342,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
                     cancellationToken);
 
                 var evaluation = await EvaluateCandidateAsync(
+                    userId,
                     run.Id,
                     runCandidate.SequenceNumber,
                     runCandidate.JobRecord,
@@ -406,6 +424,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
                 await dbContext.SaveChangesAsync(cancellationToken);
 
                 await PublishProgressSafeAsync(
+                    userId,
                     progressConnectionId,
                     new AiGlobalShortlistProgressUpdate(
                         run.Id,
@@ -450,6 +469,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
                 }
 
                 await PublishProgressSafeAsync(
+                    userId,
                     progressConnectionId,
                     new AiGlobalShortlistProgressUpdate(
                         run.Id,
@@ -476,6 +496,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
             await dbContext.SaveChangesAsync(cancellationToken);
 
             await PublishProgressSafeAsync(
+                userId,
                 progressConnectionId,
                 new AiGlobalShortlistProgressUpdate(
                     run.Id,
@@ -499,7 +520,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            await TryMarkRunCancelledAsync(runId);
+            await TryMarkRunCancelledAsync(runId, userId);
             throw;
         }
         catch (Exception exception)
@@ -516,6 +537,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
             {
                 await dbContext.SaveChangesAsync(cancellationToken);
                 await PublishProgressSafeAsync(
+                    userId,
                     progressConnectionId,
                     new AiGlobalShortlistProgressUpdate(
                         run.Id,
@@ -549,10 +571,11 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
 
     public async Task<AiGlobalShortlistRunResult> RequestCancelAsync(Guid runId, CancellationToken cancellationToken)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var run = await dbContext.AiGlobalShortlistRuns
-            .SingleOrDefaultAsync(candidate => candidate.Id == runId, cancellationToken);
+            .SingleOrDefaultAsync(candidate => candidate.Id == runId && candidate.AppUserId == userId, cancellationToken);
 
         if (run is null)
         {
@@ -586,6 +609,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await PublishProgressSafeAsync(
+            userId,
             connectionId: null,
             new AiGlobalShortlistProgressUpdate(
                 run.Id,
@@ -611,11 +635,13 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
 
     public async Task<AiGlobalShortlistRunSnapshot?> GetLatestRunAsync(CancellationToken cancellationToken)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await RecoverOrphanedActiveRunsAsync(dbContext, cancellationToken);
+        await RecoverOrphanedActiveRunsAsync(dbContext, userId, cancellationToken);
 
         var latestRunId = await dbContext.AiGlobalShortlistRuns
             .AsNoTracking()
+            .Where(run => run.AppUserId == userId)
             .OrderByDescending(static run => run.CreatedAtUtc)
             .Select(static run => (Guid?)run.Id)
             .FirstOrDefaultAsync(cancellationToken);
@@ -630,12 +656,13 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
 
     public async Task<AiGlobalShortlistRunSnapshot?> GetRunAsync(Guid runId, CancellationToken cancellationToken)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await RecoverOrphanedActiveRunsAsync(dbContext, cancellationToken);
+        await RecoverOrphanedActiveRunsAsync(dbContext, userId, cancellationToken);
 
         var run = await dbContext.AiGlobalShortlistRuns
             .AsNoTracking()
-            .SingleOrDefaultAsync(candidate => candidate.Id == runId, cancellationToken);
+            .SingleOrDefaultAsync(candidate => candidate.Id == runId && candidate.AppUserId == userId, cancellationToken);
 
         if (run is null)
         {
@@ -644,7 +671,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
 
         var items = await dbContext.AiGlobalShortlistItems
             .AsNoTracking()
-            .Where(item => item.RunId == runId)
+            .Where(item => item.RunId == runId && item.Run.AppUserId == userId)
             .OrderBy(static item => item.Rank)
             .Select(
                 item => new AiGlobalShortlistItemSnapshot(
@@ -689,12 +716,14 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
 
     public async Task<AiGlobalShortlistQueueOverviewSnapshot> GetQueueOverviewAsync(CancellationToken cancellationToken)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var eligibleJobs = dbContext.Jobs
             .AsNoTracking()
             .Where(
-                static job =>
+                job =>
+                    job.AppUserId == userId &&
                     !string.IsNullOrWhiteSpace(job.Description) &&
                     job.LastDetailSyncedAtUtc.HasValue);
 
@@ -702,6 +731,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
 
         var alreadyReviewed = await dbContext.AiGlobalShortlistItems
             .AsNoTracking()
+            .Where(item => item.Run.AppUserId == userId)
             .Select(static item => item.JobRecordId)
             .Distinct()
             .Join(
@@ -719,9 +749,11 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
 
     private async Task RecoverOrphanedActiveRunsAsync(
         LinkedInJobScraperDbContext dbContext,
+        int userId,
         CancellationToken cancellationToken)
     {
         var activeRuns = await dbContext.AiGlobalShortlistRuns
+            .Where(run => run.AppUserId == userId)
             .Where(run => run.Status == RunStatusPending || run.Status == RunStatusRunning)
             .ToListAsync(cancellationToken);
 
@@ -735,7 +767,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
 
         foreach (var run in activeRuns)
         {
-            var batch = _progressStateStore.GetBatch(run.Id, afterSequence: 0);
+            var batch = _progressStateStore.GetBatch(userId, run.Id, afterSequence: 0);
             if (batch.RunFound)
             {
                 continue;
@@ -760,6 +792,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
     }
 
     private async Task<CandidateEvaluation> EvaluateCandidateAsync(
+        int userId,
         Guid runId,
         int sequenceNumber,
         JobRecord job,
@@ -828,6 +861,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
             var delay = GetRetryDelay(transientRetryBaseDelay, nextAttempt);
 
             await PublishProgressSafeAsync(
+                userId,
                 progressConnectionId,
                 new AiGlobalShortlistProgressUpdate(
                     runId,
@@ -942,14 +976,16 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task TryMarkRunCancelledAsync(Guid runId)
+    private async Task TryMarkRunCancelledAsync(Guid runId, int userId)
     {
         try
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(CancellationToken.None);
 
             var run = await dbContext.AiGlobalShortlistRuns
-                .SingleOrDefaultAsync(candidate => candidate.Id == runId, CancellationToken.None);
+                .SingleOrDefaultAsync(
+                    candidate => candidate.Id == runId && candidate.AppUserId == userId,
+                    CancellationToken.None);
 
             if (run is null ||
                 run.Status is RunStatusCompleted or RunStatusCancelled)
@@ -1039,13 +1075,14 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
     }
 
     private async Task PublishProgressSafeAsync(
+        int userId,
         string? connectionId,
         AiGlobalShortlistProgressUpdate update,
         CancellationToken cancellationToken)
     {
         try
         {
-            await _progressNotifier.PublishAsync(connectionId, update, cancellationToken);
+            await _progressNotifier.PublishAsync(userId, connectionId, update, cancellationToken);
         }
         catch (Exception exception)
         {
@@ -1071,16 +1108,19 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
 
     private static Task<List<CandidateJob>> SelectCandidatesAsync(
         LinkedInJobScraperDbContext dbContext,
+        int userId,
         int? maxCandidateCount,
         CancellationToken cancellationToken)
     {
         var previouslyReviewedJobIds = dbContext.AiGlobalShortlistItems
+            .Where(item => item.Run.AppUserId == userId)
             .Select(static item => item.JobRecordId);
 
         IQueryable<JobRecord> query = dbContext.Jobs
             .AsNoTracking()
             .Where(
                 job =>
+                    job.AppUserId == userId &&
                     !string.IsNullOrWhiteSpace(job.Description) &&
                     job.LastDetailSyncedAtUtc.HasValue &&
                     !previouslyReviewedJobIds.Contains(job.Id))

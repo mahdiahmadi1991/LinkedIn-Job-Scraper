@@ -1,4 +1,5 @@
 using System.Text.Json;
+using LinkedIn.JobScraper.Web.Authentication;
 using LinkedIn.JobScraper.Web.Persistence;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -9,17 +10,22 @@ public sealed class DatabaseLinkedInSessionStore : ILinkedInSessionStore, IDispo
 {
     private const string PrimarySessionKey = "primary";
 
+    private readonly ICurrentAppUserContext _currentAppUserContext;
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly SemaphoreSlim _initializationGate = new(1, 1);
     private volatile bool _databaseEnsured;
 
-    public DatabaseLinkedInSessionStore(IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory)
+    public DatabaseLinkedInSessionStore(
+        IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
+        ICurrentAppUserContext currentAppUserContext)
     {
         _dbContextFactory = dbContextFactory;
+        _currentAppUserContext = currentAppUserContext;
     }
 
     public async Task<LinkedInSessionSnapshot?> GetCurrentAsync(CancellationToken cancellationToken)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await EnsureDatabaseAsync(cancellationToken);
 
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -27,7 +33,7 @@ public sealed class DatabaseLinkedInSessionStore : ILinkedInSessionStore, IDispo
         var record = await dbContext.LinkedInSessions
             .AsNoTracking()
             .SingleOrDefaultAsync(
-                static session => session.SessionKey == PrimarySessionKey && session.IsActive,
+                session => session.AppUserId == userId && session.SessionKey == PrimarySessionKey && session.IsActive,
                 cancellationToken);
 
         if (record is null)
@@ -43,19 +49,21 @@ public sealed class DatabaseLinkedInSessionStore : ILinkedInSessionStore, IDispo
 
     public async Task SaveAsync(LinkedInSessionSnapshot sessionSnapshot, CancellationToken cancellationToken)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await EnsureDatabaseAsync(cancellationToken);
 
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
         var sanitizedHeaders = LinkedInSessionHeaderSanitizer.SanitizeForStorage(sessionSnapshot.Headers);
 
         var existingRecord = await dbContext.LinkedInSessions.SingleOrDefaultAsync(
-            static session => session.SessionKey == PrimarySessionKey,
+            session => session.AppUserId == userId && session.SessionKey == PrimarySessionKey,
             cancellationToken);
 
         if (existingRecord is null)
         {
             existingRecord = new LinkedInSessionRecord
             {
+                AppUserId = userId,
                 SessionKey = PrimarySessionKey
             };
 
@@ -73,12 +81,13 @@ public sealed class DatabaseLinkedInSessionStore : ILinkedInSessionStore, IDispo
 
     public async Task InvalidateCurrentAsync(CancellationToken cancellationToken)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await EnsureDatabaseAsync(cancellationToken);
 
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var existingRecord = await dbContext.LinkedInSessions.SingleOrDefaultAsync(
-            static session => session.SessionKey == PrimarySessionKey && session.IsActive,
+            session => session.AppUserId == userId && session.SessionKey == PrimarySessionKey && session.IsActive,
             cancellationToken);
 
         if (existingRecord is null)
@@ -94,12 +103,13 @@ public sealed class DatabaseLinkedInSessionStore : ILinkedInSessionStore, IDispo
 
     public async Task MarkCurrentValidatedAsync(DateTimeOffset validatedAtUtc, CancellationToken cancellationToken)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await EnsureDatabaseAsync(cancellationToken);
 
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var existingRecord = await dbContext.LinkedInSessions.SingleOrDefaultAsync(
-            static session => session.SessionKey == PrimarySessionKey && session.IsActive,
+            session => session.AppUserId == userId && session.SessionKey == PrimarySessionKey && session.IsActive,
             cancellationToken);
 
         if (existingRecord is null)

@@ -3,6 +3,7 @@ using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Jobs;
 using LinkedIn.JobScraper.Web.Persistence;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
+using LinkedIn.JobScraper.Web.Tests.Authentication;
 using LinkedIn.JobScraper.Web.Tests.Persistence;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -98,7 +99,7 @@ public sealed class JobsDashboardServiceTests
     {
         var notifier = new FakeJobsWorkflowProgressNotifier();
         var workflowStateStore = new InMemoryJobsWorkflowStateStore();
-        var registration = workflowStateStore.RegisterWorkflow("workflow-active", CancellationToken.None);
+        var registration = workflowStateStore.RegisterWorkflow(1, "workflow-active", CancellationToken.None);
         Assert.True(registration.Accepted);
 
         var service = CreateService(
@@ -126,6 +127,7 @@ public sealed class JobsDashboardServiceTests
         JobsWorkflowOptions? jobsWorkflowOptions = null)
     {
         return new JobsDashboardService(
+            new TestCurrentAppUserContext(),
             dbContextFactory,
             jobImportService ?? new SuccessfulJobImportService(),
             jobEnrichmentService ?? new SuccessfulJobEnrichmentService(),
@@ -149,6 +151,7 @@ public sealed class JobsDashboardServiceTests
                 dbContext.Jobs.Add(
                     new JobRecord
                     {
+                        AppUserId = 1,
                         LinkedInJobId = $"job-{index}",
                         LinkedInJobPostingUrn = $"urn:li:jobPosting:{index}",
                         Title = $"Job {index}",
@@ -173,6 +176,7 @@ public sealed class JobsDashboardServiceTests
         public List<JobsWorkflowProgressUpdate> Updates { get; } = [];
 
         public Task PublishAsync(
+            int userId,
             string? connectionId,
             JobsWorkflowProgressUpdate update,
             CancellationToken cancellationToken)

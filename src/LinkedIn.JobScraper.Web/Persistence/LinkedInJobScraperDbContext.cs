@@ -36,6 +36,7 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.ToTable("Jobs");
                 entity.HasKey(static job => job.Id);
 
+                entity.Property(static job => job.AppUserId).IsRequired();
                 entity.Property(static job => job.LinkedInJobId).HasMaxLength(64).IsRequired();
                 entity.Property(static job => job.LinkedInJobPostingUrn).HasMaxLength(256).IsRequired();
                 entity.Property(static job => job.LinkedInJobCardUrn).HasMaxLength(256);
@@ -52,8 +53,9 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                     .HasConversion<string>()
                     .HasMaxLength(32);
 
-                entity.HasIndex(static job => job.LinkedInJobId).IsUnique();
-                entity.HasIndex(static job => job.LinkedInJobPostingUrn).IsUnique();
+                entity.HasIndex(static job => job.AppUserId);
+                entity.HasIndex(static job => new { job.AppUserId, job.LinkedInJobId }).IsUnique();
+                entity.HasIndex(static job => new { job.AppUserId, job.LinkedInJobPostingUrn }).IsUnique();
                 entity.HasIndex(static job => job.CurrentStatus);
                 entity.HasIndex(static job => job.AiLabel);
                 entity.HasIndex(static job => job.AiScore);
@@ -61,6 +63,11 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.HasIndex(static job => job.LastDetailSyncedAtUtc);
                 entity.HasIndex(static job => job.ListedAtUtc);
                 entity.HasIndex(static job => job.LinkedInUpdatedAtUtc);
+
+                entity.HasOne(static job => job.AppUser)
+                    .WithMany(static appUser => appUser.Jobs)
+                    .HasForeignKey(static job => job.AppUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
         modelBuilder.Entity<AppUserRecord>(
@@ -104,11 +111,17 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.ToTable("LinkedInSessions");
                 entity.HasKey(static session => session.Id);
 
+                entity.Property(static session => session.AppUserId).IsRequired();
                 entity.Property(static session => session.SessionKey).HasMaxLength(128).IsRequired();
                 entity.Property(static session => session.Source).HasMaxLength(128).IsRequired();
                 entity.Property(static session => session.RequestHeadersJson).IsRequired();
 
-                entity.HasIndex(static session => session.SessionKey).IsUnique();
+                entity.HasIndex(static session => new { session.AppUserId, session.SessionKey }).IsUnique();
+
+                entity.HasOne(static session => session.AppUser)
+                    .WithMany(static appUser => appUser.LinkedInSessions)
+                    .HasForeignKey(static session => session.AppUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
         modelBuilder.Entity<AiBehaviorSettingsRecord>(
@@ -117,9 +130,16 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.ToTable("AiBehaviorSettings");
                 entity.HasKey(static settings => settings.Id);
 
-                entity.Property(static settings => settings.ProfileName).HasMaxLength(128).IsRequired();
+                entity.Property(static settings => settings.AppUserId).IsRequired();
                 entity.Property(static settings => settings.OutputLanguageCode).HasMaxLength(8).IsRequired();
                 entity.Property(static settings => settings.RowVersion).IsRowVersion();
+
+                entity.HasIndex(static settings => settings.AppUserId).IsUnique();
+
+                entity.HasOne(static settings => settings.AppUser)
+                    .WithMany(static appUser => appUser.AiBehaviorSettings)
+                    .HasForeignKey(static settings => settings.AppUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
         modelBuilder.Entity<LinkedInSearchSettingsRecord>(
@@ -128,7 +148,7 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.ToTable("LinkedInSearchSettings");
                 entity.HasKey(static settings => settings.Id);
 
-                entity.Property(static settings => settings.ProfileName).HasMaxLength(128).IsRequired();
+                entity.Property(static settings => settings.AppUserId).IsRequired();
                 entity.Property(static settings => settings.Keywords).HasMaxLength(512).IsRequired();
                 entity.Property(static settings => settings.LocationInput).HasMaxLength(256);
                 entity.Property(static settings => settings.LocationDisplayName).HasMaxLength(256);
@@ -136,6 +156,13 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.Property(static settings => settings.WorkplaceTypeCodesCsv).HasMaxLength(128).IsRequired();
                 entity.Property(static settings => settings.JobTypeCodesCsv).HasMaxLength(128).IsRequired();
                 entity.Property(static settings => settings.RowVersion).IsRowVersion();
+
+                entity.HasIndex(static settings => settings.AppUserId).IsUnique();
+
+                entity.HasOne(static settings => settings.AppUser)
+                    .WithMany(static appUser => appUser.LinkedInSearchSettings)
+                    .HasForeignKey(static settings => settings.AppUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
         modelBuilder.Entity<AiGlobalShortlistRunRecord>(
@@ -144,14 +171,22 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.ToTable("AiGlobalShortlistRuns");
                 entity.HasKey(static run => run.Id);
 
+                entity.Property(static run => run.AppUserId).IsRequired();
                 entity.Property(static run => run.Status).HasMaxLength(32).IsRequired();
                 entity.Property(static run => run.PromptVersion).HasMaxLength(64);
                 entity.Property(static run => run.ModelName).HasMaxLength(128);
                 entity.Property(static run => run.Summary).HasMaxLength(2000);
 
+                entity.HasIndex(static run => new { run.AppUserId, run.CreatedAtUtc });
+                entity.HasIndex(static run => new { run.AppUserId, run.Status });
                 entity.HasIndex(static run => run.CreatedAtUtc);
                 entity.HasIndex(static run => run.CompletedAtUtc);
                 entity.HasIndex(static run => run.Status);
+
+                entity.HasOne(static run => run.AppUser)
+                    .WithMany(static appUser => appUser.AiGlobalShortlistRuns)
+                    .HasForeignKey(static run => run.AppUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
         modelBuilder.Entity<AiGlobalShortlistRunCandidateRecord>(

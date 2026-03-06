@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using LinkedIn.JobScraper.Web.Authentication;
 using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.LinkedIn.Search;
 using LinkedIn.JobScraper.Web.Persistence;
@@ -16,15 +17,18 @@ public sealed class JobImportService : IJobImportService
     private readonly LinkedInFetchDiagnosticsOptions _fetchDiagnosticsOptions;
     private readonly LinkedInIncrementalFetchOptions _incrementalFetchOptions;
     private readonly ILinkedInJobSearchService _linkedInJobSearchService;
+    private readonly ICurrentAppUserContext _currentAppUserContext;
     private readonly ILogger<JobImportService> _logger;
 
     public JobImportService(
+        ICurrentAppUserContext currentAppUserContext,
         IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
         ILinkedInJobSearchService linkedInJobSearchService,
         IOptions<LinkedInFetchDiagnosticsOptions> fetchDiagnosticsOptions,
         IOptions<LinkedInIncrementalFetchOptions> incrementalFetchOptions,
         ILogger<JobImportService> logger)
     {
+        _currentAppUserContext = currentAppUserContext;
         _dbContextFactory = dbContextFactory;
         _linkedInJobSearchService = linkedInJobSearchService;
         _fetchDiagnosticsOptions = fetchDiagnosticsOptions.Value;
@@ -38,9 +42,10 @@ public sealed class JobImportService : IJobImportService
     {
         var diagnosticsEnabled = _fetchDiagnosticsOptions.Enabled;
         var canLogDiagnostics = diagnosticsEnabled && _logger.IsEnabled(LogLevel.Information);
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var incrementalState = await BuildIncrementalStopStateAsync(dbContext, cancellationToken);
+        var incrementalState = await BuildIncrementalStopStateAsync(dbContext, userId, cancellationToken);
         if (canLogDiagnostics)
         {
             if (incrementalState is null)
@@ -107,7 +112,7 @@ public sealed class JobImportService : IJobImportService
             .ToArray();
 
         var existingJobs = await dbContext.Jobs
-            .Where(job => jobIds.Contains(job.LinkedInJobId))
+            .Where(job => job.AppUserId == userId && jobIds.Contains(job.LinkedInJobId))
             .ToListAsync(cancellationToken);
 
         var existingById = existingJobs.ToDictionary(
@@ -183,6 +188,7 @@ public sealed class JobImportService : IJobImportService
                 {
                     var record = new JobRecord
                     {
+                        AppUserId = userId,
                         LinkedInJobId = job.LinkedInJobId,
                         LinkedInJobPostingUrn = job.LinkedInJobPostingUrn,
                         LinkedInJobCardUrn = job.LinkedInJobCardUrn,
@@ -278,6 +284,7 @@ public sealed class JobImportService : IJobImportService
 
     private async Task<IncrementalStopState?> BuildIncrementalStopStateAsync(
         LinkedInJobScraperDbContext dbContext,
+        int userId,
         CancellationToken cancellationToken)
     {
         if (!_incrementalFetchOptions.Enabled)
@@ -287,6 +294,7 @@ public sealed class JobImportService : IJobImportService
 
         var knownIds = await dbContext.Jobs
             .AsNoTracking()
+            .Where(job => job.AppUserId == userId)
             .Select(static job => job.LinkedInJobId)
             .ToListAsync(cancellationToken);
 

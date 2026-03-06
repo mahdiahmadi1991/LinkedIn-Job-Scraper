@@ -1,4 +1,5 @@
 using LinkedIn.JobScraper.Web.LinkedIn.Details;
+using LinkedIn.JobScraper.Web.Authentication;
 using LinkedIn.JobScraper.Web.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -13,16 +14,19 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly JobsWorkflowOptions _jobsWorkflowOptions;
     private readonly ILinkedInJobDetailService _linkedInJobDetailService;
+    private readonly ICurrentAppUserContext _currentAppUserContext;
     private readonly LinkedInFetchDiagnosticsOptions _fetchDiagnosticsOptions;
     private readonly ILogger<JobEnrichmentService> _logger;
 
     public JobEnrichmentService(
+        ICurrentAppUserContext currentAppUserContext,
         IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
         ILinkedInJobDetailService linkedInJobDetailService,
         IOptions<JobsWorkflowOptions> jobsWorkflowOptions,
         IOptions<LinkedInFetchDiagnosticsOptions> fetchDiagnosticsOptions,
         ILogger<JobEnrichmentService> logger)
     {
+        _currentAppUserContext = currentAppUserContext;
         _dbContextFactory = dbContextFactory;
         _linkedInJobDetailService = linkedInJobDetailService;
         _jobsWorkflowOptions = jobsWorkflowOptions.Value;
@@ -41,6 +45,7 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
             maxCount = 1;
         }
 
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var excludedIds = excludedJobIds is { Count: > 0 }
@@ -49,6 +54,7 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
         var canLogDiagnostics = _fetchDiagnosticsOptions.Enabled && _logger.IsEnabled(LogLevel.Information);
         var selectionResult = await SelectCandidatesAsync(
             dbContext,
+            userId,
             maxCount,
             excludedIds,
             cancellationToken);
@@ -285,6 +291,7 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
 
     private async Task<CandidateSelectionResult> SelectCandidatesAsync(
         LinkedInJobScraperDbContext dbContext,
+        int userId,
         int maxCount,
         Guid[]? excludedIds,
         CancellationToken cancellationToken)
@@ -293,10 +300,11 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
         var selectedIds = new HashSet<Guid>();
 
         var incompleteQuery = dbContext.Jobs.Where(
-            static job =>
-                string.IsNullOrWhiteSpace(job.Description) ||
-                string.IsNullOrWhiteSpace(job.CompanyApplyUrl) ||
-                string.IsNullOrWhiteSpace(job.EmploymentStatus));
+            job =>
+                job.AppUserId == userId &&
+                (string.IsNullOrWhiteSpace(job.Description) ||
+                 string.IsNullOrWhiteSpace(job.CompanyApplyUrl) ||
+                 string.IsNullOrWhiteSpace(job.EmploymentStatus)));
 
         if (excludedIds is not null)
         {
@@ -328,6 +336,7 @@ public sealed class JobEnrichmentService : IJobEnrichmentService
         var staleThresholdUtc = DateTimeOffset.UtcNow - _jobsWorkflowOptions.GetDetailResyncAfter();
         var staleQuery = dbContext.Jobs.Where(
             job =>
+                job.AppUserId == userId &&
                 !string.IsNullOrWhiteSpace(job.Description) &&
                 !string.IsNullOrWhiteSpace(job.CompanyApplyUrl) &&
                 !string.IsNullOrWhiteSpace(job.EmploymentStatus) &&

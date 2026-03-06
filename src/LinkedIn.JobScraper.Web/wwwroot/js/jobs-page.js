@@ -456,6 +456,11 @@
                 credentials: "same-origin"
             });
 
+            if (response.status === 404) {
+                resetWorkflowUi({ hidePanel: true });
+                return;
+            }
+
             if (!response.ok) {
                 throw new Error("Could not read workflow progress.");
             }

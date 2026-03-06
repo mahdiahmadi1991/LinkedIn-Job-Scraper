@@ -1,4 +1,5 @@
 using LinkedIn.JobScraper.Web.AI;
+using Microsoft.AspNetCore.Http;
 
 namespace LinkedIn.JobScraper.Web.Jobs;
 
@@ -134,7 +135,8 @@ public sealed record FetchAndScoreWorkflowResult(
 public sealed record JobStatusChangeResult(
     bool Success,
     string Message,
-    string Severity);
+    string Severity,
+    int StatusCode = StatusCodes.Status200OK);
 
 public sealed record JobScoreActionResult(
     bool Success,

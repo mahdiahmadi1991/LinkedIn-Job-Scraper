@@ -11,6 +11,16 @@ public sealed class AiGlobalShortlistRunRecord
     public Guid Id { get; set; } = Guid.NewGuid();
 
     /// <summary>
+    /// Owning local application user identifier.
+    /// </summary>
+    public int AppUserId { get; set; }
+
+    /// <summary>
+    /// Navigation to the owning local application user.
+    /// </summary>
+    public AppUserRecord AppUser { get; set; } = null!;
+
+    /// <summary>
     /// UTC timestamp when the run was created/started.
     /// </summary>
     public DateTimeOffset CreatedAtUtc { get; set; }

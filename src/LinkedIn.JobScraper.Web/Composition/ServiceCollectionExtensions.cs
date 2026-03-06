@@ -63,6 +63,7 @@ public static class ServiceCollectionExtensions
             .ValidateOnStart();
 
         services.AddHostedService<AppUserSeedingStartupService>();
+        services.AddHttpContextAccessor();
         services.AddAuthentication(AppAuthenticationDefaults.CookieScheme)
             .AddCookie(
                 AppAuthenticationDefaults.CookieScheme,
@@ -88,6 +89,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IValidateOptions<LinkedInRequestSafetyOptions>, LinkedInRequestSafetyOptionsValidator>();
         services.AddSingleton<IValidateOptions<JobsWorkflowOptions>, JobsWorkflowOptionsValidator>();
         services.AddSingleton<IAppUserPasswordHasher, AppUserPasswordHasher>();
+        services.AddSingleton<ICurrentAppUserContext, HttpContextCurrentAppUserContext>();
         services.AddTransient<IAppUserAuthenticationService, AppUserAuthenticationService>();
         services.AddSingleton<ISqlServerConnectionStringProvider, ConfiguredSqlServerConnectionStringProvider>();
         services.AddSingleton<ILinkedInSessionStore, DatabaseLinkedInSessionStore>();

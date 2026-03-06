@@ -3,6 +3,7 @@ using LinkedIn.JobScraper.Web.Jobs;
 using LinkedIn.JobScraper.Web.LinkedIn.Details;
 using LinkedIn.JobScraper.Web.Persistence;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
+using LinkedIn.JobScraper.Web.Tests.Authentication;
 using LinkedIn.JobScraper.Web.Tests.Persistence;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -136,6 +137,7 @@ public sealed class JobEnrichmentServiceTests
     {
         return new JobRecord
         {
+            AppUserId = 1,
             LinkedInJobId = linkedInJobId,
             LinkedInJobPostingUrn = $"urn:li:fsd_jobPosting:{linkedInJobId}",
             LinkedInJobCardUrn = $"urn:li:fsd_jobCard:{linkedInJobId}",
@@ -157,6 +159,7 @@ public sealed class JobEnrichmentServiceTests
         int detailResyncAfterHours)
     {
         return new JobEnrichmentService(
+            new TestCurrentAppUserContext(),
             new TestDbContextFactory(dbContextOptions),
             linkedInJobDetailService,
             Options.Create(

@@ -4,6 +4,7 @@ using LinkedIn.JobScraper.Web.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LinkedIn.JobScraper.Web.Persistence.Migrations
 {
     [DbContext(typeof(LinkedInJobScraperDbContext))]
-    partial class LinkedInJobScraperDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260306084322_AddPerUserDataOwnership")]
+    partial class AddPerUserDataOwnership
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -49,6 +52,11 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                     b.Property<string>("PrioritySignals")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ProfileName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -487,6 +495,11 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                     b.Property<string>("LocationInput")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("ProfileName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()

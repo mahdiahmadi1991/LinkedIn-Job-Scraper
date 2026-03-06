@@ -104,6 +104,9 @@ Build a simple local web application for personal use that helps collect LinkedI
 - Seeded local app users now support password rotation during startup synchronization. `OpenAI` placeholder values were removed from tracked `appsettings` files, and local seeded users can be defined in development config when explicitly desired.
 - Seeded local app users now also support an optional `ExpiresAtUtc` value. Startup synchronization keeps that expiry in sync, and expired local users are blocked at login with a user-facing message instead of being authenticated.
 - Every application startup now creates a per-run log file under `src/LinkedIn.JobScraper.Web/logs/`. This gives each manual test run a separate inspectable log artifact, and sensitive token-like strings are sanitized before they are written there.
+- All persisted business data is now isolated per authenticated `AppUser` (`LinkedInSessions`, `LinkedInSearchSettings`, `AiBehaviorSettings`, `Jobs`, and AI shortlist runs), with child records inheriting ownership from parent aggregates.
+- Workflow/realtime stores now isolate state per user, and resource-id endpoints return non-disclosing `404` for non-owned records so cross-user probing does not reveal existence.
+- The ownership migration/backfill behavior and rollback options are now documented for operators in `docs/per-user-data-isolation-operations.md`.
 
 ## Product Intent
 
