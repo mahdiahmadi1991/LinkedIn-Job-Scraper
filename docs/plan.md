@@ -112,7 +112,7 @@ Revisited and not reopened:
 
 Latest completed queue:
 
-- `docs/archive/ideas/remove-settings-profile-name.md`
+- `docs/archive/ideas/admin-user-management.md`
 
 Approved execution sequence:
 

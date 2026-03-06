@@ -1,75 +1,32 @@
 using LinkedIn.JobScraper.Web.Authentication;
-using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Persistence;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.Tests.Authentication;
 
 public sealed class AppUserSeedingStartupServiceTests
 {
     [Fact]
-    public async Task StartAsyncAddsConfiguredSeedUserWhenMissing()
+    public async Task StartAsyncCreatesSuperAdminWhenMissing()
     {
         var databaseName = Guid.NewGuid().ToString("N");
         await using var dbContext = CreateDbContext(databaseName);
 
-        var service = CreateService(
-            databaseName,
-            new AppAuthenticationOptions
-            {
-                SeedUsers =
-                [
-                    new AppAuthenticationSeedUserOptions
-                    {
-                        UserName = "owner",
-                        DisplayName = "Local Owner",
-                        Password = "Passw0rd!"
-                    }
-                ]
-            },
-            isSqlConfigured: true);
+        var service = CreateService(databaseName, isSqlConfigured: true);
 
         await service.StartAsync(CancellationToken.None);
 
         var user = await dbContext.AppUsers.SingleAsync();
-        Assert.Equal("owner", user.UserName);
-        Assert.Equal("Local Owner", user.DisplayName);
+        Assert.Equal(AppUserSeedingStartupService.SuperAdminId, user.Id);
+        Assert.Equal(AppUserSeedingStartupService.SuperAdminUserName, user.UserName);
+        Assert.Equal(AppUserSeedingStartupService.SuperAdminDisplayName, user.DisplayName);
         Assert.True(user.IsSeeded);
         Assert.True(user.IsActive);
+        Assert.True(user.IsSuperAdmin);
+        Assert.Null(user.ExpiresAtUtc);
         Assert.False(string.IsNullOrWhiteSpace(user.PasswordHash));
-    }
-
-    [Fact]
-    public async Task StartAsyncAddsConfiguredExpiryWhenProvided()
-    {
-        var databaseName = Guid.NewGuid().ToString("N");
-        var expectedExpiry = DateTimeOffset.UtcNow.AddDays(7).ToUniversalTime();
-        await using var dbContext = CreateDbContext(databaseName);
-
-        var service = CreateService(
-            databaseName,
-            new AppAuthenticationOptions
-            {
-                SeedUsers =
-                [
-                    new AppAuthenticationSeedUserOptions
-                    {
-                        UserName = "owner",
-                        DisplayName = "Local Owner",
-                        Password = "Passw0rd!",
-                        ExpiresAtUtc = expectedExpiry
-                    }
-                ]
-            },
-            isSqlConfigured: true);
-
-        await service.StartAsync(CancellationToken.None);
-
-        var user = await dbContext.AppUsers.SingleAsync();
-        Assert.Equal(expectedExpiry, user.ExpiresAtUtc);
     }
 
     [Fact]
@@ -78,20 +35,7 @@ public sealed class AppUserSeedingStartupServiceTests
         var databaseName = Guid.NewGuid().ToString("N");
         await using var dbContext = CreateDbContext(databaseName);
 
-        var service = CreateService(
-            databaseName,
-            new AppAuthenticationOptions
-            {
-                SeedUsers =
-                [
-                    new AppAuthenticationSeedUserOptions
-                    {
-                        UserName = "owner",
-                        Password = "Passw0rd!"
-                    }
-                ]
-            },
-            isSqlConfigured: false);
+        var service = CreateService(databaseName, isSqlConfigured: false);
 
         await service.StartAsync(CancellationToken.None);
 
@@ -99,21 +43,25 @@ public sealed class AppUserSeedingStartupServiceTests
     }
 
     [Fact]
-    public async Task StartAsyncUpdatesExistingSeedUserPasswordWhenPasswordChanges()
+    public async Task StartAsyncNormalizesLegacyIdOneUserAndResetsPassword()
     {
         var databaseName = Guid.NewGuid().ToString("N");
         var hasher = new AppUserPasswordHasher();
+        var legacyPassword = "LegacyPassw0rd!";
 
         await using (var setupContext = CreateDbContext(databaseName))
         {
             setupContext.AppUsers.Add(
                 new AppUserRecord
                 {
-                    UserName = "owner",
-                    DisplayName = "Local Owner",
-                    PasswordHash = hasher.HashPassword("OldPassw0rd!"),
-                    IsActive = true,
-                    IsSeeded = true,
+                    Id = AppUserSeedingStartupService.SuperAdminId,
+                    UserName = "legacy-owner",
+                    DisplayName = "Legacy Owner",
+                    PasswordHash = hasher.HashPassword(legacyPassword),
+                    IsActive = false,
+                    IsSeeded = false,
+                    IsSuperAdmin = false,
+                    ExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(3),
                     CreatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
                     UpdatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1)
                 });
@@ -121,79 +69,82 @@ public sealed class AppUserSeedingStartupServiceTests
             await setupContext.SaveChangesAsync();
         }
 
-        var service = CreateService(
-            databaseName,
-            new AppAuthenticationOptions
-            {
-                SeedUsers =
-                [
-                    new AppAuthenticationSeedUserOptions
-                    {
-                        UserName = "owner",
-                        DisplayName = "Local Owner",
-                        Password = "NewPassw0rd!"
-                    }
-                ]
-            },
-            isSqlConfigured: true);
-
+        var service = CreateService(databaseName, isSqlConfigured: true);
         await service.StartAsync(CancellationToken.None);
 
         await using var verificationContext = CreateDbContext(databaseName);
         var user = await verificationContext.AppUsers.SingleAsync();
 
-        Assert.True(hasher.VerifyPassword("NewPassw0rd!", user.PasswordHash));
-        Assert.False(hasher.VerifyPassword("OldPassw0rd!", user.PasswordHash));
+        Assert.Equal(AppUserSeedingStartupService.SuperAdminId, user.Id);
+        Assert.Equal(AppUserSeedingStartupService.SuperAdminUserName, user.UserName);
+        Assert.Equal(AppUserSeedingStartupService.SuperAdminDisplayName, user.DisplayName);
+        Assert.True(user.IsActive);
+        Assert.True(user.IsSeeded);
+        Assert.True(user.IsSuperAdmin);
+        Assert.Null(user.ExpiresAtUtc);
+        Assert.False(hasher.VerifyPassword(legacyPassword, user.PasswordHash));
     }
 
     [Fact]
-    public async Task StartAsyncUpdatesExistingSeedUserExpiryWhenExpiryChanges()
+    public async Task StartAsyncThrowsWhenReservedUsernameBelongsToDifferentUserId()
     {
         var databaseName = Guid.NewGuid().ToString("N");
-        var hasher = new AppUserPasswordHasher();
-        var updatedExpiry = DateTimeOffset.UtcNow.AddDays(30).ToUniversalTime();
-
         await using (var setupContext = CreateDbContext(databaseName))
         {
             setupContext.AppUsers.Add(
                 new AppUserRecord
                 {
-                    UserName = "owner",
-                    DisplayName = "Local Owner",
-                    PasswordHash = hasher.HashPassword("Passw0rd!"),
-                    ExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1).ToUniversalTime(),
+                    Id = 2,
+                    UserName = AppUserSeedingStartupService.SuperAdminUserName,
+                    DisplayName = "Wrong Admin",
+                    PasswordHash = new AppUserPasswordHasher().HashPassword("Passw0rd!"),
                     IsActive = true,
-                    IsSeeded = true,
-                    CreatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
-                    UpdatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1)
+                    IsSeeded = false,
+                    IsSuperAdmin = false,
+                    CreatedAtUtc = DateTimeOffset.UtcNow,
+                    UpdatedAtUtc = DateTimeOffset.UtcNow
                 });
 
             await setupContext.SaveChangesAsync();
         }
 
-        var service = CreateService(
-            databaseName,
-            new AppAuthenticationOptions
-            {
-                SeedUsers =
-                [
-                    new AppAuthenticationSeedUserOptions
-                    {
-                        UserName = "owner",
-                        DisplayName = "Local Owner",
-                        Password = "Passw0rd!",
-                        ExpiresAtUtc = updatedExpiry
-                    }
-                ]
-            },
-            isSqlConfigured: true);
+        var service = CreateService(databaseName, isSqlConfigured: true);
 
-        await service.StartAsync(CancellationToken.None);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.StartAsync(CancellationToken.None));
 
-        await using var verificationContext = CreateDbContext(databaseName);
-        var user = await verificationContext.AppUsers.SingleAsync();
+        Assert.Contains("bootstrap conflict", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
 
-        Assert.Equal(updatedExpiry, user.ExpiresAtUtc);
+    [Fact]
+    public async Task StartAsyncThrowsWhenIdOneIsMissingButOtherUsersExist()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        await using (var setupContext = CreateDbContext(databaseName))
+        {
+            setupContext.AppUsers.Add(
+                new AppUserRecord
+                {
+                    Id = 2,
+                    UserName = "member-1",
+                    DisplayName = "Member One",
+                    PasswordHash = new AppUserPasswordHasher().HashPassword("Passw0rd!"),
+                    IsActive = true,
+                    IsSeeded = false,
+                    IsSuperAdmin = false,
+                    CreatedAtUtc = DateTimeOffset.UtcNow,
+                    UpdatedAtUtc = DateTimeOffset.UtcNow
+                });
+
+            await setupContext.SaveChangesAsync();
+        }
+
+        var service = CreateService(databaseName, isSqlConfigured: true);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.StartAsync(CancellationToken.None));
+
+        Assert.Contains("Id=1 does not exist", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static LinkedInJobScraperDbContext CreateDbContext(string databaseName)
@@ -205,10 +156,7 @@ public sealed class AppUserSeedingStartupServiceTests
         return new LinkedInJobScraperDbContext(options);
     }
 
-    private static AppUserSeedingStartupService CreateService(
-        string databaseName,
-        AppAuthenticationOptions options,
-        bool isSqlConfigured)
+    private static AppUserSeedingStartupService CreateService(string databaseName, bool isSqlConfigured)
     {
         var dbContextOptions = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
             .UseInMemoryDatabase(databaseName)
@@ -219,7 +167,6 @@ public sealed class AppUserSeedingStartupServiceTests
         return new AppUserSeedingStartupService(
             factory,
             new AppUserPasswordHasher(),
-            Options.Create(options),
             new TestSqlServerConnectionStringProvider(isSqlConfigured),
             NullLogger<AppUserSeedingStartupService>.Instance);
     }

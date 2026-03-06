@@ -37,6 +37,11 @@ public sealed class AppUserRecord
     public bool IsSeeded { get; set; }
 
     /// <summary>
+    /// Indicates whether the account has super-admin capability.
+    /// </summary>
+    public bool IsSuperAdmin { get; set; }
+
+    /// <summary>
     /// Optional UTC expiration instant for temporary access accounts.
     /// Null means no expiry limit.
     /// </summary>

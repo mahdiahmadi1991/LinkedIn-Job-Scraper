@@ -79,6 +79,7 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.Property(static user => user.UserName).HasMaxLength(128).IsRequired();
                 entity.Property(static user => user.DisplayName).HasMaxLength(256).IsRequired();
                 entity.Property(static user => user.PasswordHash).HasMaxLength(1024).IsRequired();
+                entity.Property(static user => user.IsSuperAdmin).HasDefaultValue(false);
 
                 entity.HasIndex(static user => user.UserName).IsUnique();
                 entity.HasIndex(static user => user.IsActive);
