@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${SKIP_LOCAL_HOOKS:-0}" == "1" ]]; then
+  exit 0
+fi
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+current_branch="$(git rev-parse --abbrev-ref HEAD)"
+if [[ "$current_branch" == "main" ]]; then
+  echo "[pre-push] Direct push from 'main' is blocked."
+  echo "[pre-push] Open a PR from a non-main branch."
+  exit 1
+fi
+
+echo "[pre-push] Running local quality gate..."
+"$repo_root/scripts/quality-gate.sh"

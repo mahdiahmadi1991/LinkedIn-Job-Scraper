@@ -205,6 +205,27 @@ Run:
 
 - `dotnet run --project src/LinkedIn.JobScraper.Web`
 
+### Local quality gate and Git hooks
+
+To prevent CI formatting/encoding failures before push, enable the repository hooks:
+
+- `chmod +x scripts/quality-gate.sh .githooks/pre-commit .githooks/pre-push`
+- `git config core.hooksPath .githooks`
+
+Behavior:
+
+- `pre-commit`: blocks commits when `dotnet format --verify-no-changes` fails
+- `pre-push`: runs `scripts/quality-gate.sh` (`restore -> format -> build -warnaserror -> test`)
+
+Manual run:
+
+- `./scripts/quality-gate.sh`
+
+Temporary bypass (only when strictly needed):
+
+- `SKIP_LOCAL_HOOKS=1 git commit ...`
+- `SKIP_LOCAL_HOOKS=1 git push ...`
+
 ## Development Notes
 
 ### LinkedIn safety posture

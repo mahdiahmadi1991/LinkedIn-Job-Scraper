@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${SKIP_LOCAL_HOOKS:-0}" == "1" ]]; then
+  exit 0
+fi
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+current_branch="$(git rev-parse --abbrev-ref HEAD)"
+if [[ "$current_branch" == "main" ]]; then
+  echo "[pre-commit] Direct commits on 'main' are blocked."
+  echo "[pre-commit] Create/switch to a feature branch and commit there."
+  exit 1
+fi
+
+echo "[pre-commit] Verifying format rules..."
+if ! dotnet format LinkedIn.JobScraper.sln --verify-no-changes; then
+  echo "[pre-commit] Formatting check failed."
+  echo "[pre-commit] Run: dotnet format LinkedIn.JobScraper.sln"
+  exit 1
+fi
