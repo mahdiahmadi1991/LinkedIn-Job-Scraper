@@ -44,6 +44,20 @@ public sealed class AdminUserManagementServiceTests
                     IsSuperAdmin = false,
                     CreatedAtUtc = DateTimeOffset.UtcNow,
                     UpdatedAtUtc = DateTimeOffset.UtcNow
+                },
+                new AppUserRecord
+                {
+                    Id = 3,
+                    UserName = "deleted-member",
+                    DisplayName = "Deleted Member",
+                    PasswordHash = new AppUserPasswordHasher().HashPassword("Passw0rd!"),
+                    IsActive = false,
+                    IsDeleted = true,
+                    DeletedAtUtc = DateTimeOffset.UtcNow.AddHours(-2),
+                    IsSeeded = false,
+                    IsSuperAdmin = false,
+                    CreatedAtUtc = DateTimeOffset.UtcNow.AddDays(-2),
+                    UpdatedAtUtc = DateTimeOffset.UtcNow.AddHours(-2)
                 });
 
             await seedContext.SaveChangesAsync();
@@ -159,6 +173,350 @@ public sealed class AdminUserManagementServiceTests
         Assert.NotNull(authenticationResult.User);
         Assert.Equal("new-user", authenticationResult.User!.UserName);
         Assert.False(authenticationResult.User.IsSuperAdmin);
+    }
+
+    [Fact]
+    public async Task CreateUserAsyncRejectsReservedSuperAdminUsername()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var options = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+        var hasher = new AppUserPasswordHasher();
+
+        await using (var seedContext = new LinkedInJobScraperDbContext(options))
+        {
+            seedContext.AppUsers.Add(
+                new AppUserRecord
+                {
+                    Id = 1,
+                    UserName = "legacy-admin",
+                    DisplayName = "Super Admin",
+                    PasswordHash = hasher.HashPassword("AdminPass!"),
+                    IsActive = true,
+                    IsSeeded = true,
+                    IsSuperAdmin = true,
+                    CreatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
+                    UpdatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1)
+                });
+
+            await seedContext.SaveChangesAsync();
+        }
+
+        var service = CreateService(options, currentUserId: 1);
+        var result = await service.CreateUserAsync(
+            new AdminUserCreateRequest(
+                AppUserSeedingStartupService.SuperAdminUserName,
+                "Another Admin",
+                "Passw0rd!",
+                true,
+                null),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.True(result.IsConflict);
+        Assert.NotNull(result.ValidationErrors);
+        Assert.Contains(result.ValidationErrors!, error => error.Field == "UserName");
+    }
+
+    [Fact]
+    public async Task SetUserActiveStateAsyncUpdatesNonSuperAdminUser()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var options = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+        var hasher = new AppUserPasswordHasher();
+
+        await using (var seedContext = new LinkedInJobScraperDbContext(options))
+        {
+            seedContext.AppUsers.AddRange(
+                new AppUserRecord
+                {
+                    Id = 1,
+                    UserName = "admin@mahdiahmadi.dev",
+                    DisplayName = "Super Admin",
+                    PasswordHash = hasher.HashPassword("AdminPass!"),
+                    IsActive = true,
+                    IsSeeded = true,
+                    IsSuperAdmin = true,
+                    CreatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
+                    UpdatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1)
+                },
+                new AppUserRecord
+                {
+                    Id = 2,
+                    UserName = "member",
+                    DisplayName = "Member",
+                    PasswordHash = hasher.HashPassword("Passw0rd!"),
+                    IsActive = true,
+                    IsSeeded = false,
+                    IsSuperAdmin = false,
+                    CreatedAtUtc = DateTimeOffset.UtcNow,
+                    UpdatedAtUtc = DateTimeOffset.UtcNow
+                });
+
+            await seedContext.SaveChangesAsync();
+        }
+
+        var service = CreateService(options, currentUserId: 1);
+        var result = await service.SetUserActiveStateAsync(
+            new AdminUserSetActiveStateRequest(2, false),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.User);
+        Assert.False(result.User!.IsActive);
+
+        await using var verificationContext = new LinkedInJobScraperDbContext(options);
+        var user = await verificationContext.AppUsers.SingleAsync(existingUser => existingUser.Id == 2);
+        Assert.False(user.IsActive);
+    }
+
+    [Fact]
+    public async Task SetUserActiveStateAsyncRejectsSuperAdminTarget()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var options = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+        var hasher = new AppUserPasswordHasher();
+
+        await using (var seedContext = new LinkedInJobScraperDbContext(options))
+        {
+            seedContext.AppUsers.Add(
+                new AppUserRecord
+                {
+                    Id = 1,
+                    UserName = "admin@mahdiahmadi.dev",
+                    DisplayName = "Super Admin",
+                    PasswordHash = hasher.HashPassword("AdminPass!"),
+                    IsActive = true,
+                    IsSeeded = true,
+                    IsSuperAdmin = true,
+                    CreatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
+                    UpdatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1)
+                });
+
+            await seedContext.SaveChangesAsync();
+        }
+
+        var service = CreateService(options, currentUserId: 1);
+        var result = await service.SetUserActiveStateAsync(
+            new AdminUserSetActiveStateRequest(1, false),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.NotNull(result.ValidationErrors);
+        Assert.Contains(result.ValidationErrors!, error => error.Field == "UserId");
+
+        await using var verificationContext = new LinkedInJobScraperDbContext(options);
+        var superAdmin = await verificationContext.AppUsers.SingleAsync(existingUser => existingUser.Id == 1);
+        Assert.True(superAdmin.IsActive);
+    }
+
+    [Fact]
+    public async Task SoftDeleteUserAsyncMarksUserAsDeletedAndInactive()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var options = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+        var hasher = new AppUserPasswordHasher();
+
+        await using (var seedContext = new LinkedInJobScraperDbContext(options))
+        {
+            seedContext.AppUsers.AddRange(
+                new AppUserRecord
+                {
+                    Id = 1,
+                    UserName = "admin@mahdiahmadi.dev",
+                    DisplayName = "Super Admin",
+                    PasswordHash = hasher.HashPassword("AdminPass!"),
+                    IsActive = true,
+                    IsSeeded = true,
+                    IsSuperAdmin = true,
+                    CreatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
+                    UpdatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1)
+                },
+                new AppUserRecord
+                {
+                    Id = 2,
+                    UserName = "member",
+                    DisplayName = "Member",
+                    PasswordHash = hasher.HashPassword("Passw0rd!"),
+                    IsActive = true,
+                    IsSeeded = false,
+                    IsSuperAdmin = false,
+                    CreatedAtUtc = DateTimeOffset.UtcNow,
+                    UpdatedAtUtc = DateTimeOffset.UtcNow
+                });
+
+            await seedContext.SaveChangesAsync();
+        }
+
+        var service = CreateService(options, currentUserId: 1);
+        var result = await service.SoftDeleteUserAsync(
+            new AdminUserSoftDeleteRequest(2),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(2, result.UserId);
+        Assert.Equal("member", result.UserName);
+
+        await using var verificationContext = new LinkedInJobScraperDbContext(options);
+        var user = await verificationContext.AppUsers.SingleAsync(existingUser => existingUser.Id == 2);
+        Assert.True(user.IsDeleted);
+        Assert.False(user.IsActive);
+        Assert.NotNull(user.DeletedAtUtc);
+    }
+
+    [Fact]
+    public async Task SoftDeleteUserAsyncRejectsSuperAdminTarget()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var options = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+        var hasher = new AppUserPasswordHasher();
+
+        await using (var seedContext = new LinkedInJobScraperDbContext(options))
+        {
+            seedContext.AppUsers.Add(
+                new AppUserRecord
+                {
+                    Id = 1,
+                    UserName = "admin@mahdiahmadi.dev",
+                    DisplayName = "Super Admin",
+                    PasswordHash = hasher.HashPassword("AdminPass!"),
+                    IsActive = true,
+                    IsSeeded = true,
+                    IsSuperAdmin = true,
+                    CreatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
+                    UpdatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1)
+                });
+
+            await seedContext.SaveChangesAsync();
+        }
+
+        var service = CreateService(options, currentUserId: 1);
+        var result = await service.SoftDeleteUserAsync(
+            new AdminUserSoftDeleteRequest(1),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.NotNull(result.ValidationErrors);
+        Assert.Contains(result.ValidationErrors!, error => error.Field == "UserId");
+
+        await using var verificationContext = new LinkedInJobScraperDbContext(options);
+        var superAdmin = await verificationContext.AppUsers.SingleAsync(existingUser => existingUser.Id == 1);
+        Assert.False(superAdmin.IsDeleted);
+    }
+
+    [Fact]
+    public async Task UpdateUserProfileAsyncUpdatesDisplayNameAndNormalizesExpiryToUtc()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var options = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+        var hasher = new AppUserPasswordHasher();
+
+        await using (var seedContext = new LinkedInJobScraperDbContext(options))
+        {
+            seedContext.AppUsers.AddRange(
+                new AppUserRecord
+                {
+                    Id = 1,
+                    UserName = "admin@mahdiahmadi.dev",
+                    DisplayName = "Super Admin",
+                    PasswordHash = hasher.HashPassword("AdminPass!"),
+                    IsActive = true,
+                    IsSeeded = true,
+                    IsSuperAdmin = true,
+                    CreatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
+                    UpdatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1)
+                },
+                new AppUserRecord
+                {
+                    Id = 2,
+                    UserName = "member",
+                    DisplayName = "Old Name",
+                    PasswordHash = hasher.HashPassword("Passw0rd!"),
+                    IsActive = true,
+                    IsSeeded = false,
+                    IsSuperAdmin = false,
+                    ExpiresAtUtc = null,
+                    CreatedAtUtc = DateTimeOffset.UtcNow,
+                    UpdatedAtUtc = DateTimeOffset.UtcNow
+                });
+
+            await seedContext.SaveChangesAsync();
+        }
+
+        var localExpiry = new DateTimeOffset(2030, 1, 2, 10, 30, 0, TimeSpan.FromHours(3));
+        var expectedUtcExpiry = localExpiry.ToUniversalTime();
+
+        var service = CreateService(options, currentUserId: 1);
+        var result = await service.UpdateUserProfileAsync(
+            new AdminUserUpdateProfileRequest(2, " Updated Member ", localExpiry),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.User);
+        Assert.Equal("Updated Member", result.User!.DisplayName);
+        Assert.Equal(expectedUtcExpiry, result.User.ExpiresAtUtc);
+
+        await using var verificationContext = new LinkedInJobScraperDbContext(options);
+        var user = await verificationContext.AppUsers.SingleAsync(existingUser => existingUser.Id == 2);
+        Assert.Equal("Updated Member", user.DisplayName);
+        Assert.Equal(expectedUtcExpiry, user.ExpiresAtUtc);
+    }
+
+    [Fact]
+    public async Task UpdateUserProfileAsyncRejectsSuperAdminTarget()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var options = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+        var hasher = new AppUserPasswordHasher();
+
+        await using (var seedContext = new LinkedInJobScraperDbContext(options))
+        {
+            seedContext.AppUsers.Add(
+                new AppUserRecord
+                {
+                    Id = 1,
+                    UserName = "admin@mahdiahmadi.dev",
+                    DisplayName = "Super Admin",
+                    PasswordHash = hasher.HashPassword("AdminPass!"),
+                    IsActive = true,
+                    IsSeeded = true,
+                    IsSuperAdmin = true,
+                    ExpiresAtUtc = null,
+                    CreatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
+                    UpdatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1)
+                });
+
+            await seedContext.SaveChangesAsync();
+        }
+
+        var service = CreateService(options, currentUserId: 1);
+        var result = await service.UpdateUserProfileAsync(
+            new AdminUserUpdateProfileRequest(
+                1,
+                "Changed Admin",
+                DateTimeOffset.UtcNow.AddDays(30)),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.NotNull(result.ValidationErrors);
+        Assert.Contains(result.ValidationErrors!, error => error.Field == "UserId");
+
+        await using var verificationContext = new LinkedInJobScraperDbContext(options);
+        var superAdmin = await verificationContext.AppUsers.SingleAsync(existingUser => existingUser.Id == 1);
+        Assert.Equal("Super Admin", superAdmin.DisplayName);
     }
 
     [Fact]

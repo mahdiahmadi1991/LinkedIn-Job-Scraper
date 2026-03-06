@@ -42,6 +42,18 @@ public sealed class AppUserRecord
     public bool IsSuperAdmin { get; set; }
 
     /// <summary>
+    /// Indicates whether this account has been soft-deleted.
+    /// Soft-deleted users are retained in storage but excluded from active app usage.
+    /// </summary>
+    public bool IsDeleted { get; set; }
+
+    /// <summary>
+    /// UTC timestamp when this account was soft-deleted.
+    /// Null means the account has not been soft-deleted.
+    /// </summary>
+    public DateTimeOffset? DeletedAtUtc { get; set; }
+
+    /// <summary>
     /// Optional UTC expiration instant for temporary access accounts.
     /// Null means no expiry limit.
     /// </summary>

@@ -7,6 +7,28 @@ namespace LinkedIn.JobScraper.Web.Tests.LinkedIn;
 public sealed class LinkedInSessionVerificationServiceTests
 {
     [Fact]
+    public async Task VerifyCurrentAsyncReturnsFailureWhenNoStoredSessionExists()
+    {
+        var apiClient = new FakeLinkedInApiClient(
+            new LinkedInApiResponse(200, true, "{}"));
+        var sessionStore = new FakeLinkedInSessionStore(null);
+        var service = new LinkedInSessionVerificationService(
+            apiClient,
+            sessionStore,
+            NullLogger<LinkedInSessionVerificationService>.Instance);
+
+        var result = await service.VerifyCurrentAsync(CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Null(result.StatusCode);
+        Assert.Contains("No stored LinkedIn session is available", result.Message, StringComparison.Ordinal);
+        Assert.Contains("Connect Session", result.Message, StringComparison.Ordinal);
+        Assert.False(sessionStore.InvalidateCalled);
+        Assert.False(sessionStore.MarkValidatedCalled);
+        Assert.Equal(0, apiClient.CallCount);
+    }
+
+    [Fact]
     public async Task VerifyCurrentAsyncInvalidatesSessionOnUnauthorized()
     {
         var apiClient = new FakeLinkedInApiClient(

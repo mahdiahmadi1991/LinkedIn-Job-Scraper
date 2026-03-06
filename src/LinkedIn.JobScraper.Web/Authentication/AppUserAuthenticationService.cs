@@ -34,7 +34,7 @@ public sealed class AppUserAuthenticationService : IAppUserAuthenticationService
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
         var activeUsers = await dbContext.AppUsers
             .AsNoTracking()
-            .Where(static appUser => appUser.IsActive)
+            .Where(static appUser => appUser.IsActive && !appUser.IsDeleted)
             .ToListAsync(cancellationToken);
 
         var user = activeUsers.FirstOrDefault(

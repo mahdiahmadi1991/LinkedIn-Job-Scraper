@@ -96,10 +96,38 @@
         autoCaptureNote.textContent = message;
     };
 
+    const resolveSessionIndicator = (state) => {
+        const autoCaptureRunning = Boolean(state?.autoCaptureActive && state?.browserOpen);
+
+        if (autoCaptureRunning) {
+            return {
+                autoCaptureRunning,
+                label: "Connecting",
+                cssClass: "session-state-connecting"
+            };
+        }
+
+        if (state?.storedSessionAvailable) {
+            return {
+                autoCaptureRunning,
+                label: "Connected",
+                cssClass: "session-state-connected"
+            };
+        }
+
+        return {
+            autoCaptureRunning,
+            label: "Missing",
+            cssClass: "session-state-missing"
+        };
+    };
+
     const applyState = (state) => {
         if (!state) {
             return;
         }
+        const sessionIndicator = resolveSessionIndicator(state);
+        const waitingVisible = sessionIndicator.autoCaptureRunning;
 
         if (browserOpen) {
             browserOpen.textContent = state.browserOpen ? "Open" : "Closed";
@@ -120,7 +148,7 @@
         }
 
         if (statusLabel) {
-            statusLabel.textContent = state.sessionIndicatorLabel || "Missing";
+            statusLabel.textContent = sessionIndicator.label;
         }
 
         if (launchButton) {
@@ -132,20 +160,20 @@
         }
 
         if (revokeButton) {
-            revokeButton.classList.toggle("d-none", !state.storedSessionAvailable || state.autoCaptureActive);
+            revokeButton.classList.toggle("d-none", !state.storedSessionAvailable || waitingVisible);
         }
 
         if (waitingPanel) {
-            waitingPanel.classList.toggle("d-none", !state.autoCaptureActive);
+            waitingPanel.classList.toggle("d-none", !waitingVisible);
         }
 
-        indicatorLabel.textContent = state.sessionIndicatorLabel || "Missing";
+        indicatorLabel.textContent = sessionIndicator.label;
         indicator.classList.remove("session-state-connected", "session-state-connecting", "session-state-missing");
-        if (state.sessionIndicatorClass) {
-            indicator.classList.add(state.sessionIndicatorClass);
-        }
+        indicator.classList.add(sessionIndicator.cssClass);
 
-        setAutoCaptureMessage(state.autoCaptureStatusMessage, state.autoCaptureActive);
+        window.dispatchEvent(new CustomEvent("linkedinsession:state", { detail: state }));
+
+        setAutoCaptureMessage(state.autoCaptureStatusMessage, waitingVisible);
 
         if (autoCloseArmed && state.autoCaptureCompletedSuccessfully && state.storedSessionAvailable && !autoVerifyInFlight) {
             autoVerifyInFlight = true;
@@ -168,6 +196,13 @@
         }
 
         if (autoCloseArmed && !state.autoCaptureActive && !state.autoCaptureCompletedSuccessfully) {
+            autoCloseArmed = false;
+            window.clearTimeout(pollTimer);
+            pollTimer = null;
+        }
+
+        if (autoCloseArmed && state.autoCaptureActive && !state.browserOpen && !state.autoCaptureCompletedSuccessfully) {
+            autoCloseArmed = false;
             window.clearTimeout(pollTimer);
             pollTimer = null;
         }

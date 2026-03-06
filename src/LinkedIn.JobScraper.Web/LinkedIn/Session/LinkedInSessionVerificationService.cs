@@ -28,7 +28,7 @@ public sealed class LinkedInSessionVerificationService : ILinkedInSessionVerific
         if (sessionSnapshot is null)
         {
             return LinkedInSessionVerificationResult.Failed(
-                "No stored LinkedIn session is available yet.");
+                $"No stored LinkedIn session is available yet. {LinkedInSessionRecoveryGuidance.ConnectAndRetryMessage}");
         }
 
         var result = await VerifySnapshotAsync(sessionSnapshot, cancellationToken);
@@ -39,7 +39,7 @@ public sealed class LinkedInSessionVerificationService : ILinkedInSessionVerific
             Log.LinkedInSessionVerificationInvalidatedExpiredSession(_logger);
 
             return LinkedInSessionVerificationResult.Failed(
-                "Stored LinkedIn session has expired. Use the session control to capture a new one.",
+                $"Stored LinkedIn session has expired. {LinkedInSessionRecoveryGuidance.ConnectAndRetryMessage}",
                 result.StatusCode);
         }
 

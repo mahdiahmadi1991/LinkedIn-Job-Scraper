@@ -15,6 +15,7 @@ public sealed class ControllerAuthorizationTests
     [InlineData(typeof(SearchSettingsController))]
     [InlineData(typeof(LinkedInSessionController))]
     [InlineData(typeof(DiagnosticsController))]
+    [InlineData(typeof(AdminController))]
     [InlineData(typeof(AdminUsersController))]
     public void ProtectedControllersRequireAppCookieAuthentication(Type controllerType)
     {
@@ -22,6 +23,24 @@ public sealed class ControllerAuthorizationTests
 
         Assert.NotNull(attribute);
         Assert.Equal(AppAuthenticationDefaults.CookieScheme, attribute.AuthenticationSchemes);
+    }
+
+    [Fact]
+    public void AdminControllerRequiresSuperAdminPolicy()
+    {
+        var attribute = typeof(AdminController).GetCustomAttribute<AuthorizeAttribute>();
+
+        Assert.NotNull(attribute);
+        Assert.Equal(AppAuthorizationPolicies.SuperAdminOnly, attribute.Policy);
+    }
+
+    [Fact]
+    public void AdminControllerHasStableAdminRoute()
+    {
+        var routeAttribute = typeof(AdminController).GetCustomAttribute<RouteAttribute>();
+
+        Assert.NotNull(routeAttribute);
+        Assert.Equal("admin", routeAttribute!.Template);
     }
 
     [Fact]

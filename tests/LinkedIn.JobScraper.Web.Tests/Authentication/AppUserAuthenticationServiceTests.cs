@@ -112,6 +112,41 @@ public sealed class AppUserAuthenticationServiceTests
     }
 
     [Fact]
+    public async Task AuthenticateAsyncReturnsFailureForSoftDeletedUser()
+    {
+        var dbContextOptions = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+
+        await using (var seedContext = new LinkedInJobScraperDbContext(dbContextOptions))
+        {
+            var passwordHasher = new AppUserPasswordHasher();
+            seedContext.AppUsers.Add(
+                new AppUserRecord
+                {
+                    UserName = "owner",
+                    DisplayName = "Local Owner",
+                    PasswordHash = passwordHasher.HashPassword("Passw0rd!"),
+                    IsActive = true,
+                    IsDeleted = true,
+                    DeletedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+                    CreatedAtUtc = DateTimeOffset.UtcNow,
+                    UpdatedAtUtc = DateTimeOffset.UtcNow
+                });
+            await seedContext.SaveChangesAsync();
+        }
+
+        var service = new AppUserAuthenticationService(
+            new TestDbContextFactory(dbContextOptions),
+            new AppUserPasswordHasher());
+
+        var result = await service.AuthenticateAsync("owner", "Passw0rd!", CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Null(result.User);
+    }
+
+    [Fact]
     public void CreatePrincipalAddsExpectedIdentityClaims()
     {
         var service = new AppUserAuthenticationService(
