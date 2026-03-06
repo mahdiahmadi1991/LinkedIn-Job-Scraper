@@ -708,7 +708,7 @@ public sealed class AiGlobalShortlistServiceTests
         {
             _activeRunIds = activeRunIds is null
                 ? []
-                : [..activeRunIds];
+                : [.. activeRunIds];
         }
 
         public AiGlobalShortlistProgressEvent Append(AiGlobalShortlistProgressUpdate update)
