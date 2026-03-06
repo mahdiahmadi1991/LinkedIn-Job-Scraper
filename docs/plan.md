@@ -50,6 +50,30 @@ The current implemented baseline already includes:
 
 ## Latest Completed Execution Queues
 
+### Remove Settings ProfileName Queue
+
+This queue was completed and is now closed for the current phase.
+
+Completed items:
+
+- `ProfileName` was removed from AI settings and LinkedIn search settings runtime contracts and UI forms
+- persistence model dropped `ProfileName` from both settings entities and EF configuration
+- migration `20260306094245_RemoveSettingsProfileName` was added and snapshot updated
+- controller/service/test paths were updated and full test suite passed without regression
+
+### Per-User Data Isolation Queue
+
+This queue was completed and is now closed for the current phase.
+
+Completed items:
+
+- direct-owner tables now enforce `AppUserId` ownership with user-scoped constraints
+- service-layer reads/writes are scoped to authenticated user context
+- in-memory workflow/progress channels are user-scoped to prevent cross-user leakage/blocking
+- resource-id endpoints enforce safe non-disclosing ownership behavior (`404` for non-owned resources)
+- isolation safety tests now cover per-user visibility, cross-user denial, uniqueness, and workflow/realtime isolation
+- architecture/project/operations docs were updated, including migration/backfill and rollback runbook
+
 ### Deferred Backlog Activation Queue
 
 This queue was completed and is now closed for the current phase.
@@ -88,7 +112,7 @@ Revisited and not reopened:
 
 Latest completed queue:
 
-- `docs/archive/ideas/ai-streaming-shortlist-page.md`
+- `docs/archive/ideas/remove-settings-profile-name.md`
 
 Approved execution sequence:
 
@@ -131,6 +155,18 @@ Open a new execution queue only when at least one of these is true:
 - it fixes a concrete bug or maintainability issue observed in the current codebase
 
 Do not open a queue for cleanup-only refactors.
+
+## Execution Discipline Additions
+
+The following rules are locked for every new approved idea:
+
+- Every idea plan must include a final explicit state for implementation-review validation against approved scope.
+- That final validation state must confirm:
+  - implemented behavior matches the idea contract
+  - no critical regression or side effect remains
+  - required verification evidence is captured (tests/smoke/manual checks as applicable)
+- After an idea is fully completed, move its file from `docs/ideas/` to `docs/archive/ideas/`.
+- After archiving, update `docs/plan.md` so the latest completed queue reference points to the archived path.
 
 ## Historical Note
 

@@ -1,3 +1,4 @@
+using LinkedIn.JobScraper.Web.Authentication;
 using LinkedIn.JobScraper.Web.Persistence;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -6,18 +7,23 @@ namespace LinkedIn.JobScraper.Web.AI;
 
 public sealed class AiBehaviorSettingsService : IAiBehaviorSettingsService
 {
+    private readonly ICurrentAppUserContext _currentAppUserContext;
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
 
-    public AiBehaviorSettingsService(IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory)
+    public AiBehaviorSettingsService(
+        IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
+        ICurrentAppUserContext currentAppUserContext)
     {
         _dbContextFactory = dbContextFactory;
+        _currentAppUserContext = currentAppUserContext;
     }
 
     public async Task<AiBehaviorProfile> GetActiveAsync(CancellationToken cancellationToken)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var record = await GetOrCreateActiveRecordAsync(dbContext, cancellationToken);
+        var record = await GetOrCreateActiveRecordAsync(dbContext, userId, cancellationToken);
 
         return Map(record);
     }
@@ -25,10 +31,11 @@ public sealed class AiBehaviorSettingsService : IAiBehaviorSettingsService
     public async Task<AiBehaviorProfile> SaveAsync(AiBehaviorProfile profile, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(profile);
+        var userId = _currentAppUserContext.GetRequiredUserId();
 
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var record = await GetOrCreateActiveRecordAsync(dbContext, cancellationToken);
+        var record = await GetOrCreateActiveRecordAsync(dbContext, userId, cancellationToken);
         var entry = dbContext.Entry(record);
         var originalRowVersion = ConcurrencyTokenCodec.Decode(profile.ConcurrencyToken);
 
@@ -37,7 +44,6 @@ public sealed class AiBehaviorSettingsService : IAiBehaviorSettingsService
             entry.Property(static settings => settings.RowVersion).OriginalValue = originalRowVersion;
         }
 
-        record.ProfileName = profile.ProfileName.Trim();
         record.BehavioralInstructions = profile.BehavioralInstructions.Trim();
         record.PrioritySignals = profile.PrioritySignals.Trim();
         record.ExclusionSignals = profile.ExclusionSignals.Trim();
@@ -60,9 +66,11 @@ public sealed class AiBehaviorSettingsService : IAiBehaviorSettingsService
 
     private static async Task<AiBehaviorSettingsRecord> GetOrCreateActiveRecordAsync(
         LinkedInJobScraperDbContext dbContext,
+        int userId,
         CancellationToken cancellationToken)
     {
         var record = await dbContext.AiBehaviorSettings
+            .Where(settings => settings.AppUserId == userId)
             .OrderBy(static settings => settings.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -70,7 +78,7 @@ public sealed class AiBehaviorSettingsService : IAiBehaviorSettingsService
         {
             record = new AiBehaviorSettingsRecord
             {
-                ProfileName = string.Empty,
+                AppUserId = userId,
                 BehavioralInstructions = string.Empty,
                 PrioritySignals = string.Empty,
                 ExclusionSignals = string.Empty,
@@ -88,7 +96,6 @@ public sealed class AiBehaviorSettingsService : IAiBehaviorSettingsService
     private static AiBehaviorProfile Map(AiBehaviorSettingsRecord record)
     {
         return new AiBehaviorProfile(
-            record.ProfileName,
             record.BehavioralInstructions,
             record.PrioritySignals,
             record.ExclusionSignals,

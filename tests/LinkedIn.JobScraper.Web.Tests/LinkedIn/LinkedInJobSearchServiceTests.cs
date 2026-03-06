@@ -49,7 +49,6 @@ public sealed class LinkedInJobSearchServiceTests
             sessionStore,
             new FakeLinkedInSearchSettingsService(
                 new LinkedInSearchSettings(
-                    "Default",
                     string.Empty,
                     null,
                     null,
@@ -237,7 +236,6 @@ public sealed class LinkedInJobSearchServiceTests
         public FakeLinkedInSearchSettingsService(LinkedInSearchSettings? settings = null)
         {
             _settings = settings ?? new LinkedInSearchSettings(
-                "Default",
                 "C# .Net",
                 "Limassol, Cyprus",
                 "Limassol, Cyprus",

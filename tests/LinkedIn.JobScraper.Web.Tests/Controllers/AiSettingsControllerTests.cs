@@ -57,7 +57,6 @@ public sealed class AiSettingsControllerTests
         var result = await controller.Save(
             new AiSettingsPageViewModel
             {
-                ProfileName = "Default",
                 BehavioralInstructions = "Test",
                 PrioritySignals = "Test",
                 ExclusionSignals = "Test",
@@ -94,7 +93,7 @@ public sealed class AiSettingsControllerTests
         };
 
         controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
-        controller.ModelState.AddModelError(nameof(AiSettingsPageViewModel.ProfileName), "Required");
+        controller.ModelState.AddModelError(nameof(AiSettingsPageViewModel.BehavioralInstructions), "Required");
 
         var result = await controller.Save(new AiSettingsPageViewModel(), CancellationToken.None);
 
@@ -103,7 +102,7 @@ public sealed class AiSettingsControllerTests
 
         Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
         Assert.Equal("AI settings validation failed", details.Title);
-        Assert.True(details.Errors.ContainsKey(nameof(AiSettingsPageViewModel.ProfileName)));
+        Assert.True(details.Errors.ContainsKey(nameof(AiSettingsPageViewModel.BehavioralInstructions)));
     }
 
     [Fact]
@@ -129,7 +128,6 @@ public sealed class AiSettingsControllerTests
         var result = await controller.Save(
             new AiSettingsPageViewModel
             {
-                ProfileName = "Default",
                 BehavioralInstructions = "Test",
                 PrioritySignals = "Test",
                 ExclusionSignals = "Test",
@@ -193,7 +191,6 @@ public sealed class AiSettingsControllerTests
         {
             return Task.FromResult(
                 new AiBehaviorProfile(
-                    "Default",
                     "Behavior",
                     "Priority",
                     "Exclusion",
@@ -231,7 +228,6 @@ public sealed class AiSettingsControllerTests
         {
             return Task.FromResult(
                 new AiBehaviorProfile(
-                    profile.ProfileName,
                     profile.BehavioralInstructions,
                     profile.PrioritySignals,
                     profile.ExclusionSignals,

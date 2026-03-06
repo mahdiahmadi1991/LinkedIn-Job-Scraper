@@ -8,7 +8,6 @@ public static class LinkedInSearchSettingsViewModelAdapter
     {
         return new LinkedInSearchSettingsPageViewModel
         {
-            ProfileName = settings.ProfileName,
             Keywords = settings.Keywords,
             ConcurrencyToken = settings.ConcurrencyToken,
             LocationInput = settings.LocationInput,

@@ -21,7 +21,6 @@ public sealed class SearchSettingsControllerTests
         var result = await controller.Save(
             new LinkedInSearchSettingsPageViewModel
             {
-                ProfileName = "Default",
                 Keywords = "C# .Net",
                 ConcurrencyToken = "token-3",
                 WorkplaceTypeCodes = ["1"],
@@ -56,7 +55,6 @@ public sealed class SearchSettingsControllerTests
         var result = await controller.Save(
             new LinkedInSearchSettingsPageViewModel
             {
-                ProfileName = "Default",
                 Keywords = "C# .Net",
                 LocationInput = "Cyprus",
                 WorkplaceTypeCodes = [],
@@ -92,7 +90,6 @@ public sealed class SearchSettingsControllerTests
         var result = await controller.Save(
             new LinkedInSearchSettingsPageViewModel
             {
-                ProfileName = "Default",
                 Keywords = "C# .Net",
                 WorkplaceTypeCodes = ["1"],
                 JobTypeCodes = ["F"]
@@ -194,7 +191,6 @@ public sealed class SearchSettingsControllerTests
         {
             return Task.FromResult(
                 new LinkedInSearchSettings(
-                    settings.ProfileName,
                     settings.Keywords,
                     settings.LocationInput,
                     settings.LocationDisplayName,

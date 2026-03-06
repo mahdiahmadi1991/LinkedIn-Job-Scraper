@@ -206,7 +206,6 @@ public sealed class LinkedInJobDetailServiceTests
         {
             return Task.FromResult(
                 new LinkedInSearchSettings(
-                    "Default",
                     "C# .Net",
                     "Limassol, Cyprus",
                     "Limassol, Cyprus",

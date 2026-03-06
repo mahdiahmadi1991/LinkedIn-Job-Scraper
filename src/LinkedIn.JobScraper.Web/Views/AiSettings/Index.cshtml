@@ -10,7 +10,7 @@
     <section class="page-hero">
         <div class="section-label mb-2">Scoring Behavior</div>
         <h1 class="hero-title h2">AI Settings</h1>
-        <p class="hero-lead">Adjust the behavioral profile used when scoring LinkedIn jobs. API keys stay in configuration, but scoring preferences live here.</p>
+        <p class="hero-lead">Adjust the behavior settings used when scoring LinkedIn jobs. API keys stay in configuration, but scoring preferences live here.</p>
     </section>
 
     <section class="row g-4">
@@ -20,11 +20,6 @@
                     <form asp-action="Save" method="post" class="d-flex flex-column gap-3" data-ai-settings-form>
                         @Html.AntiForgeryToken()
                         <input asp-for="ConcurrencyToken" type="hidden" />
-                        <div>
-                            <label asp-for="ProfileName" class="form-label"></label>
-                            <input asp-for="ProfileName" class="form-control" />
-                            <span asp-validation-for="ProfileName" class="text-danger small"></span>
-                        </div>
                         <div>
                             <label asp-for="BehavioralInstructions" class="form-label"></label>
                             <textarea asp-for="BehavioralInstructions" class="form-control" rows="6"></textarea>

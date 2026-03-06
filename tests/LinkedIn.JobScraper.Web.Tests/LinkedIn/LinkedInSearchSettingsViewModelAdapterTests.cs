@@ -9,7 +9,6 @@ public sealed class LinkedInSearchSettingsViewModelAdapterTests
     public void ToViewModelMapsPersistedValues()
     {
         var settings = new LinkedInSearchSettings(
-            "Default",
             "C# .Net",
             "Nicosia",
             "Nicosia, Cyprus",
@@ -21,7 +20,6 @@ public sealed class LinkedInSearchSettingsViewModelAdapterTests
 
         var model = LinkedInSearchSettingsViewModelAdapter.ToViewModel(settings);
 
-        Assert.Equal("Default", model.ProfileName);
         Assert.Equal("C# .Net", model.Keywords);
         Assert.Equal("Nicosia", model.LocationInput);
         Assert.Equal("Nicosia, Cyprus", model.LocationDisplayName);
@@ -36,7 +34,6 @@ public sealed class LinkedInSearchSettingsViewModelAdapterTests
     {
         var model = new LinkedInSearchSettingsPageViewModel
         {
-            ProfileName = "Default",
             Keywords = "C# .Net",
             LocationInput = "Cyprus",
             LocationGeoId = "104677818"

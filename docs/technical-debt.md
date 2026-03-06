@@ -25,7 +25,6 @@ This is a deliberately deferred product feature, not an immediate refactor.
 Intent:
 
 - Replace today's separate "AI Settings" and "Search Settings" mental model with a single reusable profile concept.
-- Give `ProfileName` a real functional role instead of leaving it as mostly metadata.
 - Let the user run `Fetch & Score` against a selected profile and keep provenance for which profile found a job.
 
 Target UX:

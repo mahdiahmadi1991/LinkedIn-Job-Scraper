@@ -78,7 +78,6 @@ public sealed class AiSettingsController : Controller
         {
             savedProfile = await _aiBehaviorSettingsService.SaveAsync(
                 new AiBehaviorProfile(
-                    viewModel.ProfileName,
                     viewModel.BehavioralInstructions,
                     viewModel.PrioritySignals,
                     viewModel.ExclusionSignals,
@@ -108,7 +107,7 @@ public sealed class AiSettingsController : Controller
         viewModel.ConcurrencyToken = savedProfile.ConcurrencyToken;
 
         TempData["AiSettingsStatusMessage"] =
-            $"Saved AI behavior profile '{savedProfile.ProfileName}' with {AiOutputLanguage.GetDisplayName(savedProfile.OutputLanguageCode)} output.";
+            $"Saved AI behavior settings with {AiOutputLanguage.GetDisplayName(savedProfile.OutputLanguageCode)} output.";
         TempData["AiSettingsStatusSucceeded"] = bool.TrueString;
 
         if (IsAjaxRequest())

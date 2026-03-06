@@ -7,10 +7,6 @@ public sealed class AiSettingsPageViewModel
     public string? ConcurrencyToken { get; set; }
 
     [Required]
-    [Display(Name = "Profile Name")]
-    public string ProfileName { get; set; } = string.Empty;
-
-    [Required]
     [Display(Name = "Behavioral Instructions")]
     public string BehavioralInstructions { get; set; } = string.Empty;
 
