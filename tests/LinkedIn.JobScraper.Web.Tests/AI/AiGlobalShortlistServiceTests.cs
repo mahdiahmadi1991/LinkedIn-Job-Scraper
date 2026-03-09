@@ -573,6 +573,42 @@ public sealed class AiGlobalShortlistServiceTests
     }
 
     [Fact]
+    public async Task GenerateAsyncReturnsConflictWhenNoReviewableJobsAreAvailable()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var dbOptions = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+
+        var service = CreateService(
+            dbOptions,
+            new SequenceGlobalShortlistGateway([]),
+            new FixedJobScoringGateway(),
+            null,
+            new AiGlobalShortlistOptions
+            {
+                PromptVersion = "v-test",
+                MaxCandidateCount = 10,
+                InterCandidateDelayMilliseconds = 0,
+                AcceptedScoreThreshold = 70,
+                RejectedScoreThreshold = 40,
+                FallbackPerItemCap = 0
+            });
+
+        var result = await service.GenerateAsync(CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(StatusCodes.Status409Conflict, result.StatusCode);
+        Assert.Null(result.RunId);
+        Assert.Contains("cannot start", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, result.CandidateCount);
+        Assert.Equal(0, result.ProcessedCount);
+
+        await using var verificationContext = new LinkedInJobScraperDbContext(dbOptions);
+        Assert.False(await verificationContext.AiGlobalShortlistRuns.AnyAsync());
+    }
+
+    [Fact]
     public async Task GetLatestRunAsyncRecoversOrphanedActiveRunAfterRestart()
     {
         var databaseName = Guid.NewGuid().ToString("N");

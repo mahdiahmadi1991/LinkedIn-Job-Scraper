@@ -76,6 +76,7 @@
     let overviewRefreshTimer = null;
     let overviewRefreshInFlight = false;
     let runCancellationRequestedAtUtc = null;
+    let queueRemainingCount = 0;
 
     const seenProgressEvents = new Set();
 
@@ -93,6 +94,18 @@
             node.textContent = String(value ?? "0");
         }
     };
+
+    const toNonNegativeCount = (value) => {
+        const parsed = Number.parseInt(String(value ?? "0"), 10);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+            return 0;
+        }
+
+        return parsed;
+    };
+
+    const getNoReviewableJobsMessage = () =>
+        "AI live review cannot start because there are no jobs available for review. Import jobs and sync details first.";
 
     const toDisplayState = (state) => {
         if (typeof state !== "string" || state.length === 0) {
@@ -262,7 +275,8 @@
         const normalizedState = String(activeRunState || "").toLowerCase();
         const isRunningLike = normalizedState === "running" || normalizedState === "pending";
         const cancellationRequested = Boolean(runCancellationRequestedAtUtc);
-        const canStart = !isRunningLike;
+        const hasReviewableJobs = queueRemainingCount > 0;
+        const canStart = !isRunningLike && hasReviewableJobs;
         const canResume = hasRun && (normalizedState === "cancelled" || normalizedState === "failed");
         const canStop = hasRun && isRunningLike && !cancellationRequested;
 
@@ -297,9 +311,16 @@
     };
 
     const updateQueueOverview = (overview) => {
-        setMetric(eligibleTotalNode, overview?.eligibleTotal ?? 0);
-        setMetric(alreadyReviewedNode, overview?.alreadyReviewed ?? 0);
-        setMetric(queueRemainingNode, overview?.queueRemaining ?? 0);
+        const eligibleTotal = toNonNegativeCount(overview?.eligibleTotal);
+        const alreadyReviewed = toNonNegativeCount(overview?.alreadyReviewed);
+        const queueRemaining = toNonNegativeCount(overview?.queueRemaining);
+
+        queueRemainingCount = queueRemaining;
+
+        setMetric(eligibleTotalNode, eligibleTotal);
+        setMetric(alreadyReviewedNode, alreadyReviewed);
+        setMetric(queueRemainingNode, queueRemaining);
+        updateActionButtons();
     };
 
     const loadOverview = async () => {
@@ -1078,7 +1099,11 @@
                     failedCount: 0
                 });
                 renderRows();
-                setStatus(payload.message || "No run is available yet.");
+                if (queueRemainingCount <= 0) {
+                    setStatus(getNoReviewableJobsMessage());
+                } else {
+                    setStatus(payload.message || "No run is available yet.");
+                }
                 return;
             }
 
@@ -1170,6 +1195,13 @@
 
         if (isInitialSyncPending) {
             setStatus("Syncing latest run state...");
+            return;
+        }
+
+        if (queueRemainingCount <= 0) {
+            const message = getNoReviewableJobsMessage();
+            setStatus(message);
+            showToast(message, false);
             return;
         }
 

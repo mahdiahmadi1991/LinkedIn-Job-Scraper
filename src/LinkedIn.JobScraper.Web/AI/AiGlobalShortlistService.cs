@@ -106,6 +106,14 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
             userId,
             options.GetMaxCandidateCount(),
             cancellationToken);
+
+        if (candidates.Count == 0)
+        {
+            return AiGlobalShortlistRunResult.Failed(
+                "AI live review cannot start because there are no jobs available for review. Import jobs and sync job details first.",
+                StatusCodes.Status409Conflict);
+        }
+
         var run = new AiGlobalShortlistRunRecord
         {
             AppUserId = userId,
@@ -156,31 +164,6 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
                 NeedsReviewCount: 0,
                 FailedCount: 0),
             cancellationToken);
-
-        if (candidates.Count == 0)
-        {
-            run.Status = RunStatusCompleted;
-            run.CompletedAtUtc = DateTimeOffset.UtcNow;
-            run.Summary = LimitText("No enriched jobs were available for shortlist generation.", 2000);
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            await PublishProgressSafeAsync(
-                userId,
-                progressConnectionId,
-                new AiGlobalShortlistProgressUpdate(
-                    run.Id,
-                    "completed",
-                    "run-finished",
-                    "No candidates were available for processing.",
-                    CandidateCount: 0,
-                    ProcessedCount: 0,
-                    AcceptedCount: 0,
-                    NeedsReviewCount: 0,
-                    FailedCount: 0),
-                cancellationToken);
-
-            return AiGlobalShortlistRunResult.Succeeded(run.Id, 0, 0, 0, 0, 0);
-        }
 
         if (progressCallback is not null)
         {
