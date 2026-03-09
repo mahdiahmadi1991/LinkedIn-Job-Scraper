@@ -37,7 +37,7 @@ The current product direction is conservative: keep the user in the loop for Lin
 - Conservative paged LinkedIn job import
 - Job detail enrichment
 - OpenAI-based scoring with summary, rationale, concerns, score, and label
-- AI output language support (`English` and `فارسی`) with correct `ltr` / `rtl` rendering
+- AI output language support (`English` and `Persian`) with correct `ltr` / `rtl` rendering
 - Search settings UI for LinkedIn query parameters
 - AI settings UI for behavior tuning
 - Jobs dashboard with:

@@ -28,6 +28,8 @@ public sealed class LinkedInJobScraperDbContext : DbContext
 
     public DbSet<LinkedInSessionRecord> LinkedInSessions => Set<LinkedInSessionRecord>();
 
+    public DbSet<OpenAiRuntimeSettingsRecord> OpenAiRuntimeSettings => Set<OpenAiRuntimeSettingsRecord>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<JobRecord>(
@@ -245,6 +247,20 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                     .WithMany(static job => job.GlobalShortlistItems)
                     .HasForeignKey(static item => item.JobRecordId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+        modelBuilder.Entity<OpenAiRuntimeSettingsRecord>(
+            entity =>
+            {
+                entity.ToTable("OpenAiRuntimeSettings");
+                entity.HasKey(static settings => settings.Id);
+
+                entity.Property(static settings => settings.SettingsKey).HasMaxLength(64).IsRequired();
+                entity.Property(static settings => settings.Model).HasMaxLength(128).IsRequired();
+                entity.Property(static settings => settings.BaseUrl).HasMaxLength(512).IsRequired();
+                entity.Property(static settings => settings.RowVersion).IsRowVersion();
+
+                entity.HasIndex(static settings => settings.SettingsKey).IsUnique();
             });
     }
 }

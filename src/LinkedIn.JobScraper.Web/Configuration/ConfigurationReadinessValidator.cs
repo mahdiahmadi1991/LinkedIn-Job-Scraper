@@ -12,13 +12,13 @@ public static class ConfigurationReadinessValidator
         if (string.IsNullOrWhiteSpace(openAiSecurityOptions.ApiKey))
         {
             warnings.Add(
-                "OpenAI API key is not configured. AI scoring will stay unavailable until OpenAI:Security:ApiKey is provided via user-secrets or environment variables.");
+                "OpenAI API key is not configured. AI scoring will stay unavailable until Administration > OpenAI Setup is completed.");
         }
 
         if (string.IsNullOrWhiteSpace(openAiSecurityOptions.Model))
         {
             warnings.Add(
-                "OpenAI model is not configured. AI scoring will stay unavailable until OpenAI:Security:Model is provided via user-secrets or environment variables.");
+                "OpenAI model is not configured. AI scoring will stay unavailable until Administration > OpenAI Setup is completed.");
         }
 
         return warnings;

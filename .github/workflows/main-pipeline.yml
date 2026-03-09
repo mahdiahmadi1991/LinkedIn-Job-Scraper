@@ -117,9 +117,6 @@ jobs:
           ssh -i ~/.ssh/id_ed25519 -p '${{ secrets.DEPLOY_SSH_PORT }}' '${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}' \
             "cat > '${{ secrets.DEPLOY_APP_DIR }}/.env.runtime'" <<'EOF'
           SqlServer__ConnectionString=${{ secrets.SQLSERVER__CONNECTIONSTRING }}
-          OpenAI__Security__ApiKey=${{ secrets.OPENAI__SECURITY__APIKEY }}
-          OpenAI__Security__Model=${{ secrets.OPENAI__SECURITY__MODEL }}
-          OpenAI__Security__BaseUrl=${{ secrets.OPENAI__SECURITY__BASEURL }}
           EOF
 
       - name: Run Remote Deploy

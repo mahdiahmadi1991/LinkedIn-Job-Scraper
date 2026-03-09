@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using LinkedIn.JobScraper.Web.Configuration;
-using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.AI;
 
@@ -43,16 +42,16 @@ public sealed class OpenAiJobScoringGateway : IJobScoringGateway
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly ILogger<OpenAiJobScoringGateway> _logger;
+    private readonly IOpenAiEffectiveSecurityOptionsResolver _openAiSecurityOptionsResolver;
     private readonly IOpenAiResponsesClient _responsesClient;
-    private readonly IOptions<OpenAiSecurityOptions> _securityOptions;
 
     public OpenAiJobScoringGateway(
         IOpenAiResponsesClient responsesClient,
-        IOptions<OpenAiSecurityOptions> securityOptions,
+        IOpenAiEffectiveSecurityOptionsResolver openAiSecurityOptionsResolver,
         ILogger<OpenAiJobScoringGateway> logger)
     {
         _responsesClient = responsesClient;
-        _securityOptions = securityOptions;
+        _openAiSecurityOptionsResolver = openAiSecurityOptionsResolver;
         _logger = logger;
     }
 
@@ -62,7 +61,7 @@ public sealed class OpenAiJobScoringGateway : IJobScoringGateway
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var securityOptions = _securityOptions.Value;
+        var securityOptions = await _openAiSecurityOptionsResolver.ResolveAsync(cancellationToken);
         var validationError = securityOptions.ValidateForScoring();
 
         if (validationError is not null)
@@ -79,6 +78,7 @@ public sealed class OpenAiJobScoringGateway : IJobScoringGateway
         {
             var response = await _responsesClient.CreateResponseAsync(
                 CreateResponsesRequest(securityOptions, request),
+                securityOptions,
                 securityOptions.GetRequestTimeout(),
                 cancellationToken);
 
@@ -165,6 +165,7 @@ public sealed class OpenAiJobScoringGateway : IJobScoringGateway
 
             response = await _responsesClient.GetResponseAsync(
                 responseId,
+                securityOptions,
                 securityOptions.GetRequestTimeout(),
                 cancellationToken);
         }

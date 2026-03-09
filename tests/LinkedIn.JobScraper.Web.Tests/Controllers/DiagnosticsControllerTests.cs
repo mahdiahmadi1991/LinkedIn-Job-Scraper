@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
+using LinkedIn.JobScraper.Web.Tests.AI;
 
 namespace LinkedIn.JobScraper.Web.Tests.Controllers;
 
@@ -170,11 +171,12 @@ public sealed class DiagnosticsControllerTests
             {
                 ConnectionString = "Server=.;Database=LinkedInJobScraper;Trusted_Connection=True;"
             }),
-            Options.Create(new OpenAiSecurityOptions
-            {
-                ApiKey = "test-key",
-                Model = "gpt-5-mini"
-            }),
+            new FixedOpenAiEffectiveSecurityOptionsResolver(
+                new OpenAiSecurityOptions
+                {
+                    ApiKey = "test-key",
+                    Model = "gpt-5-mini"
+                }),
             new FakeLinkedInSessionStore());
     }
 

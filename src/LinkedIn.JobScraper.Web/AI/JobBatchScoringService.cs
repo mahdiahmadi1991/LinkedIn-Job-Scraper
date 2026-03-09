@@ -1,10 +1,8 @@
 using LinkedIn.JobScraper.Web.Jobs;
 using LinkedIn.JobScraper.Web.Authentication;
-using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Persistence;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.AI;
 
@@ -14,20 +12,20 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
     private readonly ICurrentAppUserContext _currentAppUserContext;
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly IJobScoringGateway _jobScoringGateway;
-    private readonly IOptions<OpenAiSecurityOptions> _openAiSecurityOptions;
+    private readonly IOpenAiEffectiveSecurityOptionsResolver _openAiSecurityOptionsResolver;
 
     public JobBatchScoringService(
         ICurrentAppUserContext currentAppUserContext,
         IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
         IJobScoringGateway jobScoringGateway,
         IAiBehaviorSettingsService behaviorSettingsService,
-        IOptions<OpenAiSecurityOptions> openAiSecurityOptions)
+        IOpenAiEffectiveSecurityOptionsResolver openAiSecurityOptionsResolver)
     {
         _currentAppUserContext = currentAppUserContext;
         _dbContextFactory = dbContextFactory;
         _jobScoringGateway = jobScoringGateway;
         _behaviorSettingsService = behaviorSettingsService;
-        _openAiSecurityOptions = openAiSecurityOptions;
+        _openAiSecurityOptionsResolver = openAiSecurityOptionsResolver;
     }
 
     public async Task<JobBatchScoringResult> ScoreReadyJobsAsync(
@@ -59,7 +57,7 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
             return JobBatchScoringResult.Succeeded(maxCount, 0, 0, 0);
         }
 
-        var scoringOptions = _openAiSecurityOptions.Value;
+        var scoringOptions = await _openAiSecurityOptionsResolver.ResolveAsync(cancellationToken);
         var concurrencyValidationError = scoringOptions.ValidateScoringConcurrency();
 
         if (concurrencyValidationError is not null)

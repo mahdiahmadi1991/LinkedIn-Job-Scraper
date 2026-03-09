@@ -24,12 +24,12 @@ public sealed class OpenAiSecurityOptions
     {
         if (string.IsNullOrWhiteSpace(ApiKey))
         {
-            return "OpenAI API key is not configured. Set 'OpenAI:Security:ApiKey' with dotnet user-secrets for src/LinkedIn.JobScraper.Web or provide it via environment variables.";
+            return "OpenAI API key is not configured. Configure it in Administration > OpenAI Setup before running AI scoring.";
         }
 
         if (string.IsNullOrWhiteSpace(Model))
         {
-            return "OpenAI model is not configured. Set 'OpenAI:Security:Model' with dotnet user-secrets for src/LinkedIn.JobScraper.Web or provide it via environment variables.";
+            return "OpenAI model is not configured. Select a model in Administration > OpenAI Setup before running AI scoring.";
         }
 
         if (RequestTimeoutSeconds <= 0)

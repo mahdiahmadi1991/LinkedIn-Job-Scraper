@@ -6,7 +6,6 @@ using LinkedIn.JobScraper.Web.Tests.Authentication;
 using LinkedIn.JobScraper.Web.Tests.Persistence;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.Tests.AI;
 
@@ -221,7 +220,7 @@ public sealed class JobBatchScoringServiceTests
             new TestDbContextFactory(dbContextOptions),
             jobScoringGateway,
             new FakeAiBehaviorSettingsService(),
-            Options.Create(options));
+            new FixedOpenAiEffectiveSecurityOptionsResolver(options));
     }
 
     private static async Task SeedJobsAsync(

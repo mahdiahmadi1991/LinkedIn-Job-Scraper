@@ -1,6 +1,7 @@
+using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Configuration;
+using LinkedIn.JobScraper.Web.Tests.AI;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.Tests.Configuration;
 
@@ -10,11 +11,12 @@ public sealed class ConfigurationReadinessHealthCheckTests
     public async Task CheckHealthAsyncReturnsHealthyWhenRequiredConfigurationExists()
     {
         var healthCheck = new ConfigurationReadinessHealthCheck(
-            Options.Create(new OpenAiSecurityOptions
-            {
-                ApiKey = "test-key",
-                Model = "gpt-5-mini"
-            }));
+            new FixedOpenAiEffectiveSecurityOptionsResolver(
+                new OpenAiSecurityOptions
+                {
+                    ApiKey = "test-key",
+                    Model = "gpt-5-mini"
+                }));
 
         var result = await healthCheck.CheckHealthAsync(new HealthCheckContext
         {
@@ -33,7 +35,7 @@ public sealed class ConfigurationReadinessHealthCheckTests
     public async Task CheckHealthAsyncReturnsFailureStatusWhenConfigurationIsMissing()
     {
         var healthCheck = new ConfigurationReadinessHealthCheck(
-            Options.Create(new OpenAiSecurityOptions()));
+            new FixedOpenAiEffectiveSecurityOptionsResolver(new OpenAiSecurityOptions()));
 
         var result = await healthCheck.CheckHealthAsync(new HealthCheckContext
         {
