@@ -1,9 +1,12 @@
 @using LinkedIn.JobScraper.Web.Controllers
+@using LinkedIn.JobScraper.Web.AI
 @using System.Globalization
 @model LinkedIn.JobScraper.Web.Models.AdminUsersPageViewModel
 @{
     ViewData["Title"] = "Administration";
-    var activeTab = AdminController.UsersTab;
+    var activeTab = string.IsNullOrWhiteSpace(Model.ActiveTab)
+        ? AdminController.UsersTab
+        : Model.ActiveTab;
     var tabs = new[]
     {
         new
@@ -11,8 +14,15 @@
             Key = AdminController.UsersTab,
             Label = "User Management",
             Description = "Create and manage local user accounts."
+        },
+        new
+        {
+            Key = AdminController.OpenAiTab,
+            Label = "OpenAI Setup",
+            Description = "Manage global OpenAI runtime connection settings."
         }
     };
+    var recommendedModels = OpenAiModelCatalog.Items;
 }
 
 <div class="page-shell">
@@ -33,6 +43,15 @@
             data-status-succeeded="@(Model.StatusSucceeded ? "true" : "false")"></div>
     }
 
+    @if (!string.IsNullOrWhiteSpace(Model.OpenAiStatusMessage))
+    {
+        <div
+            class="d-none"
+            data-admin-openai-status
+            data-status-message="@Model.OpenAiStatusMessage"
+            data-status-succeeded="@(Model.OpenAiStatusSucceeded ? "true" : "false")"></div>
+    }
+
     <nav class="mb-3" aria-label="Administration tabs">
         <ul class="nav nav-tabs">
             @foreach (var tab in tabs)
@@ -44,7 +63,8 @@
                         class="nav-link @(isActive ? "active" : string.Empty)"
                         asp-controller="Admin"
                         asp-action="Index"
-                        asp-route-tab="@tab.Key">
+                        asp-route-tab="@tab.Key"
+                        aria-controls="admin-tab-panel-@tab.Key">
                         @tab.Label
                     </a>
                 </li>
@@ -55,7 +75,7 @@
     <div class="tab-content">
         <section
             id="admin-tab-panel-users"
-            class="tab-pane fade show active"
+            class="tab-pane fade @(string.Equals(activeTab, AdminController.UsersTab, StringComparison.Ordinal) ? "show active" : string.Empty)"
             role="tabpanel"
             aria-labelledby="admin-tab-link-users">
             <div class="mb-3">
@@ -343,9 +363,185 @@
                 </div>
             </div>
         </section>
+
+        <section
+            id="admin-tab-panel-openai"
+            class="tab-pane fade @(string.Equals(activeTab, AdminController.OpenAiTab, StringComparison.Ordinal) ? "show active" : string.Empty)"
+            role="tabpanel"
+            aria-labelledby="admin-tab-link-openai">
+            <div class="mb-3">
+                <h2 class="h5 mb-1">OpenAI Setup</h2>
+                <p class="text-muted mb-0">
+                    Manage OpenAI runtime settings and API key. Keys are never stored in SQL tables.
+                </p>
+            </div>
+
+            <div class="row g-4" data-admin-openai-setup>
+                <div class="col-12 col-xl-7">
+                    <div class="card app-panel">
+                        <div class="card-body app-panel-body">
+                            <form
+                                asp-controller="Admin"
+                                asp-action="SaveOpenAiSettings"
+                                method="post"
+                                class="d-flex flex-column gap-3"
+                                data-admin-openai-setup-form>
+                                @Html.AntiForgeryToken()
+
+                                <input asp-for="OpenAiSetupForm.ConcurrencyToken" type="hidden" />
+
+                                <div>
+                                    <label asp-for="OpenAiSetupForm.ApiKey" class="form-label"></label>
+                                    <textarea
+                                        asp-for="OpenAiSetupForm.ApiKey"
+                                        class="form-control"
+                                        rows="3"
+                                        autocomplete="off"
+                                        spellcheck="false"
+                                        data-admin-openai-api-key-input></textarea>
+                                    <div class="small text-muted mt-1">
+                                        Paste a valid OpenAI project API key (for example, a key starting with <code>sk-</code>). The value is stored in a local runtime secrets file and is never persisted in SQL tables.
+                                    </div>
+                                    <div class="small text-muted">
+                                        Use a server-side key only. Do not paste temporary browser tokens or keys with restricted model access.
+                                    </div>
+                                    <span asp-validation-for="OpenAiSetupForm.ApiKey" class="text-danger small"></span>
+                                </div>
+
+                                <div>
+                                    <label asp-for="OpenAiSetupForm.Model" class="form-label"></label>
+                                    <select asp-for="OpenAiSetupForm.Model" class="form-select" data-admin-openai-model-select>
+                                        @foreach (var modelOption in recommendedModels)
+                                        {
+                                            <option value="@modelOption.Value" data-model-description="@modelOption.Description">
+                                                @modelOption.Label (@modelOption.Value)
+                                            </option>
+                                        }
+                                    </select>
+                                    <div class="small text-muted mt-2" data-admin-openai-model-description></div>
+                                    <div class="small text-muted">
+                                        This model is used for scoring and shortlist evaluation. Prefer lighter models for lower cost and faster response times.
+                                    </div>
+                                    <span asp-validation-for="OpenAiSetupForm.Model" class="text-danger small"></span>
+                                </div>
+
+                                <div>
+                                    <label asp-for="OpenAiSetupForm.BaseUrl" class="form-label"></label>
+                                    <input asp-for="OpenAiSetupForm.BaseUrl" class="form-control" autocomplete="off" />
+                                    <div class="small text-muted mt-1">
+                                        Keep <code>https://api.openai.com/v1</code> for direct OpenAI usage. Change this only when routing through a trusted gateway compatible with OpenAI APIs.
+                                    </div>
+                                    <span asp-validation-for="OpenAiSetupForm.BaseUrl" class="text-danger small"></span>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label asp-for="OpenAiSetupForm.RequestTimeoutSeconds" class="form-label"></label>
+                                        <input asp-for="OpenAiSetupForm.RequestTimeoutSeconds" type="number" min="1" class="form-control" />
+                                        <div class="small text-muted mt-1">
+                                            Maximum wait time per OpenAI request. Increase for slower networks; keep moderate to avoid long blocked operations.
+                                        </div>
+                                        <span asp-validation-for="OpenAiSetupForm.RequestTimeoutSeconds" class="text-danger small"></span>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label asp-for="OpenAiSetupForm.MaxConcurrentScoringRequests" class="form-label"></label>
+                                        <input asp-for="OpenAiSetupForm.MaxConcurrentScoringRequests" type="number" min="1" class="form-control" />
+                                        <div class="small text-muted mt-1">
+                                            Number of scoring requests processed in parallel. Higher values improve throughput but increase API load and rate-limit risk.
+                                        </div>
+                                        <span asp-validation-for="OpenAiSetupForm.MaxConcurrentScoringRequests" class="text-danger small"></span>
+                                    </div>
+                                </div>
+
+                                <div class="form-check form-switch">
+                                    <input asp-for="OpenAiSetupForm.UseBackgroundMode" class="form-check-input" />
+                                    <label asp-for="OpenAiSetupForm.UseBackgroundMode" class="form-check-label"></label>
+                                    <div class="small text-muted mt-1">
+                                        Enable asynchronous response processing with polling. Recommended for longer prompts and heavier reasoning workloads.
+                                    </div>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label asp-for="OpenAiSetupForm.BackgroundPollingIntervalMilliseconds" class="form-label"></label>
+                                        <input asp-for="OpenAiSetupForm.BackgroundPollingIntervalMilliseconds" type="number" min="1" class="form-control" />
+                                        <div class="small text-muted mt-1">
+                                            Poll frequency while waiting for background responses. Lower values detect completion sooner but send more status requests.
+                                        </div>
+                                        <span asp-validation-for="OpenAiSetupForm.BackgroundPollingIntervalMilliseconds" class="text-danger small"></span>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label asp-for="OpenAiSetupForm.BackgroundPollingTimeoutSeconds" class="form-label"></label>
+                                        <input asp-for="OpenAiSetupForm.BackgroundPollingTimeoutSeconds" type="number" min="1" class="form-control" />
+                                        <div class="small text-muted mt-1">
+                                            Upper bound for waiting on background completion. Increase only when legitimate requests regularly need more time.
+                                        </div>
+                                        <span asp-validation-for="OpenAiSetupForm.BackgroundPollingTimeoutSeconds" class="text-danger small"></span>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button
+                                        type="submit"
+                                        class="btn btn-primary"
+                                        data-admin-openai-save-button
+                                        data-loading-text="Saving OpenAI setup...">
+                                        Save OpenAI Setup
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-5">
+                    <div class="card app-panel h-100">
+                        <div class="card-body app-panel-body d-flex flex-column gap-3">
+                            <div class="section-label">Connection Readiness</div>
+                            <h3 class="h5">Connection Readiness</h3>
+
+                            <div class="session-modal-status-stack">
+                                <div class="session-status-note @(Model.OpenAiConnectionReady ? "success" : "danger")" data-admin-openai-connection-status-note>
+                                    @Model.OpenAiConnectionStatusMessage
+                                </div>
+                                <div class="session-status-note subtle active">
+                                    <strong>API key:</strong> <span data-admin-openai-api-key-value>@(Model.OpenAiApiKeyConfigured ? "Configured" : "Not configured")</span>
+                                </div>
+                                <div class="session-status-note subtle active">
+                                    <strong>Model:</strong> <span data-admin-openai-model-value>@(string.IsNullOrWhiteSpace(Model.OpenAiSetupForm.Model) ? "Not configured" : Model.OpenAiSetupForm.Model)</span>
+                                </div>
+                                <div class="session-status-note subtle active">
+                                    <strong>Base URL:</strong> <span data-admin-openai-base-url-value>@Model.OpenAiSetupForm.BaseUrl</span>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                data-admin-openai-connection-check
+                                data-loading-text="Checking readiness..."
+                                data-admin-openai-connection-url="@Url.Action("OpenAiConnectionStatus", "Admin")">
+                                Check Readiness
+                            </button>
+
+                            <hr />
+
+                            <div class="section-label">Secrets Policy</div>
+                            <p class="small text-muted mb-0">
+                                API keys are never saved in SQL Server. OpenAI Setup stores the active key in a local runtime secrets file and applies changes immediately.
+                            </p>
+                            <div class="small text-muted">
+                                Use this tab as the single source of truth for OpenAI key management in this deployment.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
     </div>
 </div>
 
 @section Scripts {
     <script src="~/js/admin-users-page.js" asp-append-version="true"></script>
+    <script src="~/js/admin-openai-setup-page.js" asp-append-version="true"></script>
 }

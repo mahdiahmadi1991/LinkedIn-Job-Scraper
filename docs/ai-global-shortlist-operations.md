@@ -110,7 +110,7 @@ Fit-level states (UI projection):
 
 1. Load latest run via `GET /ai-global-shortlist/runs/latest`.
 2. Confirm SignalR connection in browser devtools and fallback poll responses from `/progress`.
-3. Verify `OpenAI:Security:ApiKey` and `OpenAI:Security:Model`.
+3. Verify OpenAI Setup has a valid API key and the expected model.
 4. If account-safety concern exists, increase `InterCandidateDelayMilliseconds`.
 5. If frequent transient failures occur, review retry settings and upstream status.
 6. If output quality drifts, bump `PromptVersion` and compare run history by version.

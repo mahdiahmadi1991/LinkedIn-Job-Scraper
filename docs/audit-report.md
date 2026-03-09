@@ -81,7 +81,7 @@
 
 | Check | Status | Evidence |
 |---|---|---|
-| Secrets management (no secrets committed; use user-secrets/env vars) | **PASS** | `src/LinkedIn.JobScraper.Web/appsettings.Development.json` contains empty placeholders (`SqlServer.ConnectionString`, `OpenAI.Security.ApiKey`, `OpenAI.Security.Model`) instead of live values. `src/LinkedIn.JobScraper.Web/LinkedIn.JobScraper.Web.csproj` includes a `UserSecretsId`, and `README.md` documents local setup using user-secrets. |
+| Secrets management (no secrets committed; use user-secrets/env vars) | **PASS** | `src/LinkedIn.JobScraper.Web/appsettings.Development.json` keeps connection/security sections without committed live secrets, `src/LinkedIn.JobScraper.Web/LinkedIn.JobScraper.Web.csproj` includes a `UserSecretsId`, and `README.md` documents local setup using user-secrets. |
 | Anti-forgery on mutating endpoints (MVC) | **PASS** | `[ValidateAntiForgeryToken]` is present on mutating actions across controllers: `JobsController.FetchAndScore`, `JobsController.UpdateStatus`, `LinkedInSessionController.{Capture,Launch,Verify,Revoke}`, `AiSettingsController.Save`, and `SearchSettingsController.{SearchLocation,Save}`. |
 | Logging redaction rules (no cookies/tokens in logs) | **PARTIAL** | There is no central redaction middleware or formal log redaction policy component. The current code does avoid obvious secret logging: `JobsDashboardService` uses `LoggerMessage.Define(...)` with workflow counters only, and configuration warnings in `ConfigurationReadinessValidator` report missing config without printing values. However, because session handling and OpenAI use sensitive material internally and there is no explicit sanitization policy for logs, this is only partial compliance. |
 

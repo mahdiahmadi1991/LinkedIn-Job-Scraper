@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using LinkedIn.JobScraper.Web.Configuration;
-using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.AI;
 
@@ -16,16 +15,16 @@ public sealed class OpenAiGlobalShortlistGateway : IAiGlobalShortlistGateway
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly ILogger<OpenAiGlobalShortlistGateway> _logger;
+    private readonly IOpenAiEffectiveSecurityOptionsResolver _openAiSecurityOptionsResolver;
     private readonly IOpenAiResponsesClient _responsesClient;
-    private readonly IOptions<OpenAiSecurityOptions> _securityOptions;
 
     public OpenAiGlobalShortlistGateway(
         IOpenAiResponsesClient responsesClient,
-        IOptions<OpenAiSecurityOptions> securityOptions,
+        IOpenAiEffectiveSecurityOptionsResolver openAiSecurityOptionsResolver,
         ILogger<OpenAiGlobalShortlistGateway> logger)
     {
         _responsesClient = responsesClient;
-        _securityOptions = securityOptions;
+        _openAiSecurityOptionsResolver = openAiSecurityOptionsResolver;
         _logger = logger;
     }
 
@@ -36,6 +35,7 @@ public sealed class OpenAiGlobalShortlistGateway : IAiGlobalShortlistGateway
         ArgumentNullException.ThrowIfNull(request);
 
         cancellationToken.ThrowIfCancellationRequested();
+        var securityOptions = await _openAiSecurityOptionsResolver.ResolveAsync(cancellationToken);
 
         if (request.Candidates.Count == 0)
         {
@@ -44,7 +44,7 @@ public sealed class OpenAiGlobalShortlistGateway : IAiGlobalShortlistGateway
                 "No candidates were provided for ranking.",
                 StatusCodes.Status200OK,
                 [],
-                _securityOptions.Value.Model);
+                securityOptions.Model);
         }
 
         if (request.MaxRecommendations <= 0)
@@ -54,11 +54,10 @@ public sealed class OpenAiGlobalShortlistGateway : IAiGlobalShortlistGateway
                 "Global shortlist max recommendations per batch must be greater than zero.",
                 StatusCodes.Status500InternalServerError,
                 null,
-                _securityOptions.Value.Model,
+                securityOptions.Model,
                 ErrorCode: "INVALID_REQUEST");
         }
 
-        var securityOptions = _securityOptions.Value;
         var validationError = securityOptions.ValidateForScoring();
         if (validationError is not null)
         {
@@ -73,6 +72,7 @@ public sealed class OpenAiGlobalShortlistGateway : IAiGlobalShortlistGateway
         {
             var response = await _responsesClient.CreateResponseAsync(
                 CreateResponsesRequest(securityOptions, request),
+                securityOptions,
                 securityOptions.GetRequestTimeout(),
                 cancellationToken);
 
@@ -217,6 +217,7 @@ public sealed class OpenAiGlobalShortlistGateway : IAiGlobalShortlistGateway
 
             response = await _responsesClient.GetResponseAsync(
                 responseId,
+                securityOptions,
                 securityOptions.GetRequestTimeout(),
                 cancellationToken);
         }

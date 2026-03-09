@@ -567,6 +567,61 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                     b.ToTable("LinkedInSessions", (string)null);
                 });
 
+            modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.OpenAiRuntimeSettingsRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BaseUrl")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<int>("BackgroundPollingIntervalMilliseconds")
+                        .HasColumnType("int");
+
+                    b.Property<int>("BackgroundPollingTimeoutSeconds")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MaxConcurrentScoringRequests")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<int>("RequestTimeoutSeconds")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SettingsKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("UseBackgroundMode")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SettingsKey")
+                        .IsUnique();
+
+                    b.ToTable("OpenAiRuntimeSettings", (string)null);
+                });
+
             modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.AiBehaviorSettingsRecord", b =>
                 {
                     b.HasOne("LinkedIn.JobScraper.Web.Persistence.Entities.AppUserRecord", "AppUser")

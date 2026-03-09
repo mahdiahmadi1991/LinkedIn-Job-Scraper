@@ -1,6 +1,5 @@
 using System.ClientModel;
 using LinkedIn.JobScraper.Web.Configuration;
-using Microsoft.Extensions.Options;
 using OpenAI;
 using OpenAI.Responses;
 
@@ -10,11 +9,13 @@ public interface IOpenAiResponsesClient
 {
     Task<OpenAiResponseSnapshot> CreateResponseAsync(
         OpenAiResponsesRequest request,
+        OpenAiSecurityOptions securityOptions,
         TimeSpan requestTimeout,
         CancellationToken cancellationToken);
 
     Task<OpenAiResponseSnapshot> GetResponseAsync(
         string responseId,
+        OpenAiSecurityOptions securityOptions,
         TimeSpan requestTimeout,
         CancellationToken cancellationToken);
 }
@@ -74,26 +75,17 @@ public sealed class OpenAiResponsesRequestException : Exception
 #pragma warning disable OPENAI001
 public sealed class OpenAiSdkResponsesClient : IOpenAiResponsesClient
 {
-    private readonly ResponsesClient _client;
-
-    public OpenAiSdkResponsesClient(IOptions<OpenAiSecurityOptions> securityOptions)
+    public OpenAiSdkResponsesClient()
     {
-        var options = securityOptions.Value;
-        var clientOptions = new OpenAIClientOptions();
-
-        if (!string.IsNullOrWhiteSpace(options.BaseUrl))
-        {
-            clientOptions.Endpoint = new Uri($"{options.BaseUrl.TrimEnd('/')}/", UriKind.Absolute);
-        }
-
-        _client = new ResponsesClient(new ApiKeyCredential(options.ApiKey), clientOptions);
     }
 
     public Task<OpenAiResponseSnapshot> CreateResponseAsync(
         OpenAiResponsesRequest request,
+        OpenAiSecurityOptions securityOptions,
         TimeSpan requestTimeout,
         CancellationToken cancellationToken)
     {
+        var client = CreateClient(securityOptions);
         var options = new CreateResponseOptions
         {
             Model = request.Model,
@@ -114,7 +106,7 @@ public sealed class OpenAiSdkResponsesClient : IOpenAiResponsesClient
         return ExecuteAsync(
             async timeoutCancellationToken =>
             {
-                ClientResult<ResponseResult> response = await _client.CreateResponseAsync(options, timeoutCancellationToken);
+                ClientResult<ResponseResult> response = await client.CreateResponseAsync(options, timeoutCancellationToken);
                 return response;
             },
             requestTimeout,
@@ -123,17 +115,31 @@ public sealed class OpenAiSdkResponsesClient : IOpenAiResponsesClient
 
     public Task<OpenAiResponseSnapshot> GetResponseAsync(
         string responseId,
+        OpenAiSecurityOptions securityOptions,
         TimeSpan requestTimeout,
         CancellationToken cancellationToken)
     {
+        var client = CreateClient(securityOptions);
         return ExecuteAsync(
             async timeoutCancellationToken =>
             {
-                ClientResult<ResponseResult> response = await _client.GetResponseAsync(responseId, timeoutCancellationToken);
+                ClientResult<ResponseResult> response = await client.GetResponseAsync(responseId, timeoutCancellationToken);
                 return response;
             },
             requestTimeout,
             cancellationToken);
+    }
+
+    private static ResponsesClient CreateClient(OpenAiSecurityOptions securityOptions)
+    {
+        var clientOptions = new OpenAIClientOptions();
+
+        if (!string.IsNullOrWhiteSpace(securityOptions.BaseUrl))
+        {
+            clientOptions.Endpoint = new Uri($"{securityOptions.BaseUrl.TrimEnd('/')}/", UriKind.Absolute);
+        }
+
+        return new ResponsesClient(new ApiKeyCredential(securityOptions.ApiKey), clientOptions);
     }
 
     private static async Task<OpenAiResponseSnapshot> ExecuteAsync(

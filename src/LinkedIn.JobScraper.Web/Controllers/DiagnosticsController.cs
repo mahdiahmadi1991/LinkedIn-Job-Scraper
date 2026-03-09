@@ -20,7 +20,7 @@ public class DiagnosticsController : Controller
     private readonly IJobEnrichmentService _jobEnrichmentService;
     private readonly IJobImportService _jobImportService;
     private readonly IOptions<SqlServerOptions> _sqlServerOptions;
-    private readonly IOptions<OpenAiSecurityOptions> _openAiSecurityOptions;
+    private readonly IOpenAiEffectiveSecurityOptionsResolver _openAiEffectiveSecurityOptionsResolver;
     private readonly ILinkedInSessionStore _linkedInSessionStore;
 
     public DiagnosticsController(
@@ -29,7 +29,7 @@ public class DiagnosticsController : Controller
         IJobEnrichmentService jobEnrichmentService,
         IJobBatchScoringService jobBatchScoringService,
         IOptions<SqlServerOptions> sqlServerOptions,
-        IOptions<OpenAiSecurityOptions> openAiSecurityOptions,
+        IOpenAiEffectiveSecurityOptionsResolver openAiEffectiveSecurityOptionsResolver,
         ILinkedInSessionStore linkedInSessionStore)
     {
         _linkedInFeasibilityProbe = linkedInFeasibilityProbe;
@@ -37,7 +37,7 @@ public class DiagnosticsController : Controller
         _jobEnrichmentService = jobEnrichmentService;
         _jobBatchScoringService = jobBatchScoringService;
         _sqlServerOptions = sqlServerOptions;
-        _openAiSecurityOptions = openAiSecurityOptions;
+        _openAiEffectiveSecurityOptionsResolver = openAiEffectiveSecurityOptionsResolver;
         _linkedInSessionStore = linkedInSessionStore;
     }
 
@@ -57,7 +57,7 @@ public class DiagnosticsController : Controller
         }
 
         var sqlServerOptions = _sqlServerOptions.Value;
-        var openAiSecurityOptions = _openAiSecurityOptions.Value;
+        var openAiSecurityOptions = await _openAiEffectiveSecurityOptionsResolver.ResolveAsync(cancellationToken);
 
         return Json(
             new DiagnosticsSummaryResponse(

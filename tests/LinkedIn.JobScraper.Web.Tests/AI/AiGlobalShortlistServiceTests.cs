@@ -697,7 +697,7 @@ public sealed class AiGlobalShortlistServiceTests
             jobScoringGateway,
             new FakeAiBehaviorSettingsService(),
             Options.Create(shortlistOptions),
-            Options.Create(
+            new FixedOpenAiEffectiveSecurityOptionsResolver(
                 new OpenAiSecurityOptions
                 {
                     ApiKey = "test-key",

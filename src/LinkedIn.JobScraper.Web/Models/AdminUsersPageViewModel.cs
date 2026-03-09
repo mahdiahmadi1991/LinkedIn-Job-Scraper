@@ -1,9 +1,24 @@
+using LinkedIn.JobScraper.Web.AI;
 using System.ComponentModel.DataAnnotations;
 
 namespace LinkedIn.JobScraper.Web.Models;
 
 public sealed class AdminUsersPageViewModel
 {
+    public string ActiveTab { get; set; } = "users";
+
+    public AdminOpenAiSetupFormViewModel OpenAiSetupForm { get; set; } = new();
+
+    public bool OpenAiApiKeyConfigured { get; set; }
+
+    public bool OpenAiConnectionReady { get; set; }
+
+    public string OpenAiConnectionStatusMessage { get; set; } = string.Empty;
+
+    public string? OpenAiStatusMessage { get; set; }
+
+    public bool OpenAiStatusSucceeded { get; set; }
+
     public AdminUserCreateFormViewModel CreateForm { get; set; } = new();
 
     public AdminUserUpdateFormViewModel UpdateForm { get; set; } = new();
@@ -83,3 +98,53 @@ public sealed record AdminUserListItemViewModel(
     DateTimeOffset? ExpiresAtUtc,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc);
+
+public sealed class AdminOpenAiSetupFormViewModel : IValidatableObject
+{
+    public string? ConcurrencyToken { get; set; }
+
+    [Required]
+    [StringLength(512)]
+    [Display(Name = "API Key")]
+    [DataType(DataType.Password)]
+    public string ApiKey { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(128)]
+    [Display(Name = "Model")]
+    public string Model { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(512)]
+    [Display(Name = "Base URL")]
+    public string BaseUrl { get; set; } = "https://api.openai.com/v1";
+
+    [Range(1, int.MaxValue)]
+    [Display(Name = "Request Timeout (seconds)")]
+    public int RequestTimeoutSeconds { get; set; } = 45;
+
+    [Display(Name = "Use Background Mode")]
+    public bool UseBackgroundMode { get; set; } = true;
+
+    [Range(1, int.MaxValue)]
+    [Display(Name = "Background Polling Interval (milliseconds)")]
+    public int BackgroundPollingIntervalMilliseconds { get; set; } = 1500;
+
+    [Range(1, int.MaxValue)]
+    [Display(Name = "Background Polling Timeout (seconds)")]
+    public int BackgroundPollingTimeoutSeconds { get; set; } = 120;
+
+    [Range(1, int.MaxValue)]
+    [Display(Name = "Max Concurrent Scoring Requests")]
+    public int MaxConcurrentScoringRequests { get; set; } = 2;
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (!OpenAiModelCatalog.IsSupported(Model))
+        {
+            yield return new ValidationResult(
+                "Selected model is not supported for this setup profile.",
+                [nameof(Model)]);
+        }
+    }
+}

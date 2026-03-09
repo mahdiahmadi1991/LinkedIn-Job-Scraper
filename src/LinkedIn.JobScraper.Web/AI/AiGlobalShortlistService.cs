@@ -30,8 +30,8 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
     private readonly IAiGlobalShortlistProgressStateStore _progressStateStore;
     private readonly IJobScoringGateway _jobScoringGateway;
     private readonly ILogger<AiGlobalShortlistService> _logger;
+    private readonly IOpenAiEffectiveSecurityOptionsResolver _openAiSecurityOptionsResolver;
     private readonly IOptions<AiGlobalShortlistOptions> _shortlistOptions;
-    private readonly IOptions<OpenAiSecurityOptions> _openAiSecurityOptions;
 
     public AiGlobalShortlistService(
         ICurrentAppUserContext currentAppUserContext,
@@ -42,7 +42,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
         IJobScoringGateway jobScoringGateway,
         IAiBehaviorSettingsService behaviorSettingsService,
         IOptions<AiGlobalShortlistOptions> shortlistOptions,
-        IOptions<OpenAiSecurityOptions> openAiSecurityOptions,
+        IOpenAiEffectiveSecurityOptionsResolver openAiSecurityOptionsResolver,
         ILogger<AiGlobalShortlistService> logger)
     {
         _currentAppUserContext = currentAppUserContext;
@@ -53,7 +53,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
         _jobScoringGateway = jobScoringGateway;
         _behaviorSettingsService = behaviorSettingsService;
         _shortlistOptions = shortlistOptions;
-        _openAiSecurityOptions = openAiSecurityOptions;
+        _openAiSecurityOptionsResolver = openAiSecurityOptionsResolver;
         _logger = logger;
     }
 
@@ -99,7 +99,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
 
         var options = _shortlistOptions.Value;
         var promptVersion = options.GetPromptVersion();
-        var modelName = _openAiSecurityOptions.Value.Model;
+        var modelName = (await _openAiSecurityOptionsResolver.ResolveAsync(cancellationToken)).Model;
 
         var candidates = await SelectCandidatesAsync(
             dbContext,
@@ -240,7 +240,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
         run.CompletedAtUtc = null;
         run.CancellationRequestedAtUtc = null;
         run.PromptVersion = promptVersion;
-        run.ModelName ??= _openAiSecurityOptions.Value.Model;
+        run.ModelName ??= (await _openAiSecurityOptionsResolver.ResolveAsync(cancellationToken)).Model;
         run.NextSequenceNumber = Math.Max(1, run.NextSequenceNumber);
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -346,6 +346,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
                     run.Id,
                     runCandidate.SequenceNumber,
                     runCandidate.JobRecord,
+                    run.ModelName ?? string.Empty,
                     behaviorProfile,
                     acceptedThreshold,
                     rejectedThreshold,
@@ -796,6 +797,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
         Guid runId,
         int sequenceNumber,
         JobRecord job,
+        string modelName,
         AiBehaviorProfile behaviorProfile,
         int acceptedThreshold,
         int rejectedThreshold,
@@ -819,7 +821,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
                 null,
                 null,
                 null,
-                _openAiSecurityOptions.Value.Model,
+                modelName,
                 false);
         }
 
@@ -943,7 +945,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
                     null,
                     null,
                     null,
-                    _openAiSecurityOptions.Value.Model,
+                    modelName,
                     true);
             }
         }
