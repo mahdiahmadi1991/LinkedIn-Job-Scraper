@@ -287,6 +287,7 @@ After implementation completes, this sequence is mandatory for every feature:
 
 - Only `develop` and `main` are long-lived branches.
 - Temporary branches are feature-only and must be removed after integration.
+- Every `feature/*` branch must be created from `develop`.
 - Release/integration branch chains are not used unless explicitly approved by the user.
 - `feature/* -> develop`: squash integration without PR.
 - `develop -> main`: PR required with merge commit.
