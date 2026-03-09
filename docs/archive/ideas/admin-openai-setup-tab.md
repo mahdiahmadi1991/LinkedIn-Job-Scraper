@@ -278,6 +278,7 @@ Decisions confirmed:
 - 2026-03-09: State 9 completed (idea archived and operational plan ledger updated with this queue closure).
 - 2026-03-09: Post-user-test Conformance Gate completed (implementation rechecked against initial approved deal and accepted as matching contract).
 - 2026-03-09: Post-user-test Integration Sync Gate completed (pipeline/runtime key cleanup, UI guidance expansion, docs/test alignment, and full-suite verification finished).
+- 2026-03-09: Post-user-test Sync follow-up completed (removed residual legacy key setup references from active docs, verified no direct legacy-key usage strings remain, and revalidated test suite/pipeline-local package update status).
 
 ## State 8 Validation Matrix
 
