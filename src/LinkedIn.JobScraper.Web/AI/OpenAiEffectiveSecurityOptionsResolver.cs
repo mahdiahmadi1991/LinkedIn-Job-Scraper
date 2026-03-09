@@ -8,6 +8,11 @@ namespace LinkedIn.JobScraper.Web.AI;
 public interface IOpenAiEffectiveSecurityOptionsResolver
 {
     Task<OpenAiSecurityOptions> ResolveAsync(CancellationToken cancellationToken);
+
+    Task<OpenAiSecurityOptions> ResolveAsync(
+        OpenAiRuntimeSettingsProfile runtimeProfile,
+        string? runtimeApiKey,
+        CancellationToken cancellationToken);
 }
 
 public sealed class OpenAiEffectiveSecurityOptionsResolver : IOpenAiEffectiveSecurityOptionsResolver
@@ -33,33 +38,44 @@ public sealed class OpenAiEffectiveSecurityOptionsResolver : IOpenAiEffectiveSec
     {
         var runtimeProfile = await _runtimeSettingsService.GetActiveAsync(cancellationToken);
         var runtimeApiKey = await _openAiRuntimeApiKeyService.GetActiveAsync(cancellationToken);
+        return await ResolveAsync(runtimeProfile, runtimeApiKey, cancellationToken);
+    }
+
+    public Task<OpenAiSecurityOptions> ResolveAsync(
+        OpenAiRuntimeSettingsProfile runtimeProfile,
+        string? runtimeApiKey,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(runtimeProfile);
+        cancellationToken.ThrowIfCancellationRequested();
         var configuredOptions = _openAiSecurityOptions.CurrentValue;
 
-        return new OpenAiSecurityOptions
-        {
-            ApiKey = runtimeApiKey ?? string.Empty,
-            Model = HasConfigurationOverride("Model")
-                ? configuredOptions.Model
-                : runtimeProfile.Model,
-            BaseUrl = HasConfigurationOverride("BaseUrl")
-                ? configuredOptions.BaseUrl
-                : runtimeProfile.BaseUrl,
-            RequestTimeoutSeconds = HasConfigurationOverride("RequestTimeoutSeconds")
-                ? configuredOptions.RequestTimeoutSeconds
-                : runtimeProfile.RequestTimeoutSeconds,
-            UseBackgroundMode = HasConfigurationOverride("UseBackgroundMode")
-                ? configuredOptions.UseBackgroundMode
-                : runtimeProfile.UseBackgroundMode,
-            BackgroundPollingIntervalMilliseconds = HasConfigurationOverride("BackgroundPollingIntervalMilliseconds")
-                ? configuredOptions.BackgroundPollingIntervalMilliseconds
-                : runtimeProfile.BackgroundPollingIntervalMilliseconds,
-            BackgroundPollingTimeoutSeconds = HasConfigurationOverride("BackgroundPollingTimeoutSeconds")
-                ? configuredOptions.BackgroundPollingTimeoutSeconds
-                : runtimeProfile.BackgroundPollingTimeoutSeconds,
-            MaxConcurrentScoringRequests = HasConfigurationOverride("MaxConcurrentScoringRequests")
-                ? configuredOptions.MaxConcurrentScoringRequests
-                : runtimeProfile.MaxConcurrentScoringRequests
-        };
+        return Task.FromResult(
+            new OpenAiSecurityOptions
+            {
+                ApiKey = runtimeApiKey ?? string.Empty,
+                Model = HasConfigurationOverride("Model")
+                    ? configuredOptions.Model
+                    : runtimeProfile.Model,
+                BaseUrl = HasConfigurationOverride("BaseUrl")
+                    ? configuredOptions.BaseUrl
+                    : runtimeProfile.BaseUrl,
+                RequestTimeoutSeconds = HasConfigurationOverride("RequestTimeoutSeconds")
+                    ? configuredOptions.RequestTimeoutSeconds
+                    : runtimeProfile.RequestTimeoutSeconds,
+                UseBackgroundMode = HasConfigurationOverride("UseBackgroundMode")
+                    ? configuredOptions.UseBackgroundMode
+                    : runtimeProfile.UseBackgroundMode,
+                BackgroundPollingIntervalMilliseconds = HasConfigurationOverride("BackgroundPollingIntervalMilliseconds")
+                    ? configuredOptions.BackgroundPollingIntervalMilliseconds
+                    : runtimeProfile.BackgroundPollingIntervalMilliseconds,
+                BackgroundPollingTimeoutSeconds = HasConfigurationOverride("BackgroundPollingTimeoutSeconds")
+                    ? configuredOptions.BackgroundPollingTimeoutSeconds
+                    : runtimeProfile.BackgroundPollingTimeoutSeconds,
+                MaxConcurrentScoringRequests = HasConfigurationOverride("MaxConcurrentScoringRequests")
+                    ? configuredOptions.MaxConcurrentScoringRequests
+                    : runtimeProfile.MaxConcurrentScoringRequests
+            });
     }
 
     private bool HasConfigurationOverride(string keySuffix)

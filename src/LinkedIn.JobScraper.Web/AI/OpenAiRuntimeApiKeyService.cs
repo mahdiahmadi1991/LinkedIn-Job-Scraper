@@ -9,7 +9,7 @@ public sealed class OpenAiRuntimeApiKeyService : IOpenAiRuntimeApiKeyService, ID
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly string _secretsFilePath;
 
-    private bool _isLoaded;
+    private volatile bool _isLoaded;
     private string? _runtimeApiKey;
 
     public OpenAiRuntimeApiKeyService(IHostEnvironment hostEnvironment)

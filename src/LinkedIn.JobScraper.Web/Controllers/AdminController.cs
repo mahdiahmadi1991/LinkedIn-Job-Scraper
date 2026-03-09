@@ -178,6 +178,7 @@ public sealed class AdminController : Controller
     }
 
     [HttpPost("openai-connection-status")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> OpenAiConnectionStatusDraft(
         [Bind(Prefix = "OpenAiSetupForm")] AdminOpenAiSetupFormViewModel viewModel,
         CancellationToken cancellationToken)
@@ -234,10 +235,14 @@ public sealed class AdminController : Controller
         await Task.WhenAll(usersTask, runtimeSettingsTask, apiKeyTask);
 
         var runtimeSettings = runtimeSettingsTask.Result;
-        var effectiveSecurityOptions = await _openAiEffectiveSecurityOptionsResolver.ResolveAsync(cancellationToken);
+        var runtimeApiKey = apiKeyTask.Result;
+        var effectiveSecurityOptions = await _openAiEffectiveSecurityOptionsResolver.ResolveAsync(
+            runtimeSettings,
+            runtimeApiKey,
+            cancellationToken);
         var connectionState = AdminOpenAiSetupViewModelAdapter.CreateConnectionState(effectiveSecurityOptions);
         var openAiSetupForm = AdminOpenAiSetupViewModelAdapter.ToViewModel(runtimeSettings);
-        openAiSetupForm.ApiKey = apiKeyTask.Result ?? string.Empty;
+        openAiSetupForm.ApiKey = runtimeApiKey ?? string.Empty;
 
         var viewModel = new AdminUsersPageViewModel
         {

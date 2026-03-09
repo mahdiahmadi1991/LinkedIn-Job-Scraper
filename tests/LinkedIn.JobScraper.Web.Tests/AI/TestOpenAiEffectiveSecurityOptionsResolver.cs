@@ -19,4 +19,13 @@ public sealed class FixedOpenAiEffectiveSecurityOptionsResolver : IOpenAiEffecti
         ResolveCallCount++;
         return Task.FromResult(Options);
     }
+
+    public Task<OpenAiSecurityOptions> ResolveAsync(
+        OpenAiRuntimeSettingsProfile runtimeProfile,
+        string? runtimeApiKey,
+        CancellationToken cancellationToken)
+    {
+        ResolveCallCount++;
+        return Task.FromResult(Options);
+    }
 }
