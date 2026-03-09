@@ -2,7 +2,6 @@ using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Configuration;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.Tests.AI;
 
@@ -148,7 +147,7 @@ public sealed class OpenAiGlobalShortlistGatewayTests
     {
         return new OpenAiGlobalShortlistGateway(
             client,
-            Options.Create(
+            new FixedOpenAiEffectiveSecurityOptionsResolver(
                 options ?? new OpenAiSecurityOptions
                 {
                     ApiKey = "test-key",
@@ -206,6 +205,7 @@ public sealed class OpenAiGlobalShortlistGatewayTests
 
         public Task<OpenAiResponseSnapshot> CreateResponseAsync(
             OpenAiResponsesRequest request,
+            OpenAiSecurityOptions securityOptions,
             TimeSpan requestTimeout,
             CancellationToken cancellationToken)
         {
@@ -221,6 +221,7 @@ public sealed class OpenAiGlobalShortlistGatewayTests
 
         public Task<OpenAiResponseSnapshot> GetResponseAsync(
             string responseId,
+            OpenAiSecurityOptions securityOptions,
             TimeSpan requestTimeout,
             CancellationToken cancellationToken)
         {

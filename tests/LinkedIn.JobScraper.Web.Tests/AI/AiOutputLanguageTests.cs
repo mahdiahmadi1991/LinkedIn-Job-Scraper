@@ -5,8 +5,8 @@ namespace LinkedIn.JobScraper.Web.Tests.AI;
 public sealed class AiOutputLanguageTests
 {
     [Theory]
-    [InlineData("fa", "rtl", "فارسی", "fa", "Persian (Farsi)")]
-    [InlineData("FA", "rtl", "فارسی", "fa", "Persian (Farsi)")]
+    [InlineData("fa", "rtl", "Persian", "fa", "Persian (Farsi)")]
+    [InlineData("FA", "rtl", "Persian", "fa", "Persian (Farsi)")]
     [InlineData("en", "ltr", "English", "en", "English")]
     [InlineData(null, "ltr", "English", "en", "English")]
     [InlineData("unknown", "ltr", "English", "en", "English")]

@@ -140,7 +140,7 @@ The current implementation is meant to help the user triage jobs faster, not to 
 The AI behavior settings include an output language selector:
 
 - `English`
-- `فارسی`
+- `Persian`
 
 The UI respects the selected AI output language by setting the proper text direction (`ltr` or `rtl`) for AI-generated content.
 

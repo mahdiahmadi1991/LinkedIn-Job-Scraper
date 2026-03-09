@@ -88,9 +88,73 @@ public sealed class AdminUsersUiContractsTests
         Assert.Contains("aria-label=\"Administration tabs\"", viewContent, StringComparison.Ordinal);
         Assert.Contains("id=\"admin-tab-link-@tab.Key\"", viewContent, StringComparison.Ordinal);
         Assert.Contains("id=\"admin-tab-panel-users\"", viewContent, StringComparison.Ordinal);
+        Assert.Contains("id=\"admin-tab-panel-openai\"", viewContent, StringComparison.Ordinal);
         Assert.Contains("asp-controller=\"Admin\"", viewContent, StringComparison.Ordinal);
         Assert.Contains("asp-route-tab=\"@tab.Key\"", viewContent, StringComparison.Ordinal);
         Assert.Contains("aria-labelledby=\"admin-tab-link-users\"", viewContent, StringComparison.Ordinal);
+        Assert.Contains("aria-labelledby=\"admin-tab-link-openai\"", viewContent, StringComparison.Ordinal);
+        Assert.Contains("AdminController.OpenAiTab", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-setup", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-setup-form", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-save-button", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-api-key-input", viewContent, StringComparison.Ordinal);
+        Assert.Contains("<textarea", viewContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-admin-openai-api-key-toggle", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-model-select", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-model-description", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-connection-check", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-connection-url", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-connection-status-note", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-api-key-value", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-model-value", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-base-url-value", viewContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminUsersViewIncludesOpenAiSetupScript()
+    {
+        var viewContent = ReadRepositoryFile("src/LinkedIn.JobScraper.Web/Views/AdminUsers/Index.cshtml");
+
+        Assert.Contains("~/js/admin-openai-setup-page.js", viewContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminOpenAiSetupScriptContainsReadinessAndSaveWiring()
+    {
+        var scriptContent = ReadRepositoryFile("src/LinkedIn.JobScraper.Web/wwwroot/js/admin-openai-setup-page.js");
+
+        Assert.Contains("data-admin-openai-setup-form", scriptContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-save-button", scriptContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-admin-openai-api-key-toggle", scriptContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-model-select", scriptContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-model-description", scriptContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-connection-check", scriptContent, StringComparison.Ordinal);
+        Assert.Contains("data-admin-openai-connection-url", scriptContent, StringComparison.Ordinal);
+        Assert.Contains("method: \"POST\"", scriptContent, StringComparison.Ordinal);
+        Assert.Contains("new FormData(form)", scriptContent, StringComparison.Ordinal);
+        Assert.Contains("OpenAiSetupForm.ConcurrencyToken", scriptContent, StringComparison.Ordinal);
+        Assert.Contains("X-Requested-With", scriptContent, StringComparison.Ordinal);
+        Assert.Contains("window.appButtons?.setLoading", scriptContent, StringComparison.Ordinal);
+        Assert.Contains("window.appToast?.show", scriptContent, StringComparison.Ordinal);
+        Assert.Contains("bindModelDescription", scriptContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AiSettingsViewNoLongerContainsConnectionReadinessUi()
+    {
+        var viewContent = ReadRepositoryFile("src/LinkedIn.JobScraper.Web/Views/AiSettings/Index.cshtml");
+
+        Assert.DoesNotContain("data-ai-connection-check", viewContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-ai-connection-status-note", viewContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-ai-connection-api-key-value", viewContent, StringComparison.Ordinal);
+        Assert.Contains("Administration &gt; OpenAI Setup", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-ai-settings-guidance", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-ai-settings-sample-behavioral", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-ai-settings-sample-priority", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-ai-settings-sample-exclusion", viewContent, StringComparison.Ordinal);
+        Assert.Contains("Define the decision policy.", viewContent, StringComparison.Ordinal);
+        Assert.Contains("List positive indicators", viewContent, StringComparison.Ordinal);
+        Assert.Contains("List blockers and mismatch signals", viewContent, StringComparison.Ordinal);
     }
 
     [Fact]

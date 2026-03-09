@@ -44,3 +44,30 @@
 - CI/CD and automated tests are intentionally deferred until after MVP and tracked as technical debt.
 - Record important decisions, assumptions, risks, and ideas in the `docs/` folder as they emerge.
 - If new uncertainty appears around LinkedIn request behavior, pause and revalidate before implementation.
+- The project must stay warning-free; fix all compiler/analyzer warnings before handing work back.
+- Check NuGet packages regularly and keep dependencies up to date; apply required code synchronization after upgrades.
+
+## Post-Feature Delivery Workflow (Mandatory)
+
+After feature implementation is finished, follow this exact sequence:
+
+1. User Test Gate
+- Stop and let the user run manual validation.
+
+2. Conformance Gate (Codex-owned)
+- Verify implementation against the original approved deal/idea contract.
+- Explicitly confirm whether behavior, scope, and acceptance criteria match.
+
+3. Integration Sync Gate (Codex-owned)
+- Detect and fix drift across code/tests/docs/config.
+- Remove dead or duplicate code and align all supporting documentation.
+
+4. Feature Branch + Commit Gate
+- Create/use a feature branch.
+- Commit the finalized feature changes on that branch.
+
+5. Develop Merge Gate
+- Prepare and execute merge to `develop` via PR workflow.
+
+6. Main Merge Gate
+- After develop stabilization, prepare and execute merge to `main` via PR workflow.

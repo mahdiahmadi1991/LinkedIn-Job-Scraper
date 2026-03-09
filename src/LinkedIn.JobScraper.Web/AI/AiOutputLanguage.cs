@@ -15,7 +15,7 @@ public static class AiOutputLanguage
     public static string GetDisplayName(string? languageCode)
     {
         return string.Equals(languageCode, Persian, StringComparison.OrdinalIgnoreCase)
-            ? "فارسی"
+            ? "Persian"
             : "English";
     }
 

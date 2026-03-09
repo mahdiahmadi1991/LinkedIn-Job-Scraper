@@ -113,6 +113,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAiGlobalShortlistProgressNotifier, SignalRAiGlobalShortlistProgressNotifier>();
         services.AddTransient<ILinkedInSessionVerificationService, LinkedInSessionVerificationService>();
         services.AddTransient<IAiBehaviorSettingsService, AiBehaviorSettingsService>();
+        services.AddHttpClient<IOpenAiConnectionProbeService, OpenAiConnectionProbeService>(
+            (_, client) =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(10);
+            });
+        services.AddTransient<IOpenAiRuntimeSettingsService, OpenAiRuntimeSettingsService>();
+        services.AddSingleton<IOpenAiRuntimeApiKeyService, OpenAiRuntimeApiKeyService>();
+        services.AddTransient<IOpenAiEffectiveSecurityOptionsResolver, OpenAiEffectiveSecurityOptionsResolver>();
         services.AddTransient<ILinkedInLocationLookupService, LinkedInLocationLookupService>();
         services.AddTransient<ILinkedInJobDetailService, LinkedInJobDetailService>();
         services.AddTransient<ILinkedInJobSearchService, LinkedInJobSearchService>();

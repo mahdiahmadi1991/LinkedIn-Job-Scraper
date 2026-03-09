@@ -34,6 +34,8 @@ If there is tension between broad roadmap intent and step-by-step execution:
 - No direct credential-post login as the primary LinkedIn path
 - No aggressive scraping patterns
 - No business-logic changes without explicit approval
+- Build and test outputs are kept warning-free
+- Dependencies are periodically reviewed and updated with required code/runtime alignment
 
 ## Current Runtime Baseline
 
@@ -173,13 +175,25 @@ Completed items:
 - login password input received overlay eye control with press-hold reveal and release-to-hide behavior
 - login UI contract tests were added and targeted test run passed
 
+### Admin OpenAI Setup Tab And AI Settings Guidance Queue
+
+This queue was completed and is now closed for the current phase.
+
+Completed items:
+
+- added super-admin `OpenAI Setup` tab under `/admin` with runtime technical settings and readiness check
+- moved readiness UX from `AI Settings` to admin OpenAI setup and added field-level guidance for both setup and behavior pages
+- implemented runtime API-key local secret storage (non-DB) with immediate effect and no restart requirement
+- removed pipeline/runtime dependency on `OpenAI__Security__ApiKey` and aligned docs/tests to UI-managed key flow
+- full test suite passed after final integration (`270 passed, 0 failed`)
+
 ## Current Queue Status
 
 - **No active implementation queue is open right now**
 
 Latest completed queue:
 
-- `docs/archive/ideas/login-page-button-and-password-peek.md`
+- `docs/archive/ideas/admin-openai-setup-tab.md`
 
 Approved execution sequence:
 
@@ -235,6 +249,33 @@ The following rules are locked for every new approved idea:
 - After an idea is fully completed, move its file from `docs/ideas/` to `docs/archive/ideas/`.
 - After archiving, update `docs/plan.md` so the latest completed queue reference points to the archived path.
 - UI consistency is mandatory: new button/interaction patterns must align with existing project design contracts; introducing a new pattern requires harmonizing related surfaces.
+- Language policy is mandatory: use English-only text across code, UI labels, tests, and documentation; do not add Persian (or other non-English) words in repository content.
+
+## Post-Feature Delivery Workflow (Locked)
+
+After implementation completes, this sequence is mandatory for every feature:
+
+1. User Test Gate
+- User runs manual validation first.
+
+2. Conformance Gate (Codex)
+- Codex verifies implemented behavior against the original approved deal/idea contract.
+- Codex explicitly confirms match or documents deviations and fixes.
+
+3. Integration Sync Gate (Codex)
+- Codex performs repository-wide sync for that feature:
+  - code/test/doc/config consistency
+  - removal of dead or duplicate implementation
+  - correction of any drift discovered post-test
+
+4. Feature Branch + Commit Gate
+- Finalized changes are committed on a feature branch (never directly on `main`).
+
+5. Develop Merge Gate
+- Merge to `develop` is prepared and executed via PR workflow.
+
+6. Main Merge Gate
+- After develop stabilization, merge to `main` is prepared and executed via PR workflow.
 
 ## Historical Note
 
