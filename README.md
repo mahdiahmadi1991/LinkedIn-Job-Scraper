@@ -190,7 +190,6 @@ This repository now keeps tracked config files secret-free.
 Set secrets with `dotnet user-secrets`:
 
 - `dotnet user-secrets set "SqlServer:ConnectionString" "<your-sql-connection-string>" --project src/LinkedIn.JobScraper.Web`
-- `dotnet user-secrets set "OpenAI:Security:ApiKey" "<your-openai-api-key>" --project src/LinkedIn.JobScraper.Web`
 - `dotnet user-secrets set "OpenAI:Security:Model" "gpt-5-mini" --project src/LinkedIn.JobScraper.Web`
 
 Optional:
@@ -198,6 +197,9 @@ Optional:
 - `dotnet user-secrets set "OpenAI:Security:BaseUrl" "https://api.openai.com/v1" --project src/LinkedIn.JobScraper.Web`
 
 You can also use environment variables instead of user-secrets if preferred.
+
+OpenAI API key is no longer configured from `appsettings`/pipeline secrets for normal runtime usage.
+Set and validate the key from `Admin -> OpenAI Setup`, where it is stored in local runtime secrets and applied immediately.
 
 ### Run the app
 

@@ -184,7 +184,7 @@ Completed items:
 - added super-admin `OpenAI Setup` tab under `/admin` with runtime technical settings and readiness check
 - moved readiness UX from `AI Settings` to admin OpenAI setup and added field-level guidance for both setup and behavior pages
 - implemented runtime API-key local secret storage (non-DB) with immediate effect and no restart requirement
-- removed pipeline/runtime dependency on `OpenAI__Security__ApiKey` and aligned docs/tests to UI-managed key flow
+- removed pipeline/runtime dependency on static OpenAI API-key secrets and aligned docs/tests to UI-managed key flow
 - full test suite passed after final integration (`270 passed, 0 failed`)
 
 ## Current Queue Status
