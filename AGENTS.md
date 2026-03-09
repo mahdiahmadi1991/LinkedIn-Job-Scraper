@@ -10,7 +10,10 @@
 - After each approved implementation step, stop and wait for explicit user approval before continuing.
 - For every newly approved feature idea, create a dedicated `docs/ideas/<idea-name>.md` file before implementation starts.
 - The idea file must contain state-based execution steps, acceptance criteria, assumptions, and out-of-scope items; implementation must continuously reference that file to avoid drift.
-- Never create commits on `main` directly; all code changes must be committed on a non-`main` branch and merged via PR.
+- Never create commits on `main` directly.
+- Feature work must start on a non-`main` branch.
+- Integration from feature branches into `develop` does not require PR and must use squash integration.
+- Integration from `develop` into `main` must always use PR with a merge commit (no squash, no rebase).
 - Never watch GitHub pipelines by default. After triggering CI/CD, ask the user to check status unless the user explicitly asks for monitoring.
 
 ## Product Direction
@@ -66,8 +69,22 @@ After feature implementation is finished, follow this exact sequence:
 - Create/use a feature branch.
 - Commit the finalized feature changes on that branch.
 
-5. Develop Merge Gate
-- Prepare and execute merge to `develop` via PR workflow.
+5. Develop Integration Gate
+- Integrate the feature branch into `develop` without PR.
+- Use squash integration so each feature appears as one integration commit on `develop`.
+- Delete the feature branch after successful integration.
 
 6. Main Merge Gate
-- After develop stabilization, prepare and execute merge to `main` via PR workflow.
+- Merge `develop` into `main` only via PR.
+- PR merge strategy must be `Create a merge commit` (no squash, no rebase).
+
+7. Post-Main Sync Gate
+- Immediately sync `develop` with `main` after the `main` merge so no long-lived divergence remains.
+
+## Git Graph Policy (Mandatory)
+
+- Long-lived branches are only `develop` and `main`.
+- Temporary branches are allowed only for active feature work and must be deleted after integration.
+- Do not introduce release/integration branch chains unless explicitly approved by the user.
+- Keep history linear on `develop` by squash-integrating feature work.
+- Keep release history explicit on `main` using PR merge commits from `develop`.
