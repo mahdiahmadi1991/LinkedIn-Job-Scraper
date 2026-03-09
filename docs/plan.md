@@ -271,11 +271,25 @@ After implementation completes, this sequence is mandatory for every feature:
 4. Feature Branch + Commit Gate
 - Finalized changes are committed on a feature branch (never directly on `main`).
 
-5. Develop Merge Gate
-- Merge to `develop` is prepared and executed via PR workflow.
+5. Develop Integration Gate
+- Integrate feature branch work into `develop` without PR.
+- Use squash integration so each feature becomes one integration commit on `develop`.
+- Delete the feature branch after successful integration.
 
 6. Main Merge Gate
-- After develop stabilization, merge to `main` is prepared and executed via PR workflow.
+- Merge `develop` into `main` only via PR.
+- PR merge strategy must be `Create a merge commit` (no squash, no rebase).
+
+7. Post-Main Sync Gate
+- Immediately sync `develop` with `main` after `main` merge so long-lived divergence does not accumulate.
+
+## Git Graph Rules (Locked)
+
+- Only `develop` and `main` are long-lived branches.
+- Temporary branches are feature-only and must be removed after integration.
+- Release/integration branch chains are not used unless explicitly approved by the user.
+- `feature/* -> develop`: squash integration without PR.
+- `develop -> main`: PR required with merge commit.
 
 ## Historical Note
 
