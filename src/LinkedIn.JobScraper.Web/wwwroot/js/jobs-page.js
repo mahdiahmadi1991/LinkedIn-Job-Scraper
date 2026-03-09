@@ -27,7 +27,17 @@
     const showToast = window.appToast?.show ?? (() => {});
     const setButtonLoading = window.appButtons?.setLoading ?? (() => {});
     const busySpinner = form.querySelector("[data-busy-spinner]");
+    const sessionOnboardingModalElement = document.querySelector("[data-session-onboarding-modal]");
+    const sessionOnboardingConnectButton = sessionOnboardingModalElement?.querySelector("[data-session-onboarding-connect]");
+    const linkedInSessionModalElement = document.querySelector("[data-linked-in-session-modal]");
+    const fetchSessionGuardNote = form.querySelector("[data-fetch-session-guard-note]");
+    const fetchSessionGuardConnectButton = form.querySelector("[data-open-session-modal]");
+    const sessionOnboardingStateUrl = jobsPage?.dataset.sessionOnboardingStateUrl || "/LinkedInSession/State";
+    const sessionOnboardingVerifyUrl = jobsPage?.dataset.sessionOnboardingVerifyUrl || "/LinkedInSession/Verify";
+    const sessionOnboardingStorageKey = "jobs.sessionOnboarding.dismissed";
     const workflowStorageKey = "jobs.activeWorkflow";
+    const sessionStateRefreshIntervalMs = 30_000;
+    const sessionVerifyIntervalMs = 5 * 60_000;
     const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
     const maxProgressLogItems = 140;
     const workflowHeartbeatIntervalMs = 3500;
@@ -45,6 +55,11 @@
     let isPageUnloading = false;
     let isProgressLogCollapsed = false;
     let lastProgressEventAt = 0;
+    let openingSessionFromOnboarding = false;
+    let sessionStateRefreshTimer = null;
+    let sessionVerifyTimer = null;
+    let sessionVerificationInFlight = false;
+    let sessionGuardHasActiveSession = true;
 
     const isCancelledAlertMessage = (message) =>
         typeof message === "string" && /\bcancelled\b/i.test(message);
@@ -65,6 +80,186 @@
     const setProgressLogCollapsed = (collapsed) => {
         isProgressLogCollapsed = collapsed;
         syncProgressLogCollapseUi();
+    };
+
+    const setSessionOnboardingDismissed = (dismissed) => {
+        try {
+            if (dismissed) {
+                window.sessionStorage.setItem(sessionOnboardingStorageKey, "1");
+                return;
+            }
+
+            window.sessionStorage.removeItem(sessionOnboardingStorageKey);
+        } catch {
+        }
+    };
+
+    const isSessionOnboardingDismissed = () => {
+        try {
+            return window.sessionStorage.getItem(sessionOnboardingStorageKey) === "1";
+        } catch {
+            return false;
+        }
+    };
+
+    const openSessionModal = () => {
+        if (!(linkedInSessionModalElement instanceof HTMLElement) || typeof bootstrap === "undefined") {
+            return false;
+        }
+
+        bootstrap.Modal.getOrCreateInstance(linkedInSessionModalElement).show();
+        return true;
+    };
+
+    const hasUsableSessionState = (state) => {
+        return Boolean(state?.storedSessionAvailable);
+    };
+
+    const applyFetchSessionGuard = (state, options = {}) => {
+        const hasSession = hasUsableSessionState(state);
+        const showTransitionToast = Boolean(options.showTransitionToast);
+        const includeRetryHint = Boolean(options.includeRetryHint);
+
+        if (button) {
+            if (!isSubmitting && !activeWorkflowId) {
+                button.disabled = !hasSession;
+            }
+
+            if (!hasSession) {
+                button.setAttribute("aria-disabled", "true");
+            } else {
+                button.removeAttribute("aria-disabled");
+            }
+        }
+
+        if (fetchSessionGuardNote instanceof HTMLElement) {
+            fetchSessionGuardNote.classList.toggle("d-none", hasSession);
+        }
+
+        if (showTransitionToast && sessionGuardHasActiveSession && !hasSession) {
+            const message = includeRetryHint
+                ? "Stored LinkedIn session is no longer valid. Connect a fresh session before running Fetch Jobs."
+                : "LinkedIn session is missing. Connect a session before running Fetch Jobs.";
+            showToast(message, false);
+        }
+
+        if (hasSession) {
+            setSessionOnboardingDismissed(false);
+        }
+
+        sessionGuardHasActiveSession = hasSession;
+    };
+
+    const fetchSessionState = async () => {
+        const response = await fetch(sessionOnboardingStateUrl, {
+            headers: {
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            credentials: "same-origin"
+        });
+
+        if (!response.ok) {
+            throw new Error("Could not read current LinkedIn session state.");
+        }
+
+        const payload = await response.json();
+        return payload?.state ?? null;
+    };
+
+    const verifySessionState = async () => {
+        if (!antiForgeryToken) {
+            return null;
+        }
+
+        const requestBody = new URLSearchParams({
+            "__RequestVerificationToken": antiForgeryToken
+        });
+
+        const response = await fetch(sessionOnboardingVerifyUrl, {
+            method: "POST",
+            headers: {
+                "X-Requested-With": "XMLHttpRequest",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+            },
+            body: requestBody,
+            credentials: "same-origin"
+        });
+
+        const contentType = response.headers.get("Content-Type") || "";
+        const canReadJson = contentType.includes("application/json") || contentType.includes("application/problem+json");
+        const payload = canReadJson ? await response.json() : null;
+
+        if (response.ok) {
+            return payload?.state ?? null;
+        }
+
+        const refreshedState = await fetchSessionState();
+        return refreshedState;
+    };
+
+    const maybeShowSessionOnboarding = async () => {
+        if (!(sessionOnboardingModalElement instanceof HTMLElement)) {
+            return;
+        }
+
+        if (isSessionOnboardingDismissed()) {
+            return;
+        }
+
+        let state;
+
+        try {
+            state = await fetchSessionState();
+        } catch {
+            return;
+        }
+
+        if (state?.storedSessionAvailable) {
+            setSessionOnboardingDismissed(false);
+            return;
+        }
+
+        if (state?.autoCaptureActive) {
+            return;
+        }
+
+        if (typeof bootstrap === "undefined") {
+            return;
+        }
+
+        bootstrap.Modal.getOrCreateInstance(sessionOnboardingModalElement).show();
+    };
+
+    const refreshSessionStateGuard = async (showTransitionToast = false) => {
+        let state;
+
+        try {
+            state = await fetchSessionState();
+        } catch {
+            return null;
+        }
+
+        applyFetchSessionGuard(state, { showTransitionToast });
+        return state;
+    };
+
+    const runPeriodicSessionVerification = async () => {
+        if (sessionVerificationInFlight || activeWorkflowId || isSubmitting || !sessionGuardHasActiveSession) {
+            return;
+        }
+
+        sessionVerificationInFlight = true;
+
+        try {
+            const state = await verifySessionState();
+            applyFetchSessionGuard(state, {
+                showTransitionToast: true,
+                includeRetryHint: true
+            });
+        } catch {
+        } finally {
+            sessionVerificationInFlight = false;
+        }
     };
 
     const setBusyState = () => {
@@ -100,7 +295,7 @@
 
     const setIdleState = () => {
         if (button) {
-            button.disabled = false;
+            button.disabled = !sessionGuardHasActiveSession;
         }
 
         if (busySpinner) {
@@ -456,6 +651,11 @@
                 credentials: "same-origin"
             });
 
+            if (response.status === 404) {
+                resetWorkflowUi({ hidePanel: true });
+                return;
+            }
+
             if (!response.ok) {
                 throw new Error("Could not read workflow progress.");
             }
@@ -524,6 +724,35 @@
         void pollWorkflowProgress();
     };
 
+    if (sessionOnboardingModalElement instanceof HTMLElement) {
+        sessionOnboardingModalElement.addEventListener("hidden.bs.modal", () => {
+            if (!openingSessionFromOnboarding) {
+                setSessionOnboardingDismissed(true);
+            }
+
+            openingSessionFromOnboarding = false;
+        });
+    }
+
+    if (sessionOnboardingConnectButton instanceof HTMLButtonElement &&
+        sessionOnboardingModalElement instanceof HTMLElement) {
+        sessionOnboardingConnectButton.addEventListener("click", () => {
+            setSessionOnboardingDismissed(true);
+
+            if (typeof bootstrap === "undefined") {
+                return;
+            }
+
+            openingSessionFromOnboarding = true;
+            bootstrap.Modal.getOrCreateInstance(sessionOnboardingModalElement).hide();
+            openSessionModal();
+        });
+    }
+
+    fetchSessionGuardConnectButton?.addEventListener("click", () => {
+        openSessionModal();
+    });
+
     progressLogToggle?.addEventListener("click", () => {
         setProgressLogCollapsed(!isProgressLogCollapsed);
     });
@@ -547,6 +776,18 @@
         }
 
         event.preventDefault();
+
+        const latestSessionState = await refreshSessionStateGuard(false);
+        const canProceedWithFetch = latestSessionState
+            ? hasUsableSessionState(latestSessionState)
+            : sessionGuardHasActiveSession;
+
+        if (!canProceedWithFetch) {
+            showToast("Connect a valid LinkedIn session before running Fetch Jobs.", false);
+            void maybeShowSessionOnboarding();
+            return;
+        }
+
         isSubmitting = true;
 
         let connection = null;
@@ -712,6 +953,53 @@
             message: "Restoring fetch workflow status after page refresh..."
         });
     }
+
+    window.addEventListener("linkedinsession:state", (event) => {
+        const state = event?.detail;
+        applyFetchSessionGuard(state, {
+            showTransitionToast: true,
+            includeRetryHint: true
+        });
+    });
+
+    const startSessionMonitoring = () => {
+        if (sessionStateRefreshTimer) {
+            window.clearInterval(sessionStateRefreshTimer);
+        }
+
+        if (sessionVerifyTimer) {
+            window.clearInterval(sessionVerifyTimer);
+        }
+
+        void refreshSessionStateGuard(false);
+
+        sessionStateRefreshTimer = window.setInterval(() => {
+            void refreshSessionStateGuard(true);
+        }, sessionStateRefreshIntervalMs);
+
+        sessionVerifyTimer = window.setInterval(() => {
+            void runPeriodicSessionVerification();
+        }, sessionVerifyIntervalMs);
+    };
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState !== "visible") {
+            return;
+        }
+
+        void refreshSessionStateGuard(true);
+        void runPeriodicSessionVerification();
+    });
+
+    window.addEventListener("focus", () => {
+        void refreshSessionStateGuard(true);
+    });
+
+    startSessionMonitoring();
+
+    window.setTimeout(() => {
+        void maybeShowSessionOnboarding();
+    }, 500);
 
     jobsPage?.addEventListener("submit", (event) => {
         const formElement = event.target;

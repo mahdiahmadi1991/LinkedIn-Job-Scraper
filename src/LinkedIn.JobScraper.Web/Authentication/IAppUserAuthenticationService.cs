@@ -13,7 +13,8 @@ public interface IAppUserAuthenticationService
 public sealed record AppUserIdentity(
     int Id,
     string UserName,
-    string DisplayName);
+    string DisplayName,
+    bool IsSuperAdmin);
 
 public sealed record AppUserAuthenticationResult(
     bool Success,

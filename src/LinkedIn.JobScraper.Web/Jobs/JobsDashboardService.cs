@@ -1,4 +1,5 @@
 using LinkedIn.JobScraper.Web.AI;
+using LinkedIn.JobScraper.Web.Authentication;
 using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Persistence;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
@@ -41,6 +42,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
             new EventId(2006, nameof(LogWorkflowRejectedBecauseAnotherIsActive)),
             "Fetch workflow rejected because another workflow is active. RequestedWorkflowId={RequestedWorkflowId}, ActiveWorkflowId={ActiveWorkflowId}");
 
+    private readonly ICurrentAppUserContext _currentAppUserContext;
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly IJobEnrichmentService _jobEnrichmentService;
     private readonly IJobImportService _jobImportService;
@@ -51,6 +53,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
     private readonly ILogger<JobsDashboardService> _logger;
 
     public JobsDashboardService(
+        ICurrentAppUserContext currentAppUserContext,
         IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
         IJobImportService jobImportService,
         IJobEnrichmentService jobEnrichmentService,
@@ -60,6 +63,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
         IOptions<JobsWorkflowOptions> jobsWorkflowOptions,
         ILogger<JobsDashboardService> logger)
     {
+        _currentAppUserContext = currentAppUserContext;
         _dbContextFactory = dbContextFactory;
         _jobImportService = jobImportService;
         _jobEnrichmentService = jobEnrichmentService;
@@ -74,14 +78,17 @@ public sealed class JobsDashboardService : IJobsDashboardService
         JobsDashboardQuery query,
         CancellationToken cancellationToken)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         query ??= new JobsDashboardQuery();
 
-        var filteredQuery = ApplyFilters(dbContext.Jobs.AsNoTracking(), query);
+        var filteredQuery = ApplyFilters(
+            dbContext.Jobs.AsNoTracking().Where(job => job.AppUserId == userId),
+            query);
 
         var filteredJobs = await filteredQuery.CountAsync(cancellationToken);
-        var aiOutputLanguageCode = await GetAiOutputLanguageCodeAsync(dbContext, cancellationToken);
+        var aiOutputLanguageCode = await GetAiOutputLanguageCodeAsync(dbContext, userId, cancellationToken);
         var rowsChunk = await GetRowsChunkAsync(
             ApplySorting(filteredQuery, query),
             query,
@@ -90,6 +97,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
             cancellationToken);
 
         var dashboardCounts = await dbContext.Jobs
+            .Where(job => job.AppUserId == userId)
             .GroupBy(static _ => 1)
             .Select(
                 static jobs => new
@@ -118,18 +126,19 @@ public sealed class JobsDashboardService : IJobsDashboardService
         Guid jobId,
         CancellationToken cancellationToken)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var job = await dbContext.Jobs
             .AsNoTracking()
-            .SingleOrDefaultAsync(job => job.Id == jobId, cancellationToken);
+            .SingleOrDefaultAsync(job => job.Id == jobId && job.AppUserId == userId, cancellationToken);
 
         if (job is null)
         {
             return null;
         }
 
-        var aiOutputLanguageCode = await GetAiOutputLanguageCodeAsync(dbContext, cancellationToken);
+        var aiOutputLanguageCode = await GetAiOutputLanguageCodeAsync(dbContext, userId, cancellationToken);
 
         return new JobDetailsSnapshot(
             job.Id,
@@ -158,14 +167,17 @@ public sealed class JobsDashboardService : IJobsDashboardService
         int offset,
         CancellationToken cancellationToken)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         query ??= new JobsDashboardQuery();
         offset = Math.Max(0, offset);
 
-        var filteredQuery = ApplyFilters(dbContext.Jobs.AsNoTracking(), query);
+        var filteredQuery = ApplyFilters(
+            dbContext.Jobs.AsNoTracking().Where(job => job.AppUserId == userId),
+            query);
         var sortedQuery = ApplySorting(filteredQuery, query);
-        var aiOutputLanguageCode = await GetAiOutputLanguageCodeAsync(dbContext, cancellationToken);
+        var aiOutputLanguageCode = await GetAiOutputLanguageCodeAsync(dbContext, userId, cancellationToken);
 
         return await GetRowsChunkAsync(
             sortedQuery,
@@ -181,7 +193,8 @@ public sealed class JobsDashboardService : IJobsDashboardService
         string? correlationId,
         CancellationToken cancellationToken)
     {
-        var workflowRegistration = _jobsWorkflowStateStore.RegisterWorkflow(workflowId, cancellationToken);
+        var userId = _currentAppUserContext.GetRequiredUserId();
+        var workflowRegistration = _jobsWorkflowStateStore.RegisterWorkflow(userId, workflowId, cancellationToken);
         if (!workflowRegistration.Accepted)
         {
             LogWorkflowRejectedBecauseAnotherIsActive(_logger, workflowId, workflowRegistration.ActiveWorkflowId, null);
@@ -211,6 +224,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
         JobBatchScoringResult? scoringResult = null;
 
         await PublishProgressAsync(
+            userId,
             progressConnectionId,
             new JobsWorkflowProgressUpdate(
                 workflowId,
@@ -224,6 +238,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
         try
         {
             await PublishProgressAsync(
+                userId,
                 progressConnectionId,
                 new JobsWorkflowProgressUpdate(
                     workflowId,
@@ -235,6 +250,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 CancellationToken.None);
 
             var importProgressCallback = CreateStageProgressCallback(
+                userId,
                 progressConnectionId,
                 workflowId,
                 effectiveCorrelationId,
@@ -251,6 +267,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 LogWorkflowFailed(_logger, effectiveCorrelationId, importResult.Message, null);
 
                 await PublishProgressAsync(
+                    userId,
                     progressConnectionId,
                     new JobsWorkflowProgressUpdate(
                         workflowId,
@@ -284,6 +301,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 null);
 
             await PublishProgressAsync(
+                userId,
                 progressConnectionId,
                 new JobsWorkflowProgressUpdate(
                     workflowId,
@@ -298,10 +316,10 @@ public sealed class JobsDashboardService : IJobsDashboardService
                     0),
                 CancellationToken.None);
 
-            var totalIncompleteJobs = await CountIncompleteJobsAsync(workflowCancellationToken);
+            var totalIncompleteJobs = await CountIncompleteJobsAsync(userId, workflowCancellationToken);
             var staleResyncRunCap = _jobsWorkflowOptions.GetStaleDetailRefreshRunCap();
             var totalStaleResyncCandidates = staleResyncRunCap > 0
-                ? await CountStaleDetailJobsAsync(workflowCancellationToken)
+                ? await CountStaleDetailJobsAsync(userId, workflowCancellationToken)
                 : 0;
             var totalEnrichmentCandidates = totalIncompleteJobs + Math.Min(totalStaleResyncCandidates, staleResyncRunCap);
             var configuredEnrichmentBatchSize = _jobsWorkflowOptions.GetEnrichmentBatchSize();
@@ -327,6 +345,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                     Math.Max(totalEnrichmentCandidates, 1));
 
                 await PublishProgressAsync(
+                    userId,
                     progressConnectionId,
                     new JobsWorkflowProgressUpdate(
                         workflowId,
@@ -342,6 +361,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                     CancellationToken.None);
 
                 await PublishProgressAsync(
+                    userId,
                     progressConnectionId,
                     new JobsWorkflowProgressUpdate(
                         workflowId,
@@ -353,6 +373,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                     CancellationToken.None);
 
                 var enrichmentProgressCallback = CreateAccumulatingStageProgressCallback(
+                    userId,
                     progressConnectionId,
                     workflowId,
                     effectiveCorrelationId,
@@ -421,6 +442,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 null);
 
             await PublishProgressAsync(
+                userId,
                 progressConnectionId,
                 new JobsWorkflowProgressUpdate(
                     workflowId,
@@ -464,6 +486,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 scoringResult);
 
             await PublishProgressAsync(
+                userId,
                 progressConnectionId,
                 new JobsWorkflowProgressUpdate(
                     workflowId,
@@ -494,6 +517,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
                 scoringResult);
 
             await PublishProgressAsync(
+                userId,
                 progressConnectionId,
                 new JobsWorkflowProgressUpdate(
                     workflowId,
@@ -513,7 +537,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
         }
         finally
         {
-            _jobsWorkflowStateStore.ReleaseWorkflow(workflowId);
+            _jobsWorkflowStateStore.ReleaseWorkflow(userId, workflowId);
         }
     }
 
@@ -521,6 +545,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
         Guid jobId,
         CancellationToken cancellationToken)
     {
+        _ = _currentAppUserContext.GetRequiredUserId();
         var scoringResult = await _jobBatchScoringService.ScoreJobAsync(jobId, cancellationToken);
 
         if (!scoringResult.Success || scoringResult.Snapshot is null)
@@ -548,15 +573,20 @@ public sealed class JobsDashboardService : IJobsDashboardService
         JobWorkflowState status,
         CancellationToken cancellationToken)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var job = await dbContext.Jobs.SingleOrDefaultAsync(
-            job => job.Id == jobId,
+            job => job.Id == jobId && job.AppUserId == userId,
             cancellationToken);
 
         if (job is null)
         {
-            return new JobStatusChangeResult(false, "Job was not found.", "danger");
+            return new JobStatusChangeResult(
+                false,
+                "Job was not found.",
+                "danger",
+                StatusCodes.Status404NotFound);
         }
 
         var entityStatus = ToEntityStatus(status);
@@ -580,24 +610,28 @@ public sealed class JobsDashboardService : IJobsDashboardService
             return new JobStatusChangeResult(
                 false,
                 "Job status was updated by another operation. Refresh the dashboard and try again.",
-                "danger");
+                "danger",
+                StatusCodes.Status409Conflict);
         }
 
         return new JobStatusChangeResult(
             true,
             $"Status for '{job.Title}' was updated to {status}.",
-            "success");
+            "success",
+            StatusCodes.Status200OK);
     }
 
     private Task PublishProgressAsync(
+        int userId,
         string? progressConnectionId,
         JobsWorkflowProgressUpdate update,
         CancellationToken cancellationToken)
     {
-        return _jobsWorkflowProgressNotifier.PublishAsync(progressConnectionId, update, cancellationToken);
+        return _jobsWorkflowProgressNotifier.PublishAsync(userId, progressConnectionId, update, cancellationToken);
     }
 
     private JobStageProgressCallback CreateStageProgressCallback(
+        int userId,
         string? progressConnectionId,
         string workflowId,
         string correlationId,
@@ -607,6 +641,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
     {
         return (progress, _) =>
             PublishProgressAsync(
+                userId,
                 progressConnectionId,
                 new JobsWorkflowProgressUpdate(
                     workflowId,
@@ -623,6 +658,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
     }
 
     private JobStageProgressCallback CreateAccumulatingStageProgressCallback(
+        int userId,
         string? progressConnectionId,
         string workflowId,
         string correlationId,
@@ -645,6 +681,7 @@ public sealed class JobsDashboardService : IJobsDashboardService
             var enrichedMessage = $"Enrichment {totalProcessedCount}/{totalRequestedCount}. {baseMessage}";
 
             return PublishProgressAsync(
+                userId,
                 progressConnectionId,
                 new JobsWorkflowProgressUpdate(
                     workflowId,
@@ -788,10 +825,12 @@ public sealed class JobsDashboardService : IJobsDashboardService
 
     private static async Task<string> GetAiOutputLanguageCodeAsync(
         LinkedInJobScraperDbContext dbContext,
+        int userId,
         CancellationToken cancellationToken)
     {
         var outputLanguageCode = await dbContext.AiBehaviorSettings
             .AsNoTracking()
+            .Where(settings => settings.AppUserId == userId)
             .OrderByDescending(settings => settings.UpdatedAtUtc)
             .ThenByDescending(settings => settings.Id)
             .Select(settings => settings.OutputLanguageCode)
@@ -800,25 +839,27 @@ public sealed class JobsDashboardService : IJobsDashboardService
         return AiOutputLanguage.Normalize(outputLanguageCode);
     }
 
-    private async Task<int> CountIncompleteJobsAsync(CancellationToken cancellationToken)
+    private async Task<int> CountIncompleteJobsAsync(int userId, CancellationToken cancellationToken)
     {
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         return await dbContext.Jobs.CountAsync(
             job =>
-                string.IsNullOrWhiteSpace(job.Description) ||
-                string.IsNullOrWhiteSpace(job.CompanyApplyUrl) ||
-                string.IsNullOrWhiteSpace(job.EmploymentStatus),
+                job.AppUserId == userId &&
+                (string.IsNullOrWhiteSpace(job.Description) ||
+                 string.IsNullOrWhiteSpace(job.CompanyApplyUrl) ||
+                 string.IsNullOrWhiteSpace(job.EmploymentStatus)),
             cancellationToken);
     }
 
-    private async Task<int> CountStaleDetailJobsAsync(CancellationToken cancellationToken)
+    private async Task<int> CountStaleDetailJobsAsync(int userId, CancellationToken cancellationToken)
     {
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
         var staleThresholdUtc = DateTimeOffset.UtcNow - _jobsWorkflowOptions.GetDetailResyncAfter();
 
         return await dbContext.Jobs.CountAsync(
             job =>
+                job.AppUserId == userId &&
                 !string.IsNullOrWhiteSpace(job.Description) &&
                 !string.IsNullOrWhiteSpace(job.CompanyApplyUrl) &&
                 !string.IsNullOrWhiteSpace(job.EmploymentStatus) &&

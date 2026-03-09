@@ -103,7 +103,6 @@ public sealed class SearchSettingsController : Controller
         {
             savedSettings = await _linkedInSearchSettingsService.SaveAsync(
                 new LinkedInSearchSettings(
-                    viewModel.ProfileName,
                     viewModel.Keywords,
                     viewModel.LocationInput,
                     viewModel.LocationDisplayName,
@@ -130,8 +129,7 @@ public sealed class SearchSettingsController : Controller
             return View("Index", viewModel);
         }
 
-        TempData["SearchSettingsStatusMessage"] =
-            $"Saved LinkedIn fetch settings for '{savedSettings.ProfileName}'.";
+        TempData["SearchSettingsStatusMessage"] = "Saved LinkedIn fetch settings.";
         TempData["SearchSettingsStatusSucceeded"] = bool.TrueString;
 
         if (IsAjaxRequest())

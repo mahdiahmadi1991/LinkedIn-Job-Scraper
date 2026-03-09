@@ -11,6 +11,28 @@ namespace LinkedIn.JobScraper.Web.Tests.LinkedIn;
 public sealed class LinkedInJobDetailServiceTests
 {
     [Fact]
+    public async Task FetchAsyncReturnsSessionGuidanceWhenNoStoredSessionExists()
+    {
+        var apiClient = new FakeLinkedInApiClient(
+            new LinkedInApiResponse(200, true, "{}"));
+        var sessionStore = new FakeLinkedInSessionStore(null);
+        var service = new LinkedInJobDetailService(
+            apiClient,
+            sessionStore,
+            new FakeLinkedInSearchSettingsService(),
+            Options.Create(new LinkedInRequestOptions()),
+            NullLogger<LinkedInJobDetailService>.Instance);
+
+        var result = await service.FetchAsync("4379963196", CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(502, result.StatusCode);
+        Assert.Contains("No active LinkedIn session is available", result.Message, StringComparison.Ordinal);
+        Assert.Contains("Connect Session", result.Message, StringComparison.Ordinal);
+        Assert.Null(result.Job);
+    }
+
+    [Fact]
     public async Task FetchAsyncReturnsFailureWhenSessionExpires()
     {
         var apiClient = new FakeLinkedInApiClient(
@@ -206,7 +228,6 @@ public sealed class LinkedInJobDetailServiceTests
         {
             return Task.FromResult(
                 new LinkedInSearchSettings(
-                    "Default",
                     "C# .Net",
                     "Limassol, Cyprus",
                     "Limassol, Cyprus",

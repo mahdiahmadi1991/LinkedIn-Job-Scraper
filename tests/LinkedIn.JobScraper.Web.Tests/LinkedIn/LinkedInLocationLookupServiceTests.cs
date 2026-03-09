@@ -11,6 +11,25 @@ namespace LinkedIn.JobScraper.Web.Tests.LinkedIn;
 public sealed class LinkedInLocationLookupServiceTests
 {
     [Fact]
+    public async Task SearchAsyncReturnsSessionGuidanceWhenNoStoredSessionExists()
+    {
+        var apiClient = new FakeLinkedInApiClient(new LinkedInApiResponse(200, true, "{}"));
+        var service = new LinkedInLocationLookupService(
+            apiClient,
+            new FakeLinkedInSessionStore(null),
+            CreateRequestOptions(),
+            NullLogger<LinkedInLocationLookupService>.Instance);
+
+        var result = await service.SearchAsync("Limassol", CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(StatusCodes.Status400BadRequest, result.StatusCode);
+        Assert.Contains("stored LinkedIn session is required", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Connect Session", result.Message, StringComparison.Ordinal);
+        Assert.Null(apiClient.LastRequestUri);
+    }
+
+    [Fact]
     public async Task SearchAsyncUsesGeoTypeaheadRequestShapeAndReturnsSuggestions()
     {
         const string responseBody =

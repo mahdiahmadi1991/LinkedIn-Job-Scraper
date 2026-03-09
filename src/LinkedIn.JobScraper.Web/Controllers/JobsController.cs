@@ -12,15 +12,18 @@ namespace LinkedIn.JobScraper.Web.Controllers;
 [Authorize(AuthenticationSchemes = AppAuthenticationDefaults.CookieScheme)]
 public class JobsController : Controller
 {
+    private readonly ICurrentAppUserContext _currentAppUserContext;
     private readonly IJobsDashboardService _jobsDashboardService;
     private readonly IJobsWorkflowExecutor _jobsWorkflowExecutor;
     private readonly IJobsWorkflowStateStore _jobsWorkflowStateStore;
 
     public JobsController(
+        ICurrentAppUserContext currentAppUserContext,
         IJobsDashboardService jobsDashboardService,
         IJobsWorkflowExecutor jobsWorkflowExecutor,
         IJobsWorkflowStateStore jobsWorkflowStateStore)
     {
+        _currentAppUserContext = currentAppUserContext;
         _jobsDashboardService = jobsDashboardService;
         _jobsWorkflowExecutor = jobsWorkflowExecutor;
         _jobsWorkflowStateStore = jobsWorkflowStateStore;
@@ -122,6 +125,8 @@ public class JobsController : Controller
         [FromQuery] string workflowId,
         [FromQuery] long afterSequence = 0)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
+
         if (string.IsNullOrWhiteSpace(workflowId))
         {
             return Problem(
@@ -130,7 +135,13 @@ public class JobsController : Controller
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
-        return Json(_jobsWorkflowStateStore.GetBatch(workflowId.Trim(), afterSequence));
+        var batch = _jobsWorkflowStateStore.GetBatch(userId, workflowId.Trim(), afterSequence);
+        if (!batch.WorkflowFound)
+        {
+            return NotFound();
+        }
+
+        return Json(batch);
     }
 
     [HttpPost]
@@ -138,6 +149,8 @@ public class JobsController : Controller
     [EnableRateLimiting(SecurityRateLimitPolicies.SensitiveLocalActions)]
     public IActionResult CancelWorkflow([FromForm] string workflowId)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
+
         if (string.IsNullOrWhiteSpace(workflowId))
         {
             return Problem(
@@ -146,7 +159,7 @@ public class JobsController : Controller
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
-        if (!_jobsWorkflowStateStore.RequestCancellation(workflowId.Trim()))
+        if (!_jobsWorkflowStateStore.RequestCancellation(userId, workflowId.Trim()))
         {
             return Problem(
                 title: "Workflow not found",
@@ -197,6 +210,11 @@ public class JobsController : Controller
         CancellationToken cancellationToken)
     {
         var result = await _jobsDashboardService.UpdateStatusAsync(jobId, status, cancellationToken);
+        if (!result.Success && result.StatusCode == StatusCodes.Status404NotFound)
+        {
+            return NotFound();
+        }
+
         TempData["JobsAlertMessage"] = result.Message;
         TempData["JobsAlertSeverity"] = result.Severity;
 

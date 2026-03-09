@@ -117,34 +117,7 @@ jobs:
           ssh -i ~/.ssh/id_ed25519 -p '${{ secrets.DEPLOY_SSH_PORT }}' '${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}' \
             "cat > '${{ secrets.DEPLOY_APP_DIR }}/.env.runtime'" <<'EOF'
           SqlServer__ConnectionString=${{ secrets.SQLSERVER__CONNECTIONSTRING }}
-          OpenAI__Security__ApiKey=${{ secrets.OPENAI__SECURITY__APIKEY }}
-          OpenAI__Security__Model=${{ secrets.OPENAI__SECURITY__MODEL }}
-          OpenAI__Security__BaseUrl=${{ secrets.OPENAI__SECURITY__BASEURL }}
           EOF
-          if [ -n '${{ secrets.APPAUTHENTICATION__SEEDUSERS__JSON }}' ]; then
-            seed_env_file="$(mktemp)"
-            cat > "$seed_env_file" <<'EOF'
-          ${{ secrets.APPAUTHENTICATION__SEEDUSERS__JSON }}
-          EOF
-            jq -r '
-              to_entries[]
-              | .key as $index
-              | .value
-              | [
-                  "AppAuthentication__SeedUsers__\($index)__DisplayName=\(.DisplayName)",
-                  "AppAuthentication__SeedUsers__\($index)__UserName=\(.UserName)",
-                  "AppAuthentication__SeedUsers__\($index)__Password=\(.Password)"
-                ]
-              | .[]
-            ' "$seed_env_file" > "${seed_env_file}.env"
-            scp -i ~/.ssh/id_ed25519 -P '${{ secrets.DEPLOY_SSH_PORT }}' \
-              "${seed_env_file}.env" \
-              '${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_APP_DIR }}/seed-users.env'
-            ssh -i ~/.ssh/id_ed25519 -p '${{ secrets.DEPLOY_SSH_PORT }}' '${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}' \
-              "cat '${{ secrets.DEPLOY_APP_DIR }}/seed-users.env' >> '${{ secrets.DEPLOY_APP_DIR }}/.env.runtime' && \
-               rm -f '${{ secrets.DEPLOY_APP_DIR }}/seed-users.env'"
-            rm -f "$seed_env_file" "${seed_env_file}.env"
-          fi
 
       - name: Run Remote Deploy
         shell: bash

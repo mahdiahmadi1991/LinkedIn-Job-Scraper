@@ -10,7 +10,7 @@
     <section class="page-hero">
         <div class="section-label mb-2">Scoring Behavior</div>
         <h1 class="hero-title h2">AI Settings</h1>
-        <p class="hero-lead">Adjust the behavioral profile used when scoring LinkedIn jobs. API keys stay in configuration, but scoring preferences live here.</p>
+        <p class="hero-lead">Adjust the behavior settings used when scoring LinkedIn jobs. API keys stay in configuration, but scoring preferences live here.</p>
     </section>
 
     <section class="row g-4">
@@ -21,30 +21,37 @@
                         @Html.AntiForgeryToken()
                         <input asp-for="ConcurrencyToken" type="hidden" />
                         <div>
-                            <label asp-for="ProfileName" class="form-label"></label>
-                            <input asp-for="ProfileName" class="form-control" />
-                            <span asp-validation-for="ProfileName" class="text-danger small"></span>
-                        </div>
-                        <div>
                             <label asp-for="BehavioralInstructions" class="form-label"></label>
+                            <div class="small text-muted mb-2">
+                                Define the decision policy. Explain how the model should evaluate fit quality and trade-offs.
+                            </div>
                             <textarea asp-for="BehavioralInstructions" class="form-control" rows="6"></textarea>
                             <span asp-validation-for="BehavioralInstructions" class="text-danger small"></span>
                         </div>
                         <div>
                             <label asp-for="PrioritySignals" class="form-label"></label>
+                            <div class="small text-muted mb-2">
+                                List positive indicators that should increase score confidence.
+                            </div>
                             <textarea asp-for="PrioritySignals" class="form-control" rows="5"></textarea>
                             <span asp-validation-for="PrioritySignals" class="text-danger small"></span>
                         </div>
                         <div>
                             <label asp-for="ExclusionSignals" class="form-label"></label>
+                            <div class="small text-muted mb-2">
+                                List blockers and mismatch signals that should reduce score or push to skip.
+                            </div>
                             <textarea asp-for="ExclusionSignals" class="form-control" rows="5"></textarea>
                             <span asp-validation-for="ExclusionSignals" class="text-danger small"></span>
                         </div>
                         <div>
                             <label asp-for="OutputLanguageCode" class="form-label"></label>
+                            <div class="small text-muted mb-2">
+                                Controls language of AI-generated summaries and rationale, not your input language.
+                            </div>
                             <select asp-for="OutputLanguageCode" class="form-select">
                                 <option value="en">English</option>
-                                <option value="fa">فارسی</option>
+                                <option value="fa">Persian</option>
                             </select>
                             <span asp-validation-for="OutputLanguageCode" class="text-danger small"></span>
                         </div>
@@ -59,34 +66,32 @@
         <div class="col-12 col-xl-4">
             <div class="card h-100 app-panel">
                 <div class="card-body app-panel-body d-flex flex-column gap-3">
-                    <div class="section-label">AI Connection</div>
-                    <h2 class="h5">AI Connection</h2>
-                    <div class="session-modal-status-stack">
-                        <div class="session-status-note @(Model.OpenAiConnectionReady ? "success" : "danger")" data-ai-connection-status-note>
-                            @Model.OpenAiConnectionStatusMessage
-                        </div>
-                        <div class="session-status-note subtle active" data-ai-connection-api-key>
-                            <strong>API key:</strong> <span data-ai-connection-api-key-value>@(Model.OpenAiApiKeyConfigured ? "Configured" : "Not configured")</span>
-                        </div>
-                        <div class="session-status-note subtle active" data-ai-connection-model>
-                            <strong>Model:</strong> <span data-ai-connection-model-value>@(string.IsNullOrWhiteSpace(Model.OpenAiModel) ? "Not configured" : Model.OpenAiModel)</span>
-                        </div>
-                        <div class="session-status-note subtle active" data-ai-connection-base-url>
-                            <strong>Base URL:</strong> <span data-ai-connection-base-url-value>@Model.OpenAiBaseUrl</span>
-                        </div>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button type="button"
-                                class="btn btn-outline-secondary btn-sm"
-                                data-ai-connection-check
-                                data-loading-text="Checking readiness..."
-                                data-ai-connection-url="@Url.Action("ConnectionStatus", "AiSettings")">
-                            Check Current Readiness
-                        </button>
-                    </div>
+                    <div class="section-label">OpenAI Setup</div>
+                    <h2 class="h5">OpenAI Setup</h2>
                     <p class="small text-muted mb-0">
-                        API keys are not stored in the database. Keep them in <code>dotnet user-secrets</code> or environment variables.
+                        OpenAI readiness and technical connection settings moved to
+                        <strong>Administration &gt; OpenAI Setup</strong>.
                     </p>
+                    <hr />
+                    <div class="section-label" data-ai-settings-guidance>Field Guide + Templates</div>
+                    <h2 class="h5">Field Guide + Templates</h2>
+                    <div class="small text-muted">
+                        <strong>Behavioral Instructions</strong>: decision policy and ranking style.
+                    </div>
+                    <pre class="small mb-0 p-3 rounded bg-light border" data-ai-settings-sample-behavioral>Evaluate each job for practical fit. Prioritize backend .NET roles.
+Penalize mismatches, weak evidence, and unclear scope.
+Return direct, decision-focused rationale.</pre>
+                    <div class="small text-muted">
+                        <strong>Priority Signals</strong>: concrete positive evidence.
+                    </div>
+                    <pre class="small mb-0 p-3 rounded bg-light border" data-ai-settings-sample-priority>C#, .NET, ASP.NET Core, Web API, SQL Server, REST APIs,
+backend ownership, clear responsibilities, realistic seniority.</pre>
+                    <div class="small text-muted">
+                        <strong>Exclusion Signals</strong>: blockers and high-risk mismatches.
+                    </div>
+                    <pre class="small mb-0 p-3 rounded bg-light border" data-ai-settings-sample-exclusion>frontend-dominant role, infra-first scope, unclear stack,
+strict incompatible location/work-authorization constraints,
+role unrelated to backend engineering.</pre>
                     <hr />
                     <div class="section-label">What this controls</div>
                     <h2 class="h5">What this controls</h2>
@@ -96,10 +101,6 @@
                         <li>The mismatch signals that should push jobs toward review or skip</li>
                         <li>The language and reading direction used for AI-generated summaries and rationale</li>
                     </ul>
-                    <hr />
-                    <p class="small text-muted mb-0">
-                        Security settings such as the OpenAI API key, model, and base URL stay outside the database and should be managed through configuration and local secrets.
-                    </p>
                 </div>
             </div>
         </div>

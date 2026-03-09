@@ -41,7 +41,8 @@ public sealed class LinkedInLocationLookupService : ILinkedInLocationLookupServi
 
         if (sessionSnapshot is null)
         {
-            return LinkedInLocationLookupResult.Failed("A stored LinkedIn session is required before location lookup.");
+            return LinkedInLocationLookupResult.Failed(
+                $"A stored LinkedIn session is required before location lookup. {LinkedInSessionRecoveryGuidance.ConnectAndRetryMessage}");
         }
 
         var response = await _linkedInApiClient.GetAsync(

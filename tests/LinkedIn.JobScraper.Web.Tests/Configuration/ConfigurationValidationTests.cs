@@ -1,6 +1,7 @@
 using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Persistence;
+using LinkedIn.JobScraper.Web.Tests.AI;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -181,8 +182,7 @@ public sealed class ConfigurationValidationTests
         var result = await gateway.ScoreAsync(CreateRequest(), CancellationToken.None);
 
         Assert.False(result.CanScore);
-        Assert.Contains("OpenAI:Security:ApiKey", result.Message, StringComparison.Ordinal);
-        Assert.Contains("dotnet user-secrets", result.Message, StringComparison.Ordinal);
+        Assert.Contains("Administration > OpenAI Setup", result.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -198,8 +198,7 @@ public sealed class ConfigurationValidationTests
         var result = await gateway.ScoreAsync(CreateRequest(), CancellationToken.None);
 
         Assert.False(result.CanScore);
-        Assert.Contains("OpenAI:Security:Model", result.Message, StringComparison.Ordinal);
-        Assert.Contains("dotnet user-secrets", result.Message, StringComparison.Ordinal);
+        Assert.Contains("Administration > OpenAI Setup", result.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -322,7 +321,7 @@ public sealed class ConfigurationValidationTests
     {
         return new OpenAiJobScoringGateway(
             client ?? new FakeOpenAiResponsesClient(),
-            Options.Create(
+            new FixedOpenAiEffectiveSecurityOptionsResolver(
                 options ?? new OpenAiSecurityOptions
                 {
                     ApiKey = "test-key",
@@ -363,6 +362,7 @@ public sealed class ConfigurationValidationTests
 
         public Task<OpenAiResponseSnapshot> CreateResponseAsync(
             OpenAiResponsesRequest request,
+            OpenAiSecurityOptions securityOptions,
             TimeSpan requestTimeout,
             CancellationToken cancellationToken)
         {
@@ -383,6 +383,7 @@ public sealed class ConfigurationValidationTests
 
         public Task<OpenAiResponseSnapshot> GetResponseAsync(
             string responseId,
+            OpenAiSecurityOptions securityOptions,
             TimeSpan requestTimeout,
             CancellationToken cancellationToken)
         {

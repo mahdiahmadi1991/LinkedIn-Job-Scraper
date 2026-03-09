@@ -10,6 +10,7 @@ public sealed class AiGlobalShortlistProgressHub : Hub
 public interface IAiGlobalShortlistProgressNotifier
 {
     Task PublishAsync(
+        int userId,
         string? connectionId,
         AiGlobalShortlistProgressUpdate update,
         CancellationToken cancellationToken);
@@ -17,9 +18,9 @@ public interface IAiGlobalShortlistProgressNotifier
 
 public interface IAiGlobalShortlistProgressStateStore
 {
-    AiGlobalShortlistProgressEvent Append(AiGlobalShortlistProgressUpdate update);
+    AiGlobalShortlistProgressEvent Append(int userId, AiGlobalShortlistProgressUpdate update);
 
-    AiGlobalShortlistProgressBatch GetBatch(Guid runId, long afterSequence);
+    AiGlobalShortlistProgressBatch GetBatch(int userId, Guid runId, long afterSequence);
 }
 
 public sealed class SignalRAiGlobalShortlistProgressNotifier : IAiGlobalShortlistProgressNotifier
@@ -36,11 +37,12 @@ public sealed class SignalRAiGlobalShortlistProgressNotifier : IAiGlobalShortlis
     }
 
     public Task PublishAsync(
+        int userId,
         string? connectionId,
         AiGlobalShortlistProgressUpdate update,
         CancellationToken cancellationToken)
     {
-        var progressEvent = _progressStateStore.Append(update);
+        var progressEvent = _progressStateStore.Append(userId, update);
 
         if (string.IsNullOrWhiteSpace(connectionId))
         {
@@ -87,17 +89,17 @@ public sealed record AiGlobalShortlistProgressBatch(
 
 public sealed class InMemoryAiGlobalShortlistProgressStateStore : IAiGlobalShortlistProgressStateStore
 {
-    private readonly ConcurrentDictionary<Guid, RunState> _runs = new();
+    private readonly ConcurrentDictionary<(int UserId, Guid RunId), RunState> _runs = new();
 
-    public AiGlobalShortlistProgressEvent Append(AiGlobalShortlistProgressUpdate update)
+    public AiGlobalShortlistProgressEvent Append(int userId, AiGlobalShortlistProgressUpdate update)
     {
-        var state = _runs.GetOrAdd(update.RunId, static _ => new RunState());
+        var state = _runs.GetOrAdd((userId, update.RunId), static _ => new RunState());
         return state.Append(update);
     }
 
-    public AiGlobalShortlistProgressBatch GetBatch(Guid runId, long afterSequence)
+    public AiGlobalShortlistProgressBatch GetBatch(int userId, Guid runId, long afterSequence)
     {
-        if (!_runs.TryGetValue(runId, out var state))
+        if (!_runs.TryGetValue((userId, runId), out var state))
         {
             return new AiGlobalShortlistProgressBatch([], 1, false);
         }

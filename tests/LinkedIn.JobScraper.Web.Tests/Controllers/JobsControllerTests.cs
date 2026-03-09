@@ -1,6 +1,7 @@
 using LinkedIn.JobScraper.Web.Controllers;
 using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.Jobs;
+using LinkedIn.JobScraper.Web.Tests.Authentication;
 using LinkedIn.JobScraper.Web.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +17,7 @@ public sealed class JobsControllerTests
         var service = new FakeJobsDashboardService();
         var workflowExecutor = new FakeJobsWorkflowExecutor(service);
         var workflowStateStore = new FakeJobsWorkflowStateStore();
-        var controller = new JobsController(service, workflowExecutor, workflowStateStore)
+        var controller = new JobsController(new TestCurrentAppUserContext(), service, workflowExecutor, workflowStateStore)
         {
             ControllerContext = new ControllerContext
             {
@@ -56,7 +57,7 @@ public sealed class JobsControllerTests
     public async Task FetchAndScoreReturnsProblemDetailsForAjaxFailures()
     {
         var service = new FailedJobsDashboardService();
-        var controller = new JobsController(service, new FakeJobsWorkflowExecutor(service), new FakeJobsWorkflowStateStore())
+        var controller = new JobsController(new TestCurrentAppUserContext(), service, new FakeJobsWorkflowExecutor(service), new FakeJobsWorkflowStateStore())
         {
             ControllerContext = new ControllerContext
             {
@@ -84,7 +85,7 @@ public sealed class JobsControllerTests
     public async Task FetchAndScoreReturnsWarningJsonPayloadForAjaxWarnings()
     {
         var service = new WarningJobsDashboardService();
-        var controller = new JobsController(service, new FakeJobsWorkflowExecutor(service), new FakeJobsWorkflowStateStore())
+        var controller = new JobsController(new TestCurrentAppUserContext(), service, new FakeJobsWorkflowExecutor(service), new FakeJobsWorkflowStateStore())
         {
             ControllerContext = new ControllerContext
             {
@@ -113,7 +114,7 @@ public sealed class JobsControllerTests
     public async Task ScoreJobReturnsTypedJsonPayload()
     {
         var service = new FakeJobsDashboardService();
-        var controller = new JobsController(service, new FakeJobsWorkflowExecutor(service), new FakeJobsWorkflowStateStore())
+        var controller = new JobsController(new TestCurrentAppUserContext(), service, new FakeJobsWorkflowExecutor(service), new FakeJobsWorkflowStateStore())
         {
             ControllerContext = new ControllerContext
             {
@@ -131,6 +132,66 @@ public sealed class JobsControllerTests
         Assert.Equal("success", payload.Severity);
         Assert.Equal(91, payload.Job?.AiScore);
         Assert.Equal("StrongMatch", payload.Job?.AiLabel);
+    }
+
+    [Fact]
+    public void WorkflowProgressReturnsNotFoundWhenWorkflowIsMissing()
+    {
+        var stateStore = new FakeJobsWorkflowStateStore
+        {
+            Batch = new JobsWorkflowProgressBatch([], 1, false, false)
+        };
+        var controller = new JobsController(
+            new TestCurrentAppUserContext(),
+            new FakeJobsDashboardService(),
+            new FakeJobsWorkflowExecutor(new FakeJobsDashboardService()),
+            stateStore);
+
+        var result = controller.WorkflowProgress("workflow-404");
+
+        Assert.IsType<NotFoundResult>(result);
+        Assert.Equal(1, stateStore.LastGetBatchUserId);
+        Assert.Equal("workflow-404", stateStore.LastGetBatchWorkflowId);
+    }
+
+    [Fact]
+    public void WorkflowProgressReturnsJsonWhenWorkflowExists()
+    {
+        var expectedBatch = new JobsWorkflowProgressBatch([], 2, false, true);
+        var stateStore = new FakeJobsWorkflowStateStore
+        {
+            Batch = expectedBatch
+        };
+        var controller = new JobsController(
+            new TestCurrentAppUserContext(),
+            new FakeJobsDashboardService(),
+            new FakeJobsWorkflowExecutor(new FakeJobsDashboardService()),
+            stateStore);
+
+        var result = controller.WorkflowProgress("workflow-1");
+
+        var json = Assert.IsType<JsonResult>(result);
+        var payload = Assert.IsType<JobsWorkflowProgressBatch>(json.Value);
+        Assert.Equal(expectedBatch, payload);
+    }
+
+    [Fact]
+    public async Task UpdateStatusReturnsNotFoundWhenJobDoesNotExistForCurrentUser()
+    {
+        var service = new NotFoundJobStatusDashboardService();
+        var controller = new JobsController(
+            new TestCurrentAppUserContext(),
+            service,
+            new FakeJobsWorkflowExecutor(service),
+            new FakeJobsWorkflowStateStore());
+
+        var result = await controller.UpdateStatus(
+            Guid.NewGuid(),
+            JobWorkflowState.Applied,
+            new JobsDashboardQuery(),
+            CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
     }
 
     private sealed class FakeJobsDashboardService : IJobsDashboardService
@@ -342,28 +403,81 @@ public sealed class JobsControllerTests
         }
     }
 
+    private sealed class NotFoundJobStatusDashboardService : IJobsDashboardService
+    {
+        public Task<JobsDashboardSnapshot> GetSnapshotAsync(JobsDashboardQuery query, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<JobDetailsSnapshot?> GetJobDetailsAsync(Guid jobId, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<JobsRowsChunk> GetRowsAsync(JobsDashboardQuery query, int offset, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<FetchAndScoreWorkflowResult> RunFetchAndScoreAsync(
+            string? progressConnectionId,
+            string workflowId,
+            string? correlationId,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<JobScoreActionResult> ScoreJobAsync(Guid jobId, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<JobStatusChangeResult> UpdateStatusAsync(
+            Guid jobId,
+            JobWorkflowState status,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                new JobStatusChangeResult(
+                    false,
+                    "Job was not found.",
+                    "danger",
+                    StatusCodes.Status404NotFound));
+        }
+    }
+
     private sealed class FakeJobsWorkflowStateStore : IJobsWorkflowStateStore
     {
-        public void Append(JobsWorkflowProgressUpdate update)
+        public JobsWorkflowProgressBatch Batch { get; set; } = new([], 1, false, false);
+
+        public int? LastGetBatchUserId { get; private set; }
+
+        public string? LastGetBatchWorkflowId { get; private set; }
+
+        public void Append(int userId, JobsWorkflowProgressUpdate update)
         {
         }
 
-        public JobsWorkflowProgressBatch GetBatch(string workflowId, long afterSequence)
+        public JobsWorkflowProgressBatch GetBatch(int userId, string workflowId, long afterSequence)
         {
-            return new JobsWorkflowProgressBatch([], 1, false, false);
+            LastGetBatchUserId = userId;
+            LastGetBatchWorkflowId = workflowId;
+            return Batch;
         }
 
-        public JobsWorkflowRegistrationResult RegisterWorkflow(string workflowId, CancellationToken outerCancellationToken)
+        public JobsWorkflowRegistrationResult RegisterWorkflow(int userId, string workflowId, CancellationToken outerCancellationToken)
         {
             return new JobsWorkflowRegistrationResult(true, null, outerCancellationToken);
         }
 
-        public bool RequestCancellation(string workflowId)
+        public bool RequestCancellation(int userId, string workflowId)
         {
             return false;
         }
 
-        public void ReleaseWorkflow(string workflowId)
+        public void ReleaseWorkflow(int userId, string workflowId)
         {
         }
     }

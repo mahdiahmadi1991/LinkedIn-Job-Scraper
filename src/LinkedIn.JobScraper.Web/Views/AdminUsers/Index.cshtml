@@ -1,0 +1,547 @@
+@using LinkedIn.JobScraper.Web.Controllers
+@using LinkedIn.JobScraper.Web.AI
+@using System.Globalization
+@model LinkedIn.JobScraper.Web.Models.AdminUsersPageViewModel
+@{
+    ViewData["Title"] = "Administration";
+    var activeTab = string.IsNullOrWhiteSpace(Model.ActiveTab)
+        ? AdminController.UsersTab
+        : Model.ActiveTab;
+    var tabs = new[]
+    {
+        new
+        {
+            Key = AdminController.UsersTab,
+            Label = "User Management",
+            Description = "Create and manage local user accounts."
+        },
+        new
+        {
+            Key = AdminController.OpenAiTab,
+            Label = "OpenAI Setup",
+            Description = "Manage global OpenAI runtime connection settings."
+        }
+    };
+    var recommendedModels = OpenAiModelCatalog.Items;
+}
+
+<div class="page-shell">
+    <section class="page-hero">
+        <div class="section-label mb-2">Admin</div>
+        <h1 class="hero-title h2">Administration</h1>
+        <p class="hero-lead">
+            Super-admin modules are grouped in one place. Add future admin capabilities as new tabs.
+        </p>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div
+            class="d-none"
+            data-admin-page-status
+            data-status-message="@Model.StatusMessage"
+            data-status-succeeded="@(Model.StatusSucceeded ? "true" : "false")"></div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.OpenAiStatusMessage))
+    {
+        <div
+            class="d-none"
+            data-admin-openai-status
+            data-status-message="@Model.OpenAiStatusMessage"
+            data-status-succeeded="@(Model.OpenAiStatusSucceeded ? "true" : "false")"></div>
+    }
+
+    <nav class="mb-3" aria-label="Administration tabs">
+        <ul class="nav nav-tabs">
+            @foreach (var tab in tabs)
+            {
+                var isActive = string.Equals(tab.Key, activeTab, StringComparison.Ordinal);
+                <li class="nav-item" role="presentation">
+                    <a
+                        id="admin-tab-link-@tab.Key"
+                        class="nav-link @(isActive ? "active" : string.Empty)"
+                        asp-controller="Admin"
+                        asp-action="Index"
+                        asp-route-tab="@tab.Key"
+                        aria-controls="admin-tab-panel-@tab.Key">
+                        @tab.Label
+                    </a>
+                </li>
+            }
+        </ul>
+    </nav>
+
+    <div class="tab-content">
+        <section
+            id="admin-tab-panel-users"
+            class="tab-pane fade @(string.Equals(activeTab, AdminController.UsersTab, StringComparison.Ordinal) ? "show active" : string.Empty)"
+            role="tabpanel"
+            aria-labelledby="admin-tab-link-users">
+            <div class="mb-3">
+                <h2 class="h5 mb-1">User Management</h2>
+                <p class="text-muted mb-0">Create local users, adjust profile metadata, and control activation state.</p>
+            </div>
+
+            <div
+                class="row g-4"
+                data-admin-users-page
+                data-update-user-url="@Url.Action("Update", "AdminUsers")"
+                data-toggle-user-url="@Url.Action("SetActiveState", "AdminUsers")"
+                data-soft-delete-user-url="@Url.Action("SoftDelete", "AdminUsers")">
+                <div class="col-12 col-xl-4">
+                    <div class="card app-panel">
+                        <div class="card-body app-panel-body">
+                            <h3 class="h5 mb-3">Create User</h3>
+                            <form asp-controller="AdminUsers" asp-action="Create" method="post" class="d-flex flex-column gap-3 admin-create-user-form" data-local-datetime-form data-admin-user-create-form autocomplete="off">
+                                @Html.AntiForgeryToken()
+
+                                <div>
+                                    <label asp-for="CreateForm.UserName" class="form-label"></label>
+                                    <input asp-for="CreateForm.UserName" class="form-control" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" />
+                                    <span asp-validation-for="CreateForm.UserName" class="text-danger small"></span>
+                                </div>
+
+                                <div>
+                                    <label asp-for="CreateForm.DisplayName" class="form-label"></label>
+                                    <input asp-for="CreateForm.DisplayName" class="form-control" autocomplete="off" />
+                                    <span asp-validation-for="CreateForm.DisplayName" class="text-danger small"></span>
+                                </div>
+
+                                <div>
+                                    <label asp-for="CreateForm.Password" class="form-label"></label>
+                                    <div class="d-flex align-items-stretch gap-2 admin-password-field">
+                                        <input asp-for="CreateForm.Password" class="form-control" autocomplete="new-password" data-random-password-target data-password-input />
+                                        <div class="d-flex align-items-stretch gap-1 admin-password-tools">
+                                            <button type="button" class="btn admin-icon-button" data-generate-random-password aria-label="Generate random password" title="Generate random password">
+                                                <svg class="admin-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                    <path d="M12 3V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                                    <path d="M12 17V21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                                    <path d="M3 12H7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                                    <path d="M17 12H21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                                    <path d="M5.64 5.64L8.47 8.47" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                                    <path d="M15.53 15.53L18.36 18.36" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                                    <path d="M18.36 5.64L15.53 8.47" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                                    <path d="M8.47 15.53L5.64 18.36" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                                </svg>
+                                                <span class="visually-hidden">Generate random password</span>
+                                            </button>
+                                            <button type="button" class="btn admin-icon-button" data-toggle-password-visibility aria-pressed="false" aria-label="Show password" title="Show password">
+                                                <svg class="admin-icon" data-password-icon-show viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                    <path d="M2 12C3.73 8.5 7.46 6 12 6C16.54 6 20.27 8.5 22 12C20.27 15.5 16.54 18 12 18C7.46 18 3.73 15.5 2 12Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8" />
+                                                </svg>
+                                                <svg class="admin-icon d-none" data-password-icon-hide viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                    <path d="M2 12C3.73 8.5 7.46 6 12 6C16.54 6 20.27 8.5 22 12C20.27 15.5 16.54 18 12 18C7.46 18 3.73 15.5 2 12Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8" />
+                                                    <path d="M4 20L20 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                                </svg>
+                                                <span class="visually-hidden" data-password-visibility-label>Show password</span>
+                                            </button>
+                                            <button type="button" class="btn admin-icon-button" data-copy-password aria-label="Copy password" title="Copy password">
+                                                <svg class="admin-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                    <rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.8" />
+                                                    <path d="M6 15H5C3.9 15 3 14.1 3 13V5C3 3.9 3.9 3 5 3H13C14.1 3 15 3.9 15 5V6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                                </svg>
+                                                <span class="visually-hidden">Copy password</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <span asp-validation-for="CreateForm.Password" class="text-danger small"></span>
+                                </div>
+
+                                <div class="form-check form-switch">
+                                    <input asp-for="CreateForm.IsActive" class="form-check-input" />
+                                    <label asp-for="CreateForm.IsActive" class="form-check-label"></label>
+                                </div>
+
+                                <div>
+                                    <label asp-for="CreateForm.ExpiresAtUtc" class="form-label"></label>
+                                    <input asp-for="CreateForm.ExpiresAtUtc" type="hidden" data-utc-hidden />
+                                    <input type="date" class="form-control" data-local-expiry-date-input autocomplete="off" />
+                                    <span asp-validation-for="CreateForm.ExpiresAtUtc" class="text-danger small"></span>
+                                    <div class="small text-muted mt-1">
+                                        Leave empty for no expiry. Expiry is applied at end of selected local date. Browser timezone:
+                                        <span data-local-timezone-label>Local</span>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-2">
+                                    <button type="submit" class="btn btn-primary" data-loading-text="Creating user..." data-admin-user-create-submit>
+                                        Create User
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-8">
+                    <div class="card app-panel">
+                        <div class="card-body app-panel-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h3 class="h5 mb-0">Current Users</h3>
+                                <span class="small text-muted" data-admin-users-total>Total: @Model.Users.Count</span>
+                            </div>
+
+                            <p class="text-muted mb-0 @(Model.Users.Count == 0 ? string.Empty : "d-none")" data-admin-users-empty-state>No users are currently stored.</p>
+
+                            <div class="table-responsive @(Model.Users.Count == 0 ? "d-none" : string.Empty)" data-admin-users-table-wrapper>
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Id</th>
+                                            <th scope="col">Username</th>
+                                            <th scope="col">Display Name</th>
+                                            <th scope="col">Flags</th>
+                                            <th scope="col">Expires (Local)</th>
+                                            <th scope="col">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var user in Model.Users)
+                                        {
+                                            var editDisplayName = user.DisplayName;
+                                            var editExpiryUtcIso = user.ExpiresAtUtc?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty;
+                                            var userExpiryUtcIso = user.ExpiresAtUtc?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty;
+                                            var userIsActiveText = user.IsActive ? "Active" : "Inactive";
+                                            var userIsActiveBadgeClass = user.IsActive ? "text-bg-success" : "text-bg-secondary";
+
+                                            <tr
+                                                data-admin-user-row="@(user.IsSuperAdmin ? "false" : "true")"
+                                                data-user-id="@user.Id"
+                                                data-user-name="@user.UserName"
+                                                data-initial-display-name="@user.DisplayName"
+                                                data-initial-expires-utc="@userExpiryUtcIso"
+                                                data-initial-is-active="@(user.IsActive ? "true" : "false")">
+                                                <td>@user.Id</td>
+                                                <td>@user.UserName</td>
+                                                <td class="min-w-240">
+                                                    @if (user.IsSuperAdmin)
+                                                    {
+                                                        <span>@user.DisplayName</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span data-row-view-display-name>@editDisplayName</span>
+                                                        <input
+                                                            type="text"
+                                                            class="form-control form-control-sm d-none"
+                                                            data-row-edit-display-name
+                                                            value="@editDisplayName"
+                                                            maxlength="256"
+                                                            autocomplete="off" />
+                                                    }
+                                                </td>
+                                                <td>
+                                                    @if (user.IsSuperAdmin)
+                                                    {
+                                                        <span class="badge @userIsActiveBadgeClass me-1">@userIsActiveText</span>
+                                                        <span class="badge text-bg-primary">Super Admin</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div data-row-view-flags>
+                                                            <span class="badge @userIsActiveBadgeClass me-1" data-row-active-badge>@userIsActiveText</span>
+                                                        </div>
+                                                        <div class="form-check form-switch d-none" data-row-edit-active-wrapper>
+                                                            <input class="form-check-input" type="checkbox" data-row-edit-is-active @(user.IsActive ? "checked" : null) />
+                                                            <label class="form-check-label small">Active</label>
+                                                        </div>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    <span data-row-view-expires data-utc-display="@userExpiryUtcIso">@(string.IsNullOrWhiteSpace(userExpiryUtcIso) ? "-" : user.ExpiresAtUtc?.ToString("yyyy-MM-dd HH:mm 'UTC'"))</span>
+                                                    @if (!user.IsSuperAdmin)
+                                                    {
+                                                        <input type="hidden" data-row-edit-expires-utc value="@editExpiryUtcIso" />
+                                                        <input type="date" class="form-control form-control-sm d-none" data-row-edit-expires-local autocomplete="off" />
+                                                    }
+                                                </td>
+                                                <td>
+                                                    @if (user.IsSuperAdmin)
+                                                    {
+                                                        <span class="small text-muted">Locked</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="d-inline-flex align-items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                class="btn admin-row-action-button"
+                                                                data-row-edit-action
+                                                                aria-label="Edit user '@user.UserName'"
+                                                                title="Edit user">
+                                                                <svg class="admin-icon" data-row-action-icon-edit viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                                    <path d="M4 20H8L18 10C18.78 9.22 18.78 7.95 18 7.17L16.83 6C16.05 5.22 14.78 5.22 14 6L4 16V20Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                                                </svg>
+                                                                <svg class="admin-icon d-none" data-row-action-icon-save viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                                    <path d="M5 12L10 17L19 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                                                </svg>
+                                                                <span class="visually-hidden">Edit user</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                class="btn admin-row-action-button admin-row-action-button-danger"
+                                                                data-row-delete-action
+                                                                aria-label="Soft-delete user '@user.UserName'"
+                                                                title="Soft-delete user">
+                                                                <svg class="admin-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                                    <path d="M4 7H20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                                                    <path d="M9 11V17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                                                    <path d="M15 11V17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                                                    <path d="M6 7L7 19C7.08 19.93 7.85 20.64 8.79 20.64H15.21C16.15 20.64 16.92 19.93 17 19L18 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                                                    <path d="M10 4H14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                                                </svg>
+                                                                <span class="visually-hidden">Soft-delete user</span>
+                                                            </button>
+                                                        </div>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center mt-3 @(Model.Users.Count == 0 ? "d-none" : string.Empty)" data-admin-users-pagination>
+                                <span class="small text-muted" data-admin-users-page-info></span>
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Users pagination">
+                                    <button type="button" class="btn btn-outline-secondary" data-admin-users-prev-page>Previous</button>
+                                    <button type="button" class="btn btn-outline-secondary" data-admin-users-next-page>Next</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                class="modal fade"
+                id="adminSoftDeleteConfirmModal"
+                tabindex="-1"
+                aria-labelledby="adminSoftDeleteConfirmModalTitle"
+                aria-hidden="true"
+                data-admin-soft-delete-modal>
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content admin-soft-delete-modal-content">
+                        <div class="modal-body p-4">
+                            <div class="admin-soft-delete-modal-icon" aria-hidden="true">
+                                <svg class="admin-icon" viewBox="0 0 24 24" fill="none">
+                                    <path d="M4 7H20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                    <path d="M9 11V17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                    <path d="M15 11V17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                    <path d="M6 7L7 19C7.08 19.93 7.85 20.64 8.79 20.64H15.21C16.15 20.64 16.92 19.93 17 19L18 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                    <path d="M10 4H14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                </svg>
+                            </div>
+                            <h3 id="adminSoftDeleteConfirmModalTitle" class="h5 mb-2">Soft-delete User</h3>
+                            <p class="text-muted mb-3">
+                                This account will be hidden from active usage and sign-in.
+                            </p>
+                            <div class="admin-soft-delete-modal-user mb-4">
+                                <span class="small text-muted">Target user</span>
+                                <div class="fw-semibold" data-admin-soft-delete-user-name>-</div>
+                            </div>
+                            <div class="d-flex justify-content-end gap-2">
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-secondary btn-sm px-3"
+                                    data-admin-soft-delete-cancel
+                                    data-bs-dismiss="modal">
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-danger btn-sm px-3"
+                                    data-admin-soft-delete-confirm>
+                                    Soft Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section
+            id="admin-tab-panel-openai"
+            class="tab-pane fade @(string.Equals(activeTab, AdminController.OpenAiTab, StringComparison.Ordinal) ? "show active" : string.Empty)"
+            role="tabpanel"
+            aria-labelledby="admin-tab-link-openai">
+            <div class="mb-3">
+                <h2 class="h5 mb-1">OpenAI Setup</h2>
+                <p class="text-muted mb-0">
+                    Manage OpenAI runtime settings and API key. Keys are never stored in SQL tables.
+                </p>
+            </div>
+
+            <div class="row g-4" data-admin-openai-setup>
+                <div class="col-12 col-xl-7">
+                    <div class="card app-panel">
+                        <div class="card-body app-panel-body">
+                            <form
+                                asp-controller="Admin"
+                                asp-action="SaveOpenAiSettings"
+                                method="post"
+                                class="d-flex flex-column gap-3"
+                                data-admin-openai-setup-form>
+                                @Html.AntiForgeryToken()
+
+                                <input asp-for="OpenAiSetupForm.ConcurrencyToken" type="hidden" />
+
+                                <div>
+                                    <label asp-for="OpenAiSetupForm.ApiKey" class="form-label"></label>
+                                    <textarea
+                                        asp-for="OpenAiSetupForm.ApiKey"
+                                        class="form-control"
+                                        rows="3"
+                                        autocomplete="off"
+                                        spellcheck="false"
+                                        data-admin-openai-api-key-input></textarea>
+                                    <div class="small text-muted mt-1">
+                                        Paste a valid OpenAI project API key (for example, a key starting with <code>sk-</code>). The value is stored in a local runtime secrets file and is never persisted in SQL tables.
+                                    </div>
+                                    <div class="small text-muted">
+                                        Use a server-side key only. Do not paste temporary browser tokens or keys with restricted model access.
+                                    </div>
+                                    <span asp-validation-for="OpenAiSetupForm.ApiKey" class="text-danger small"></span>
+                                </div>
+
+                                <div>
+                                    <label asp-for="OpenAiSetupForm.Model" class="form-label"></label>
+                                    <select asp-for="OpenAiSetupForm.Model" class="form-select" data-admin-openai-model-select>
+                                        @foreach (var modelOption in recommendedModels)
+                                        {
+                                            <option value="@modelOption.Value" data-model-description="@modelOption.Description">
+                                                @modelOption.Label (@modelOption.Value)
+                                            </option>
+                                        }
+                                    </select>
+                                    <div class="small text-muted mt-2" data-admin-openai-model-description></div>
+                                    <div class="small text-muted">
+                                        This model is used for scoring and shortlist evaluation. Prefer lighter models for lower cost and faster response times.
+                                    </div>
+                                    <span asp-validation-for="OpenAiSetupForm.Model" class="text-danger small"></span>
+                                </div>
+
+                                <div>
+                                    <label asp-for="OpenAiSetupForm.BaseUrl" class="form-label"></label>
+                                    <input asp-for="OpenAiSetupForm.BaseUrl" class="form-control" autocomplete="off" />
+                                    <div class="small text-muted mt-1">
+                                        Keep <code>https://api.openai.com/v1</code> for direct OpenAI usage. Change this only when routing through a trusted gateway compatible with OpenAI APIs.
+                                    </div>
+                                    <span asp-validation-for="OpenAiSetupForm.BaseUrl" class="text-danger small"></span>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label asp-for="OpenAiSetupForm.RequestTimeoutSeconds" class="form-label"></label>
+                                        <input asp-for="OpenAiSetupForm.RequestTimeoutSeconds" type="number" min="1" class="form-control" />
+                                        <div class="small text-muted mt-1">
+                                            Maximum wait time per OpenAI request. Increase for slower networks; keep moderate to avoid long blocked operations.
+                                        </div>
+                                        <span asp-validation-for="OpenAiSetupForm.RequestTimeoutSeconds" class="text-danger small"></span>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label asp-for="OpenAiSetupForm.MaxConcurrentScoringRequests" class="form-label"></label>
+                                        <input asp-for="OpenAiSetupForm.MaxConcurrentScoringRequests" type="number" min="1" class="form-control" />
+                                        <div class="small text-muted mt-1">
+                                            Number of scoring requests processed in parallel. Higher values improve throughput but increase API load and rate-limit risk.
+                                        </div>
+                                        <span asp-validation-for="OpenAiSetupForm.MaxConcurrentScoringRequests" class="text-danger small"></span>
+                                    </div>
+                                </div>
+
+                                <div class="form-check form-switch">
+                                    <input asp-for="OpenAiSetupForm.UseBackgroundMode" class="form-check-input" />
+                                    <label asp-for="OpenAiSetupForm.UseBackgroundMode" class="form-check-label"></label>
+                                    <div class="small text-muted mt-1">
+                                        Enable asynchronous response processing with polling. Recommended for longer prompts and heavier reasoning workloads.
+                                    </div>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label asp-for="OpenAiSetupForm.BackgroundPollingIntervalMilliseconds" class="form-label"></label>
+                                        <input asp-for="OpenAiSetupForm.BackgroundPollingIntervalMilliseconds" type="number" min="1" class="form-control" />
+                                        <div class="small text-muted mt-1">
+                                            Poll frequency while waiting for background responses. Lower values detect completion sooner but send more status requests.
+                                        </div>
+                                        <span asp-validation-for="OpenAiSetupForm.BackgroundPollingIntervalMilliseconds" class="text-danger small"></span>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label asp-for="OpenAiSetupForm.BackgroundPollingTimeoutSeconds" class="form-label"></label>
+                                        <input asp-for="OpenAiSetupForm.BackgroundPollingTimeoutSeconds" type="number" min="1" class="form-control" />
+                                        <div class="small text-muted mt-1">
+                                            Upper bound for waiting on background completion. Increase only when legitimate requests regularly need more time.
+                                        </div>
+                                        <span asp-validation-for="OpenAiSetupForm.BackgroundPollingTimeoutSeconds" class="text-danger small"></span>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button
+                                        type="submit"
+                                        class="btn btn-primary"
+                                        data-admin-openai-save-button
+                                        data-loading-text="Saving OpenAI setup...">
+                                        Save OpenAI Setup
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-5">
+                    <div class="card app-panel h-100">
+                        <div class="card-body app-panel-body d-flex flex-column gap-3">
+                            <div class="section-label">Connection Readiness</div>
+                            <h3 class="h5">Connection Readiness</h3>
+
+                            <div class="session-modal-status-stack">
+                                <div class="session-status-note @(Model.OpenAiConnectionReady ? "success" : "danger")" data-admin-openai-connection-status-note>
+                                    @Model.OpenAiConnectionStatusMessage
+                                </div>
+                                <div class="session-status-note subtle active">
+                                    <strong>API key:</strong> <span data-admin-openai-api-key-value>@(Model.OpenAiApiKeyConfigured ? "Configured" : "Not configured")</span>
+                                </div>
+                                <div class="session-status-note subtle active">
+                                    <strong>Model:</strong> <span data-admin-openai-model-value>@(string.IsNullOrWhiteSpace(Model.OpenAiSetupForm.Model) ? "Not configured" : Model.OpenAiSetupForm.Model)</span>
+                                </div>
+                                <div class="session-status-note subtle active">
+                                    <strong>Base URL:</strong> <span data-admin-openai-base-url-value>@Model.OpenAiSetupForm.BaseUrl</span>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                data-admin-openai-connection-check
+                                data-loading-text="Checking readiness..."
+                                data-admin-openai-connection-url="@Url.Action("OpenAiConnectionStatus", "Admin")">
+                                Check Readiness
+                            </button>
+
+                            <hr />
+
+                            <div class="section-label">Secrets Policy</div>
+                            <p class="small text-muted mb-0">
+                                API keys are never saved in SQL Server. OpenAI Setup stores the active key in a local runtime secrets file and applies changes immediately.
+                            </p>
+                            <div class="small text-muted">
+                                Use this tab as the single source of truth for OpenAI key management in this deployment.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/admin-users-page.js" asp-append-version="true"></script>
+    <script src="~/js/admin-openai-setup-page.js" asp-append-version="true"></script>
+}

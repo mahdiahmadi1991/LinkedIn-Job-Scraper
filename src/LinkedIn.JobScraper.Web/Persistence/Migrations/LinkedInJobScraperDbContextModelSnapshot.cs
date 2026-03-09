@@ -30,6 +30,9 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("AppUserId")
+                        .HasColumnType("int");
+
                     b.Property<string>("BehavioralInstructions")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -47,11 +50,6 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ProfileName")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -62,6 +60,9 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AppUserId")
+                        .IsUnique();
 
                     b.ToTable("AiBehaviorSettings", (string)null);
                 });
@@ -188,6 +189,9 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("AppUserId")
+                        .HasColumnType("int");
+
                     b.Property<DateTimeOffset?>("CancellationRequestedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -240,6 +244,10 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
 
                     b.HasIndex("Status");
 
+                    b.HasIndex("AppUserId", "CreatedAtUtc");
+
+                    b.HasIndex("AppUserId", "Status");
+
                     b.ToTable("AiGlobalShortlistRuns", (string)null);
                 });
 
@@ -254,6 +262,9 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -265,8 +276,18 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<bool>("IsSeeded")
                         .HasColumnType("bit");
+
+                    b.Property<bool>("IsSuperAdmin")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -283,9 +304,13 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DeletedAtUtc");
+
                     b.HasIndex("ExpiresAtUtc");
 
                     b.HasIndex("IsActive");
+
+                    b.HasIndex("IsDeleted");
 
                     b.HasIndex("UserName")
                         .IsUnique();
@@ -314,6 +339,9 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
 
                     b.Property<string>("AiWhyMatched")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("AppUserId")
+                        .HasColumnType("int");
 
                     b.Property<string>("CompanyApplyUrl")
                         .HasMaxLength(2048)
@@ -392,21 +420,23 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
 
                     b.HasIndex("AiScore");
 
+                    b.HasIndex("AppUserId");
+
                     b.HasIndex("CurrentStatus");
 
                     b.HasIndex("LastDetailSyncedAtUtc");
 
                     b.HasIndex("LastSeenAtUtc");
 
-                    b.HasIndex("LinkedInJobId")
-                        .IsUnique();
-
-                    b.HasIndex("LinkedInJobPostingUrn")
-                        .IsUnique();
-
                     b.HasIndex("LinkedInUpdatedAtUtc");
 
                     b.HasIndex("ListedAtUtc");
+
+                    b.HasIndex("AppUserId", "LinkedInJobId")
+                        .IsUnique();
+
+                    b.HasIndex("AppUserId", "LinkedInJobPostingUrn")
+                        .IsUnique();
 
                     b.ToTable("Jobs", (string)null);
                 });
@@ -447,6 +477,9 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("AppUserId")
+                        .HasColumnType("int");
+
                     b.Property<bool>("EasyApply")
                         .HasColumnType("bit");
 
@@ -472,11 +505,6 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
-                    b.Property<string>("ProfileName")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -493,6 +521,9 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AppUserId")
+                        .IsUnique();
+
                     b.ToTable("LinkedInSearchSettings", (string)null);
                 });
 
@@ -501,6 +532,9 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AppUserId")
+                        .HasColumnType("int");
 
                     b.Property<DateTimeOffset>("CapturedAtUtc")
                         .HasColumnType("datetimeoffset");
@@ -527,10 +561,76 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("SessionKey")
+                    b.HasIndex("AppUserId", "SessionKey")
                         .IsUnique();
 
                     b.ToTable("LinkedInSessions", (string)null);
+                });
+
+            modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.OpenAiRuntimeSettingsRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BaseUrl")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<int>("BackgroundPollingIntervalMilliseconds")
+                        .HasColumnType("int");
+
+                    b.Property<int>("BackgroundPollingTimeoutSeconds")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MaxConcurrentScoringRequests")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<int>("RequestTimeoutSeconds")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SettingsKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("UseBackgroundMode")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SettingsKey")
+                        .IsUnique();
+
+                    b.ToTable("OpenAiRuntimeSettings", (string)null);
+                });
+
+            modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.AiBehaviorSettingsRecord", b =>
+                {
+                    b.HasOne("LinkedIn.JobScraper.Web.Persistence.Entities.AppUserRecord", "AppUser")
+                        .WithMany("AiBehaviorSettings")
+                        .HasForeignKey("AppUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AppUser");
                 });
 
             modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.AiGlobalShortlistItemRecord", b =>
@@ -571,6 +671,28 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                     b.Navigation("Run");
                 });
 
+            modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.AiGlobalShortlistRunRecord", b =>
+                {
+                    b.HasOne("LinkedIn.JobScraper.Web.Persistence.Entities.AppUserRecord", "AppUser")
+                        .WithMany("AiGlobalShortlistRuns")
+                        .HasForeignKey("AppUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AppUser");
+                });
+
+            modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.JobRecord", b =>
+                {
+                    b.HasOne("LinkedIn.JobScraper.Web.Persistence.Entities.AppUserRecord", "AppUser")
+                        .WithMany("Jobs")
+                        .HasForeignKey("AppUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AppUser");
+                });
+
             modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.JobStatusHistoryRecord", b =>
                 {
                     b.HasOne("LinkedIn.JobScraper.Web.Persistence.Entities.JobRecord", "JobRecord")
@@ -582,11 +704,46 @@ namespace LinkedIn.JobScraper.Web.Persistence.Migrations
                     b.Navigation("JobRecord");
                 });
 
+            modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.LinkedInSearchSettingsRecord", b =>
+                {
+                    b.HasOne("LinkedIn.JobScraper.Web.Persistence.Entities.AppUserRecord", "AppUser")
+                        .WithMany("LinkedInSearchSettings")
+                        .HasForeignKey("AppUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AppUser");
+                });
+
+            modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.LinkedInSessionRecord", b =>
+                {
+                    b.HasOne("LinkedIn.JobScraper.Web.Persistence.Entities.AppUserRecord", "AppUser")
+                        .WithMany("LinkedInSessions")
+                        .HasForeignKey("AppUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AppUser");
+                });
+
             modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.AiGlobalShortlistRunRecord", b =>
                 {
                     b.Navigation("Candidates");
 
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.AppUserRecord", b =>
+                {
+                    b.Navigation("AiBehaviorSettings");
+
+                    b.Navigation("AiGlobalShortlistRuns");
+
+                    b.Navigation("Jobs");
+
+                    b.Navigation("LinkedInSearchSettings");
+
+                    b.Navigation("LinkedInSessions");
                 });
 
             modelBuilder.Entity("LinkedIn.JobScraper.Web.Persistence.Entities.JobRecord", b =>

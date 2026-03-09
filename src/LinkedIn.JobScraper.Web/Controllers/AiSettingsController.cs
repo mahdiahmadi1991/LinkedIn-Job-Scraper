@@ -1,12 +1,10 @@
 using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Authentication;
-using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.Controllers;
 
@@ -14,14 +12,14 @@ namespace LinkedIn.JobScraper.Web.Controllers;
 public sealed class AiSettingsController : Controller
 {
     private readonly IAiBehaviorSettingsService _aiBehaviorSettingsService;
-    private readonly IOptions<OpenAiSecurityOptions> _openAiSecurityOptions;
+    private readonly IOpenAiEffectiveSecurityOptionsResolver _openAiEffectiveSecurityOptionsResolver;
 
     public AiSettingsController(
         IAiBehaviorSettingsService aiBehaviorSettingsService,
-        IOptions<OpenAiSecurityOptions> openAiSecurityOptions)
+        IOpenAiEffectiveSecurityOptionsResolver openAiEffectiveSecurityOptionsResolver)
     {
         _aiBehaviorSettingsService = aiBehaviorSettingsService;
-        _openAiSecurityOptions = openAiSecurityOptions;
+        _openAiEffectiveSecurityOptionsResolver = openAiEffectiveSecurityOptionsResolver;
     }
 
     [HttpGet]
@@ -38,7 +36,7 @@ public sealed class AiSettingsController : Controller
 
         AiSettingsViewModelAdapter.PopulateConnectionStatus(
             viewModel,
-            AiSettingsViewModelAdapter.CreateConnectionState(_openAiSecurityOptions.Value));
+            await ResolveOpenAiConnectionStateAsync(cancellationToken));
 
         return View(viewModel);
     }
@@ -53,7 +51,7 @@ public sealed class AiSettingsController : Controller
         {
             AiSettingsViewModelAdapter.PopulateConnectionStatus(
                 viewModel,
-                AiSettingsViewModelAdapter.CreateConnectionState(_openAiSecurityOptions.Value));
+                await ResolveOpenAiConnectionStateAsync(cancellationToken));
             viewModel.StatusMessage = "All AI behavior fields are required.";
             viewModel.StatusSucceeded = false;
 
@@ -72,13 +70,46 @@ public sealed class AiSettingsController : Controller
             return View("Index", viewModel);
         }
 
+        var guardrailEvaluation = AiBehaviorInputGuardrails.Evaluate(
+            viewModel.BehavioralInstructions,
+            viewModel.PrioritySignals,
+            viewModel.ExclusionSignals);
+
+        viewModel.BehavioralInstructions = guardrailEvaluation.BehavioralInstructions;
+        viewModel.PrioritySignals = guardrailEvaluation.PrioritySignals;
+        viewModel.ExclusionSignals = guardrailEvaluation.ExclusionSignals;
+
+        if (guardrailEvaluation.IsBlocked)
+        {
+            AddGuardrailBlockingErrors(guardrailEvaluation);
+
+            AiSettingsViewModelAdapter.PopulateConnectionStatus(
+                viewModel,
+                await ResolveOpenAiConnectionStateAsync(cancellationToken));
+            viewModel.StatusMessage = "AI settings were blocked by guardrails. Review highlighted fields.";
+            viewModel.StatusSucceeded = false;
+
+            if (IsAjaxRequest())
+            {
+                var details = new ValidationProblemDetails(ModelState)
+                {
+                    Title = "AI settings guardrails blocked save",
+                    Detail = viewModel.StatusMessage,
+                    Status = StatusCodes.Status400BadRequest
+                };
+
+                return BadRequest(details);
+            }
+
+            return View("Index", viewModel);
+        }
+
         AiBehaviorProfile savedProfile;
 
         try
         {
             savedProfile = await _aiBehaviorSettingsService.SaveAsync(
                 new AiBehaviorProfile(
-                    viewModel.ProfileName,
                     viewModel.BehavioralInstructions,
                     viewModel.PrioritySignals,
                     viewModel.ExclusionSignals,
@@ -90,7 +121,7 @@ public sealed class AiSettingsController : Controller
         {
             AiSettingsViewModelAdapter.PopulateConnectionStatus(
                 viewModel,
-                AiSettingsViewModelAdapter.CreateConnectionState(_openAiSecurityOptions.Value));
+                await ResolveOpenAiConnectionStateAsync(cancellationToken));
             viewModel.StatusMessage = exception.Message;
             viewModel.StatusSucceeded = false;
 
@@ -107,8 +138,14 @@ public sealed class AiSettingsController : Controller
 
         viewModel.ConcurrencyToken = savedProfile.ConcurrencyToken;
 
-        TempData["AiSettingsStatusMessage"] =
-            $"Saved AI behavior profile '{savedProfile.ProfileName}' with {AiOutputLanguage.GetDisplayName(savedProfile.OutputLanguageCode)} output.";
+        var statusMessage =
+            $"Saved AI behavior settings with {AiOutputLanguage.GetDisplayName(savedProfile.OutputLanguageCode)} output.";
+        if (guardrailEvaluation.SoftWarnings.Count > 0)
+        {
+            statusMessage += $" Warning: {string.Join(' ', guardrailEvaluation.SoftWarnings)}";
+        }
+
+        TempData["AiSettingsStatusMessage"] = statusMessage;
         TempData["AiSettingsStatusSucceeded"] = bool.TrueString;
 
         if (IsAjaxRequest())
@@ -127,9 +164,9 @@ public sealed class AiSettingsController : Controller
     }
 
     [HttpGet]
-    public IActionResult ConnectionStatus()
+    public async Task<IActionResult> ConnectionStatus(CancellationToken cancellationToken)
     {
-        var payload = AiSettingsViewModelAdapter.CreateConnectionState(_openAiSecurityOptions.Value);
+        var payload = await ResolveOpenAiConnectionStateAsync(cancellationToken);
 
         if (!payload.Ready)
         {
@@ -150,11 +187,28 @@ public sealed class AiSettingsController : Controller
                     payload.Ready)));
     }
 
+    private async Task<OpenAiConnectionStateData> ResolveOpenAiConnectionStateAsync(CancellationToken cancellationToken)
+    {
+        var effectiveSecurityOptions = await _openAiEffectiveSecurityOptionsResolver.ResolveAsync(cancellationToken);
+        return AiSettingsViewModelAdapter.CreateConnectionState(effectiveSecurityOptions);
+    }
+
     private bool IsAjaxRequest()
     {
         return string.Equals(
             HttpContext?.Request.Headers.XRequestedWith.ToString(),
             "XMLHttpRequest",
             StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void AddGuardrailBlockingErrors(AiBehaviorGuardrailEvaluation evaluation)
+    {
+        foreach (var (field, messages) in evaluation.BlockingErrors)
+        {
+            foreach (var message in messages)
+            {
+                ModelState.AddModelError(field, message);
+            }
+        }
     }
 }

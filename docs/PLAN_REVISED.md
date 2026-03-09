@@ -4,7 +4,7 @@
 
 This plan replaces the current step-by-step delivery log in `docs/plan.md` with a forward-looking portfolio-quality roadmap for evolving the repository into a strong public showcase project while preserving its current product direction:
 
-- Keep the app a **local-only, single-user, modular monolith MVC**.
+- Keep the app a **local-only, per-user-isolated modular monolith MVC**.
 - Preserve the current **safe, user-in-the-loop** LinkedIn session model.
 - Improve **engineering quality, reliability, testability, observability, and presentation** without changing the product into a distributed system.
 - Keep the existing strengths: pragmatic service boundaries, MVC UI, EF Core + SQL Server, Playwright-assisted session capture, SignalR workflow progress, and OpenAI-based job triage.
@@ -63,7 +63,7 @@ The following public or cross-module contracts are candidates to be added or ref
 - No aggressive scraping, high-concurrency crawling, or anti-detection tactics.
 - No direct HTTP-level credential-post login as the primary LinkedIn auth strategy.
 - No migration to microservices, distributed queues, or event-driven infrastructure.
-- No internal app login/authentication in the current local-only phase.
+- No external IdP integration or enterprise-grade auth/tenant management in the current local-only phase.
 - No speculative expansion into multi-user tenancy, cloud-first hosting, or SaaS concerns.
 - No attempt to generalize this into a generic recruiter platform in the current roadmap.
 
@@ -590,7 +590,7 @@ These are the behaviors that must remain intact throughout all future work:
 - `Fetch & Score` orchestration
 - dashboard filtering, lazy-load, and row expansion
 - SignalR workflow progress and live activity log
-- local-only single-user posture
+- local-only per-user-isolated posture
 
 ### M0: Architecture Baseline & Guardrails
 

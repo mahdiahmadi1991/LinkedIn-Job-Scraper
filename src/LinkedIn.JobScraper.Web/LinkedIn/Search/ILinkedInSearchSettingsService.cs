@@ -1,3 +1,4 @@
+using LinkedIn.JobScraper.Web.Authentication;
 using LinkedIn.JobScraper.Web.Persistence;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -13,20 +14,25 @@ public interface ILinkedInSearchSettingsService
 
 public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsService, IDisposable
 {
+    private readonly ICurrentAppUserContext _currentAppUserContext;
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly SemaphoreSlim _initializationGate = new(1, 1);
     private volatile bool _databaseEnsured;
 
-    public LinkedInSearchSettingsService(IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory)
+    public LinkedInSearchSettingsService(
+        IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
+        ICurrentAppUserContext currentAppUserContext)
     {
         _dbContextFactory = dbContextFactory;
+        _currentAppUserContext = currentAppUserContext;
     }
 
     public async Task<LinkedInSearchSettings> GetActiveAsync(CancellationToken cancellationToken)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await EnsureDatabaseAsync(cancellationToken);
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var record = await GetOrCreateActiveRecordAsync(dbContext, cancellationToken);
+        var record = await GetOrCreateActiveRecordAsync(dbContext, userId, cancellationToken);
         return Map(record);
     }
 
@@ -35,10 +41,11 @@ public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsServi
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        var userId = _currentAppUserContext.GetRequiredUserId();
 
         await EnsureDatabaseAsync(cancellationToken);
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var record = await GetOrCreateActiveRecordAsync(dbContext, cancellationToken);
+        var record = await GetOrCreateActiveRecordAsync(dbContext, userId, cancellationToken);
         var entry = dbContext.Entry(record);
         var originalRowVersion = ConcurrencyTokenCodec.Decode(settings.ConcurrencyToken);
 
@@ -47,7 +54,6 @@ public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsServi
             entry.Property(static current => current.RowVersion).OriginalValue = originalRowVersion;
         }
 
-        record.ProfileName = settings.ProfileName.Trim();
         record.Keywords = settings.Keywords.Trim();
         record.LocationInput = NormalizeNullable(settings.LocationInput);
         record.LocationDisplayName = NormalizeNullable(settings.LocationDisplayName);
@@ -73,9 +79,11 @@ public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsServi
 
     private static async Task<LinkedInSearchSettingsRecord> GetOrCreateActiveRecordAsync(
         LinkedInJobScraperDbContext dbContext,
+        int userId,
         CancellationToken cancellationToken)
     {
         var record = await dbContext.LinkedInSearchSettings
+            .Where(settings => settings.AppUserId == userId)
             .OrderBy(static settings => settings.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -83,7 +91,7 @@ public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsServi
         {
             record = new LinkedInSearchSettingsRecord
             {
-                ProfileName = string.Empty,
+                AppUserId = userId,
                 Keywords = string.Empty,
                 LocationInput = null,
                 LocationDisplayName = null,
@@ -104,7 +112,6 @@ public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsServi
     private static LinkedInSearchSettings Map(LinkedInSearchSettingsRecord record)
     {
         return new LinkedInSearchSettings(
-            record.ProfileName,
             record.Keywords,
             record.LocationInput,
             record.LocationDisplayName,
@@ -179,7 +186,6 @@ public sealed class LinkedInSearchSettingsService : ILinkedInSearchSettingsServi
 }
 
 public sealed record LinkedInSearchSettings(
-    string ProfileName,
     string Keywords,
     string? LocationInput,
     string? LocationDisplayName,

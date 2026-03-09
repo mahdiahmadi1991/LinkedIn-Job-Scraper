@@ -1,29 +1,31 @@
 using LinkedIn.JobScraper.Web.Jobs;
-using LinkedIn.JobScraper.Web.Configuration;
+using LinkedIn.JobScraper.Web.Authentication;
 using LinkedIn.JobScraper.Web.Persistence;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.AI;
 
 public sealed class JobBatchScoringService : IJobBatchScoringService
 {
     private readonly IAiBehaviorSettingsService _behaviorSettingsService;
+    private readonly ICurrentAppUserContext _currentAppUserContext;
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly IJobScoringGateway _jobScoringGateway;
-    private readonly IOptions<OpenAiSecurityOptions> _openAiSecurityOptions;
+    private readonly IOpenAiEffectiveSecurityOptionsResolver _openAiSecurityOptionsResolver;
 
     public JobBatchScoringService(
+        ICurrentAppUserContext currentAppUserContext,
         IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
         IJobScoringGateway jobScoringGateway,
         IAiBehaviorSettingsService behaviorSettingsService,
-        IOptions<OpenAiSecurityOptions> openAiSecurityOptions)
+        IOpenAiEffectiveSecurityOptionsResolver openAiSecurityOptionsResolver)
     {
+        _currentAppUserContext = currentAppUserContext;
         _dbContextFactory = dbContextFactory;
         _jobScoringGateway = jobScoringGateway;
         _behaviorSettingsService = behaviorSettingsService;
-        _openAiSecurityOptions = openAiSecurityOptions;
+        _openAiSecurityOptionsResolver = openAiSecurityOptionsResolver;
     }
 
     public async Task<JobBatchScoringResult> ScoreReadyJobsAsync(
@@ -36,12 +38,14 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
             maxCount = 1;
         }
 
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
         var behaviorProfile = await _behaviorSettingsService.GetActiveAsync(cancellationToken);
 
         var jobsToScore = await dbContext.Jobs
             .Where(
-                static job =>
+                job =>
+                    job.AppUserId == userId &&
                     !string.IsNullOrWhiteSpace(job.Description) &&
                     job.AiScore == null)
             .OrderByDescending(static job => job.LastSeenAtUtc)
@@ -53,7 +57,7 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
             return JobBatchScoringResult.Succeeded(maxCount, 0, 0, 0);
         }
 
-        var scoringOptions = _openAiSecurityOptions.Value;
+        var scoringOptions = await _openAiSecurityOptionsResolver.ResolveAsync(cancellationToken);
         var concurrencyValidationError = scoringOptions.ValidateScoringConcurrency();
 
         if (concurrencyValidationError is not null)
@@ -214,10 +218,11 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
         Guid jobId,
         CancellationToken cancellationToken)
     {
+        var userId = _currentAppUserContext.GetRequiredUserId();
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var job = await dbContext.Jobs.SingleOrDefaultAsync(
-            candidate => candidate.Id == jobId,
+            candidate => candidate.Id == jobId && candidate.AppUserId == userId,
             cancellationToken);
 
         if (job is null)

@@ -83,16 +83,28 @@ public sealed class PlaywrightLinkedInBrowserLoginService :
     public async Task<LinkedInBrowserLoginState> GetStateAsync(CancellationToken cancellationToken)
     {
         var storedSession = await _sessionStore.GetCurrentAsync(cancellationToken);
+        var browserOpen = _browser is not null && _browser.IsConnected;
+        var autoCaptureRunning = _autoCaptureActive && browserOpen;
         var currentPageUrl = _page?.IsClosed == false ? _page.Url : null;
+        var autoCaptureStatusMessage = _autoCaptureStatusMessage;
+
+        if (!autoCaptureRunning &&
+            _autoCaptureActive &&
+            !_autoCaptureCompletedSuccessfully &&
+            string.IsNullOrWhiteSpace(autoCaptureStatusMessage))
+        {
+            autoCaptureStatusMessage =
+                "Controlled browser was closed before login completed. Launch Connect Session to try again.";
+        }
 
         return new LinkedInBrowserLoginState(
-            BrowserOpen: _browser is not null && _browser.IsConnected,
+            BrowserOpen: browserOpen,
             CurrentPageUrl: string.IsNullOrWhiteSpace(currentPageUrl) ? null : currentPageUrl,
             StoredSessionAvailable: storedSession is not null,
             StoredSessionCapturedAtUtc: storedSession?.CapturedAtUtc,
             StoredSessionSource: storedSession?.Source,
-            AutoCaptureActive: _autoCaptureActive,
-            AutoCaptureStatusMessage: _autoCaptureStatusMessage,
+            AutoCaptureActive: autoCaptureRunning,
+            AutoCaptureStatusMessage: autoCaptureStatusMessage,
             AutoCaptureCompletedSuccessfully: _autoCaptureCompletedSuccessfully);
     }
 
@@ -240,6 +252,14 @@ public sealed class PlaywrightLinkedInBrowserLoginService :
 
             try
             {
+                if (!IsControlledBrowserSessionOpen())
+                {
+                    _autoCaptureStatusMessage =
+                        "Controlled browser was closed before login completed. Launch Connect Session to try again.";
+                    await CloseControlledBrowserSessionAsync();
+                    return;
+                }
+
                 var snapshot = await TryCreateSnapshotAsync("PlaywrightAutoCapture");
 
                 if (snapshot is null)
@@ -265,6 +285,15 @@ public sealed class PlaywrightLinkedInBrowserLoginService :
             _autoCaptureStatusMessage =
                 "Auto-capture timed out before a logged-in LinkedIn session was detected. You can still finish manually with Capture Session.";
         }
+    }
+
+    private bool IsControlledBrowserSessionOpen()
+    {
+        return _browser is not null &&
+               _browser.IsConnected &&
+               _context is not null &&
+               _page is not null &&
+               !_page.IsClosed;
     }
 
     private async Task CloseControlledBrowserSessionAsync()

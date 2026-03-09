@@ -224,7 +224,7 @@ public class LinkedInSessionController : Controller
                 viewModel.StoredSessionAvailable,
                 viewModel.StoredSessionCapturedAtUtc,
                 viewModel.StoredSessionSource,
-                viewModel.AutoCaptureActive,
+                viewModel.IsAutoCaptureRunning,
                 viewModel.AutoCaptureStatusMessage,
                 viewModel.AutoCaptureCompletedSuccessfully,
                 viewModel.ShowManualCaptureAction,

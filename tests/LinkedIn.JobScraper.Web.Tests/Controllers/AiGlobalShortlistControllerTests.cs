@@ -2,6 +2,7 @@ using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.Controllers;
 using LinkedIn.JobScraper.Web.Jobs;
+using LinkedIn.JobScraper.Web.Tests.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,6 +14,7 @@ public sealed class AiGlobalShortlistControllerTests
     public async Task StartReturnsTypedPayloadAndStatusCode()
     {
         var controller = new AiGlobalShortlistController(
+            new TestCurrentAppUserContext(),
             new FakeAiGlobalShortlistService(
                 new AiGlobalShortlistRunResult(
                     true,
@@ -41,6 +43,7 @@ public sealed class AiGlobalShortlistControllerTests
     public async Task StartReturnsFailurePayloadWithServiceStatusCode()
     {
         var controller = new AiGlobalShortlistController(
+            new TestCurrentAppUserContext(),
             new FakeAiGlobalShortlistService(
                 new AiGlobalShortlistRunResult(
                     false,
@@ -69,6 +72,7 @@ public sealed class AiGlobalShortlistControllerTests
     {
         var runId = Guid.NewGuid();
         var controller = new AiGlobalShortlistController(
+            new TestCurrentAppUserContext(),
             new FakeAiGlobalShortlistService(
                 AiGlobalShortlistRunResult.Succeeded(runId, 30, 10, 6, 2, 1)),
             new InMemoryAiGlobalShortlistProgressStateStore());
@@ -89,6 +93,7 @@ public sealed class AiGlobalShortlistControllerTests
     {
         var runId = Guid.NewGuid();
         var controller = new AiGlobalShortlistController(
+            new TestCurrentAppUserContext(),
             new FakeAiGlobalShortlistService(
                 AiGlobalShortlistRunResult.Succeeded(runId, 30, 12, 7, 3, 1)),
             new InMemoryAiGlobalShortlistProgressStateStore());
@@ -108,6 +113,7 @@ public sealed class AiGlobalShortlistControllerTests
     public async Task LatestReturnsEmptySuccessWhenNoRunExists()
     {
         var controller = new AiGlobalShortlistController(
+            new TestCurrentAppUserContext(),
             new FakeAiGlobalShortlistService(
                 AiGlobalShortlistRunResult.Succeeded(Guid.NewGuid(), 0, 0, 0, 0, 0),
                 queueOverview: new AiGlobalShortlistQueueOverviewSnapshot(10, 3, 7)),
@@ -129,6 +135,7 @@ public sealed class AiGlobalShortlistControllerTests
     public async Task GetByIdReturnsNotFoundPayloadWhenRunDoesNotExist()
     {
         var controller = new AiGlobalShortlistController(
+            new TestCurrentAppUserContext(),
             new FakeAiGlobalShortlistService(
                 AiGlobalShortlistRunResult.Succeeded(Guid.NewGuid(), 0, 0, 0, 0, 0),
                 queueOverview: new AiGlobalShortlistQueueOverviewSnapshot(20, 5, 15)),
@@ -152,6 +159,7 @@ public sealed class AiGlobalShortlistControllerTests
     {
         var runId = Guid.Parse("bbbb1111-2222-3333-4444-555566667777");
         var controller = new AiGlobalShortlistController(
+            new TestCurrentAppUserContext(),
             new FakeAiGlobalShortlistService(
                 AiGlobalShortlistRunResult.Succeeded(runId, 30, 2, 10, 1, 0),
                 new AiGlobalShortlistRunSnapshot(
@@ -210,11 +218,12 @@ public sealed class AiGlobalShortlistControllerTests
     }
 
     [Fact]
-    public void ProgressReturnsOrderedBatch()
+    public async Task ProgressReturnsOrderedBatch()
     {
         var runId = Guid.NewGuid();
         var progressStore = new InMemoryAiGlobalShortlistProgressStateStore();
         progressStore.Append(
+            userId: 1,
             new AiGlobalShortlistProgressUpdate(
                 runId,
                 "running",
@@ -225,11 +234,27 @@ public sealed class AiGlobalShortlistControllerTests
                 AcceptedCount: 1));
 
         var controller = new AiGlobalShortlistController(
+            new TestCurrentAppUserContext(),
             new FakeAiGlobalShortlistService(
-                AiGlobalShortlistRunResult.Succeeded(runId, 10, 1, 1, 0, 0)),
+                AiGlobalShortlistRunResult.Succeeded(runId, 10, 1, 1, 0, 0),
+                new AiGlobalShortlistRunSnapshot(
+                    runId,
+                    "Running",
+                    DateTimeOffset.UtcNow.AddMinutes(-1),
+                    null,
+                    null,
+                    10,
+                    1,
+                    1,
+                    0,
+                    0,
+                    2,
+                    "gpt-5-mini",
+                    "In progress",
+                    [])),
             progressStore);
 
-        var result = controller.Progress(runId, 0);
+        var result = await controller.Progress(runId, 0, CancellationToken.None);
 
         var json = Assert.IsType<JsonResult>(result);
         var payload = Assert.IsType<AiGlobalShortlistProgressBatch>(json.Value);
@@ -240,9 +265,26 @@ public sealed class AiGlobalShortlistControllerTests
     }
 
     [Fact]
+    public async Task ProgressReturnsNotFoundWhenRunIsMissing()
+    {
+        var runId = Guid.NewGuid();
+        var controller = new AiGlobalShortlistController(
+            new TestCurrentAppUserContext(),
+            new FakeAiGlobalShortlistService(
+                AiGlobalShortlistRunResult.Succeeded(runId, 0, 0, 0, 0, 0),
+                run: null),
+            new InMemoryAiGlobalShortlistProgressStateStore());
+
+        var result = await controller.Progress(runId, 0, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
     public async Task OverviewReturnsTypedPayload()
     {
         var controller = new AiGlobalShortlistController(
+            new TestCurrentAppUserContext(),
             new FakeAiGlobalShortlistService(
                 AiGlobalShortlistRunResult.Succeeded(Guid.NewGuid(), 0, 0, 0, 0, 0),
                 queueOverview: new AiGlobalShortlistQueueOverviewSnapshot(125, 40, 85)),

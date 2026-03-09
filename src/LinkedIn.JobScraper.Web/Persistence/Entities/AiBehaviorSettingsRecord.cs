@@ -1,7 +1,7 @@
 namespace LinkedIn.JobScraper.Web.Persistence.Entities;
 
 /// <summary>
-/// Persisted AI scoring behavior profile used to build scoring prompts.
+/// Persisted AI scoring behavior settings used to build scoring prompts.
 /// </summary>
 public sealed class AiBehaviorSettingsRecord
 {
@@ -12,9 +12,14 @@ public sealed class AiBehaviorSettingsRecord
     public int Id { get; set; }
 
     /// <summary>
-    /// User-facing name of the behavior profile.
+    /// Owning local application user identifier.
     /// </summary>
-    public string ProfileName { get; set; } = string.Empty;
+    public int AppUserId { get; set; }
+
+    /// <summary>
+    /// Navigation to the owning local application user.
+    /// </summary>
+    public AppUserRecord AppUser { get; set; } = null!;
 
     /// <summary>
     /// Core instructions that define how the AI should evaluate jobs.

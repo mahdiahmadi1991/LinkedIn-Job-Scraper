@@ -2,6 +2,7 @@ using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Persistence;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
+using LinkedIn.JobScraper.Web.Tests.Authentication;
 using LinkedIn.JobScraper.Web.Tests.Persistence;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,7 @@ public sealed class AiGlobalShortlistServiceTests
         var now = DateTimeOffset.UtcNow;
         var firstJob = new JobRecord
         {
+            AppUserId = 1,
             LinkedInJobId = "job-all-1",
             LinkedInJobPostingUrn = "urn:li:jobPosting:all-1",
             Title = "First Eligible",
@@ -34,6 +36,7 @@ public sealed class AiGlobalShortlistServiceTests
         };
         var secondJob = new JobRecord
         {
+            AppUserId = 1,
             LinkedInJobId = "job-all-2",
             LinkedInJobPostingUrn = "urn:li:jobPosting:all-2",
             Title = "Second Eligible",
@@ -45,6 +48,7 @@ public sealed class AiGlobalShortlistServiceTests
         };
         var thirdJob = new JobRecord
         {
+            AppUserId = 1,
             LinkedInJobId = "job-all-3",
             LinkedInJobPostingUrn = "urn:li:jobPosting:all-3",
             Title = "Third Eligible",
@@ -138,6 +142,7 @@ public sealed class AiGlobalShortlistServiceTests
         var now = DateTimeOffset.UtcNow;
         var acceptedJob = new JobRecord
         {
+            AppUserId = 1,
             LinkedInJobId = "job-1",
             LinkedInJobPostingUrn = "urn:li:jobPosting:1",
             Title = "Accepted Candidate",
@@ -149,6 +154,7 @@ public sealed class AiGlobalShortlistServiceTests
         };
         var rejectedJob = new JobRecord
         {
+            AppUserId = 1,
             LinkedInJobId = "job-2",
             LinkedInJobPostingUrn = "urn:li:jobPosting:2",
             Title = "Rejected Candidate",
@@ -160,6 +166,7 @@ public sealed class AiGlobalShortlistServiceTests
         };
         var ignoredJob = new JobRecord
         {
+            AppUserId = 1,
             LinkedInJobId = "job-3",
             LinkedInJobPostingUrn = "urn:li:jobPosting:3",
             Title = "Ignored",
@@ -264,6 +271,7 @@ public sealed class AiGlobalShortlistServiceTests
         var now = DateTimeOffset.UtcNow;
         var alreadyReviewedJob = new JobRecord
         {
+            AppUserId = 1,
             LinkedInJobId = "job-reviewed",
             LinkedInJobPostingUrn = "urn:li:jobPosting:reviewed",
             Title = "Already Reviewed",
@@ -274,6 +282,7 @@ public sealed class AiGlobalShortlistServiceTests
         };
         var newJob = new JobRecord
         {
+            AppUserId = 1,
             LinkedInJobId = "job-new",
             LinkedInJobPostingUrn = "urn:li:jobPosting:new",
             Title = "New Candidate",
@@ -291,6 +300,7 @@ public sealed class AiGlobalShortlistServiceTests
                 new AiGlobalShortlistRunRecord
                 {
                     Id = historicalRunId,
+                    AppUserId = 1,
                     CreatedAtUtc = now.AddDays(-1),
                     CompletedAtUtc = now.AddDays(-1).AddMinutes(5),
                     Status = "Completed",
@@ -371,6 +381,7 @@ public sealed class AiGlobalShortlistServiceTests
         var now = DateTimeOffset.UtcNow;
         var firstJob = new JobRecord
         {
+            AppUserId = 1,
             LinkedInJobId = "job-11",
             LinkedInJobPostingUrn = "urn:li:jobPosting:11",
             Title = "First",
@@ -381,6 +392,7 @@ public sealed class AiGlobalShortlistServiceTests
         };
         var secondJob = new JobRecord
         {
+            AppUserId = 1,
             LinkedInJobId = "job-12",
             LinkedInJobPostingUrn = "urn:li:jobPosting:12",
             Title = "Second",
@@ -400,6 +412,7 @@ public sealed class AiGlobalShortlistServiceTests
                 new AiGlobalShortlistRunRecord
                 {
                     Id = runId,
+                    AppUserId = 1,
                     CreatedAtUtc = now.AddMinutes(-3),
                     Status = "Cancelled",
                     CandidateCount = 2,
@@ -522,6 +535,7 @@ public sealed class AiGlobalShortlistServiceTests
                 new AiGlobalShortlistRunRecord
                 {
                     Id = activeRunId,
+                    AppUserId = 1,
                     CreatedAtUtc = now.AddMinutes(-1),
                     Status = "Running",
                     CandidateCount = 200,
@@ -575,6 +589,7 @@ public sealed class AiGlobalShortlistServiceTests
                 new AiGlobalShortlistRunRecord
                 {
                     Id = runId,
+                    AppUserId = 1,
                     CreatedAtUtc = createdAtUtc,
                     Status = "Running",
                     CandidateCount = 100,
@@ -631,6 +646,7 @@ public sealed class AiGlobalShortlistServiceTests
                 new AiGlobalShortlistRunRecord
                 {
                     Id = runId,
+                    AppUserId = 1,
                     CreatedAtUtc = now.AddMinutes(-1),
                     Status = "Running",
                     CandidateCount = 20,
@@ -673,6 +689,7 @@ public sealed class AiGlobalShortlistServiceTests
         AiGlobalShortlistOptions shortlistOptions)
     {
         return new AiGlobalShortlistService(
+            new TestCurrentAppUserContext(),
             new TestDbContextFactory(dbOptions),
             shortlistGateway,
             new NullAiGlobalShortlistProgressNotifier(),
@@ -680,7 +697,7 @@ public sealed class AiGlobalShortlistServiceTests
             jobScoringGateway,
             new FakeAiBehaviorSettingsService(),
             Options.Create(shortlistOptions),
-            Options.Create(
+            new FixedOpenAiEffectiveSecurityOptionsResolver(
                 new OpenAiSecurityOptions
                 {
                     ApiKey = "test-key",
@@ -692,6 +709,7 @@ public sealed class AiGlobalShortlistServiceTests
     private sealed class NullAiGlobalShortlistProgressNotifier : IAiGlobalShortlistProgressNotifier
     {
         public Task PublishAsync(
+            int userId,
             string? connectionId,
             AiGlobalShortlistProgressUpdate update,
             CancellationToken cancellationToken)
@@ -702,24 +720,24 @@ public sealed class AiGlobalShortlistServiceTests
 
     private sealed class InMemoryProgressStateStore : IAiGlobalShortlistProgressStateStore
     {
-        private readonly HashSet<Guid> _activeRunIds;
+        private readonly HashSet<(int UserId, Guid RunId)> _activeRunIds;
 
         public InMemoryProgressStateStore(IEnumerable<Guid>? activeRunIds = null)
         {
             _activeRunIds = activeRunIds is null
                 ? []
-                : [.. activeRunIds];
+                : [.. activeRunIds.Select(static runId => (1, runId))];
         }
 
-        public AiGlobalShortlistProgressEvent Append(AiGlobalShortlistProgressUpdate update)
+        public AiGlobalShortlistProgressEvent Append(int userId, AiGlobalShortlistProgressUpdate update)
         {
-            _activeRunIds.Add(update.RunId);
+            _activeRunIds.Add((userId, update.RunId));
             return new AiGlobalShortlistProgressEvent(1, DateTimeOffset.UtcNow, update);
         }
 
-        public AiGlobalShortlistProgressBatch GetBatch(Guid runId, long afterSequence)
+        public AiGlobalShortlistProgressBatch GetBatch(int userId, Guid runId, long afterSequence)
         {
-            return _activeRunIds.Contains(runId)
+            return _activeRunIds.Contains((userId, runId))
                 ? new AiGlobalShortlistProgressBatch([], 1, true)
                 : new AiGlobalShortlistProgressBatch([], 1, false);
         }
@@ -731,7 +749,6 @@ public sealed class AiGlobalShortlistServiceTests
         {
             return Task.FromResult(
                 new AiBehaviorProfile(
-                    "Default",
                     "Behavior",
                     "Priority",
                     "Exclusion",
