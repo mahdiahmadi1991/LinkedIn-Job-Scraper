@@ -3,6 +3,7 @@
 ## Purpose
 
 This document captures the most common operational issues for local development and how to recover from them quickly.
+It also keeps a short lessons-learned log so repeated failures are less likely across future threads.
 
 ## 1. LinkedIn Session Problems
 
@@ -161,6 +162,34 @@ What to do:
 2. Set missing SQL values through user-secrets/environment variables and complete OpenAI values in Administration > OpenAI Setup.
 3. Re-run the app.
 
+### Symptom: App fails at startup when launched with `--no-launch-profile`
+
+Likely cause:
+
+- launch profile variables were bypassed (`ASPNETCORE_ENVIRONMENT=Development` not applied)
+- required runtime settings (especially `SqlServer:ConnectionString`) were not provided explicitly for that run
+
+What to do:
+
+1. Start the app with the recommended command:
+   - `dotnet run --launch-profile http --project src/LinkedIn.JobScraper.Web`
+2. If you must use `--no-launch-profile`, set all required values explicitly in that shell session (or via user-secrets/environment variables available to the process).
+3. Confirm startup log shows `Hosting environment: Development` when you expect development behavior.
+
+### Symptom: Firefox shows `This address is restricted` for local app URL
+
+Likely cause:
+
+- app was started on a Firefox-restricted port (for example `5060`)
+
+What to do:
+
+1. Use the default launch-profile URL:
+   - `http://localhost:5058`
+2. For HTTPS local testing, use:
+   - `https://localhost:7145`
+3. Avoid launching on restricted ports when manual browser validation is required.
+
 ## 5. Health and Diagnostics
 
 ### `/health`
@@ -276,3 +305,15 @@ What to do:
 1. Use the runbook in `docs/per-user-data-isolation-operations.md`.
 2. Fix the pre-check issue and rerun migration.
 3. If rollback is required, prefer DB backup restore over down-migration.
+
+## 9. Lessons Learned Log
+
+- 2026-03-10: Local launch reliability
+  - Failure pattern: running with `--no-launch-profile` caused startup failure due to missing SQL/runtime config in that process context.
+  - Stable fix: prefer `dotnet run --launch-profile http --project src/LinkedIn.JobScraper.Web` for manual local validation.
+  - Guardrail: always verify the startup line `Hosting environment: Development` before evaluating UI behavior.
+
+- 2026-03-10: Firefox local access restriction
+  - Failure pattern: launching local app on port `5060` caused Firefox error `This address is restricted`.
+  - Stable fix: run local validation on launch-profile ports (`5058` / `7145`).
+  - Guardrail: do not choose browser-restricted ports for user manual validation links.

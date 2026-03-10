@@ -201,11 +201,16 @@ You can also use environment variables instead of user-secrets if preferred.
 OpenAI API key is no longer configured from `appsettings`/pipeline secrets for normal runtime usage.
 Set and validate the key from `Admin -> OpenAI Setup`, where it is stored in local runtime secrets and applied immediately.
 
-### Run the app
+### Run the app (recommended)
 
 Run:
 
-- `dotnet run --project src/LinkedIn.JobScraper.Web`
+- `dotnet run --launch-profile http --project src/LinkedIn.JobScraper.Web`
+
+Notes:
+
+- This uses `src/LinkedIn.JobScraper.Web/Properties/launchSettings.json` and sets `ASPNETCORE_ENVIRONMENT=Development`.
+- Avoid `--no-launch-profile` unless you explicitly provide all required runtime configuration (especially `SqlServer:ConnectionString` and environment values) via user-secrets or environment variables.
 
 ### Local quality gate and Git hooks
 

@@ -11,6 +11,7 @@
 - Create a dedicated `docs/ideas/<idea-name>.md` file only for newly approved net-new features (capabilities that do not already exist in the system).
 - For bug fixes or improvements of existing capabilities, a dedicated idea file is not required unless the user explicitly requests one.
 - Keep "capture-only" (not-now) ideas in `docs/idea-inbox.md` with status tracking so they can be listed and selected later.
+- After any meaningful failure (runtime, integration, release, or workflow mistake), record a short lessons-learned entry in `docs/troubleshooting.md` under `Lessons Learned Log` (failure pattern, root cause, stable fix, guardrail).
 - When a net-new feature idea file exists, it must contain state-based execution steps, acceptance criteria, assumptions, and out-of-scope items; implementation must continuously reference that file to avoid drift.
 - Project versioning is mandatory and must use root `VERSION` with format `v.MAJOR.MINOR.PATCH`.
 - Every work integration into `develop` must include:
@@ -30,7 +31,10 @@
   - `fix/<slug>` for improvements to existing capabilities
   - `bugfix/<slug>` for bug fixes
 - Integration from work branches into `develop` does not require PR and must produce a merge commit on `develop`; squash work-branch commits to one commit before merging.
+- Before any merge into `develop`, Codex must run the project locally for user validation and receive explicit user approval in the same thread; without that approval, merging to `develop` is not allowed.
+- `main` merge is never implicit: Codex may merge into `main` only when the user explicitly requests `merge to main` in the current thread; requests like "continue" or "merge to develop" must never be interpreted as `main` approval.
 - Integration from `develop` into `main` must always use PR with a merge commit (no squash, no rebase).
+- `develop` intentionally has no CI pipeline; do not block `develop` integration waiting for CI checks.
 - Never watch GitHub pipelines by default. After triggering CI/CD, ask the user to check status unless the user explicitly asks for monitoring.
 
 ## Product Direction
@@ -87,19 +91,31 @@ After implementation (feature/fix/bugfix) is finished, follow this exact sequenc
 - Create/use a work branch with the required prefix (`feature/*`, `fix/*`, `bugfix/*`).
 - Commit the finalized changes on that branch.
 
-5. Develop Integration Gate
+5. Local Run + Approval Gate (Mandatory Before Develop Merge)
+- Run the project locally so the user can manually validate the latest implementation.
+- Default local validation launch command:
+  - `dotnet run --launch-profile http --project src/LinkedIn.JobScraper.Web`
+- Default validation URLs to share with the user:
+  - `http://localhost:5058`
+  - `https://localhost:7145`
+- Avoid browser-restricted ports for manual validation links (Firefox may block them with `This address is restricted`).
+- Wait for explicit user approval to merge into `develop`.
+- If explicit approval is not provided, stop and do not merge.
+
+6. Develop Integration Gate
 - Integrate the work branch into `develop` without PR.
 - First squash work-branch commits into one commit.
 - Then merge into `develop` with a merge commit (`--no-ff`) so the graph explicitly shows feature integration.
 - Delete the work branch after successful integration.
 
-6. Main Merge Gate
+7. Main Merge Gate
+- Require explicit user instruction for `main` merge in the current thread before opening/merging a PR to `main`.
 - Merge `develop` into `main` only via PR.
 - PR merge strategy must be `Create a merge commit` (no squash, no rebase).
 - Main pipeline must validate `VERSION`/`CHANGELOG.md` and register git tag for the active version when missing.
 - Main PR guard check must enforce `VERSION` + `CHANGELOG.md` presence before merge.
 
-7. Post-Main Sync Gate
+8. Post-Main Sync Gate
 - Immediately sync `develop` with `main` after the `main` merge so no long-lived divergence remains.
 
 ## Git Graph Policy (Mandatory)
