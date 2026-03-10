@@ -25,3 +25,4 @@ Purpose: store "capture-only" ideas that are not approved for immediate implemen
 | ID | CapturedOn (UTC) | Type | Title | Status | Notes |
 |---|---|---|---|---|---|
 | IDEA-2026-03-10-01 | 2026-03-10T18:50:51Z | Feature | LinkedIn Client-Side Fetch Mode | Captured | Deferred by product decision; details archived at `docs/archive/ideas/linkedin-client-side-fetch-mode.md`; do not implement unless explicitly re-approved. |
+| IDEA-2026-03-10-02 | 2026-03-10T20:54:56Z | Improvement | Product Rebrand to LinkedIn Career Signal | Captured | Deferred by product decision for now; full execution blueprint captured at `docs/archive/ideas/linkedin-career-signal-rebrand.md` with phased rollout, risks, acceptance criteria, and rollback plan. |
