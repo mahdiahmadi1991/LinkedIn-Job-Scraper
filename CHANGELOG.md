@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v.4.0.1] - 2026-03-10
+### Changed
+- Main-merge guard automation is now more resilient: required checks are re-evaluated automatically when PR reviews are submitted, reducing manual rerun steps.
+- Auto-merge orchestration for `develop -> main` now runs only after required guards pass and uses explicit repository context for more reliable execution.
+- Product-rebrand planning is now captured in backlog with an executable phased blueprint (`LinkedIn Career Signal`) for future implementation.
+
 ## [v.4.0.0] - 2026-03-10
 ### Changed
 - LinkedIn session setup is now a single clear path: users import `Copy as cURL (bash)` directly in the app.

@@ -9,6 +9,13 @@ on:
       - reopened
       - synchronize
       - ready_for_review
+  pull_request_review:
+    types:
+      - submitted
+
+concurrency:
+  group: main-pr-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   versioning-pr-guard:
@@ -106,7 +113,15 @@ jobs:
             );
 
   enable-auto-merge:
-    if: github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'develop' && github.event.pull_request.draft == false
+    needs:
+      - versioning-pr-guard
+      - copilot-review-gate
+    if: >-
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.ref == 'develop' &&
+      github.event.pull_request.draft == false &&
+      needs.versioning-pr-guard.result == 'success' &&
+      needs.copilot-review-gate.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -119,4 +134,4 @@ jobs:
         run: |
           set -euo pipefail
           PR_NUMBER='${{ github.event.pull_request.number }}'
-          gh pr merge "$PR_NUMBER" --auto --merge
+          gh pr merge "$PR_NUMBER" --repo '${{ github.repository }}' --auto --merge
