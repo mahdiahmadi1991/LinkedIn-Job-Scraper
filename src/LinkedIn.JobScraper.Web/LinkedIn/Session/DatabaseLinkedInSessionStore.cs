@@ -44,7 +44,12 @@ public sealed class DatabaseLinkedInSessionStore : ILinkedInSessionStore, IDispo
         var headers = JsonSerializer.Deserialize<Dictionary<string, string>>(record.RequestHeadersJson) ??
                       new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        return new LinkedInSessionSnapshot(headers, record.CapturedAtUtc, record.Source);
+        return new LinkedInSessionSnapshot(
+            headers,
+            record.CapturedAtUtc,
+            record.Source,
+            record.EstimatedExpiresAtUtc,
+            record.ExpirySource);
     }
 
     public async Task SaveAsync(LinkedInSessionSnapshot sessionSnapshot, CancellationToken cancellationToken)
@@ -73,6 +78,8 @@ public sealed class DatabaseLinkedInSessionStore : ILinkedInSessionStore, IDispo
         existingRecord.RequestHeadersJson = JsonSerializer.Serialize(sanitizedHeaders);
         existingRecord.CapturedAtUtc = sessionSnapshot.CapturedAtUtc;
         existingRecord.Source = sessionSnapshot.Source;
+        existingRecord.EstimatedExpiresAtUtc = sessionSnapshot.EstimatedExpiresAtUtc;
+        existingRecord.ExpirySource = sessionSnapshot.ExpirySource;
         existingRecord.IsActive = true;
         existingRecord.LastValidatedAtUtc = null;
 

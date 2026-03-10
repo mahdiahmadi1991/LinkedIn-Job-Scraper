@@ -7,7 +7,7 @@ This plan replaces the current step-by-step delivery log in `docs/plan.md` with 
 - Keep the app a **local-only, per-user-isolated modular monolith MVC**.
 - Preserve the current **safe, user-in-the-loop** LinkedIn session model.
 - Improve **engineering quality, reliability, testability, observability, and presentation** without changing the product into a distributed system.
-- Keep the existing strengths: pragmatic service boundaries, MVC UI, EF Core + SQL Server, Playwright-assisted session capture, SignalR workflow progress, and OpenAI-based job triage.
+- Keep the existing strengths: pragmatic service boundaries, MVC UI, EF Core + SQL Server, cURL-based session capture, SignalR workflow progress, and OpenAI-based job triage.
 
 Top 5 recommended milestones to do next:
 
@@ -89,7 +89,7 @@ The following public or cross-module contracts are candidates to be added or ref
   - parse OpenAI responses
 - **Application/service logic** must live in service classes under domain-relevant folders.
 - **Persistence concerns** must stay under `Persistence` and not leak direct EF query logic into controllers or views.
-- **Infrastructure integration** (LinkedIn, OpenAI, Playwright) must be isolated behind service contracts and not leak low-level concerns into UI rendering.
+- **Infrastructure integration** (LinkedIn and OpenAI) must be isolated behind service contracts and not leak low-level concerns into UI rendering.
 
 ### Proposed module boundaries
 
@@ -270,7 +270,7 @@ The following public or cross-module contracts are candidates to be added or ref
 - Standards:
   - minimal parallelism by default
   - explicit caps on page count and job count
-  - user-in-the-loop browser session capture
+  - user-in-the-loop authenticated cURL session import
   - automatic session invalidation on `401`
   - no direct credential-post login as the default path
 - Centralize pacing settings in configuration and feature flags:
@@ -354,7 +354,7 @@ The following public or cross-module contracts are candidates to be added or ref
   - last workflow summary snapshot
   - endpoint health status without live risky automation
 
-## 7. Security & Privacy (Local-Only MVP)
+## 7. Security & Privacy (Local-Only)
 
 ### Threat model for a local app
 
@@ -541,7 +541,7 @@ Document clear local setup for both the original owner and outside reviewers:
 - SQL Server connection setup
 - optional Docker-based SQL Server path
 - `dotnet-ef` tool setup
-- Playwright browser install path
+- Browser DevTools cURL copy guidance path
 - user-secrets setup for OpenAI and any sensitive config
 
 ### One-command run approach
@@ -584,7 +584,7 @@ Update or add the following documentation over time:
 
 These are the behaviors that must remain intact throughout all future work:
 
-- controlled-browser session capture
+- cURL-based session onboarding
 - automatic session invalidation on `401`
 - conservative LinkedIn fetch pacing
 - `Fetch & Score` orchestration
@@ -914,7 +914,7 @@ These are the behaviors that must remain intact throughout all future work:
 ### Developer Experience & Portfolio Presentation
 
 - **Must**: Rewrite `README.md` to match the current product reality. **Portfolio high-signal**
-- **Must**: Document local setup for SQL Server, Playwright, secrets, and app launch.
+- **Must**: Document local setup for SQL Server, LinkedIn cURL import workflow, secrets, and app launch.
 - **Must**: Add architecture and flow diagrams under `docs/`.
 - **Should**: Add screenshots of dashboard, settings, and session modal.
 - **Should**: Add troubleshooting guidance for LinkedIn session issues.

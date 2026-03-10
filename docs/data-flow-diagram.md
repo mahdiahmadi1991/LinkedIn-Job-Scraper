@@ -16,16 +16,16 @@ It is intended for:
 flowchart TD
     User["User opens session control"]
     Modal["Session Modal"]
-    Browser["Controlled Browser (Playwright)"]
-    Detect["Auto-capture detects authenticated cookies"]
+    Guide["In-app cURL guide (browser-specific)"]
+    Copy["User copies authenticated LinkedIn cURL"]
     Store["Store sanitized session headers"]
     Verify["Lightweight session verification"]
     Ready["Session indicator shows ready state"]
 
     User --> Modal
-    Modal --> Browser
-    Browser --> Detect
-    Detect --> Store
+    Modal --> Guide
+    Guide --> Copy
+    Copy --> Store
     Store --> Verify
     Verify --> Ready
 ```

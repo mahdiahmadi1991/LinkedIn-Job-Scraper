@@ -8,56 +8,65 @@
         return;
     }
 
-    const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
-    const autoCaptureNote = modalElement.querySelector("[data-session-auto-capture-note]");
-    const browserOpen = modalElement.querySelector("[data-session-browser-open]");
-    const currentPage = modalElement.querySelector("[data-session-current-page]");
-    const capturedAt = modalElement.querySelector("[data-session-captured-at]");
-    const source = modalElement.querySelector("[data-session-source]");
-    const statusLabel = modalElement.querySelector("[data-session-status-label]");
-    const waitingPanel = modalElement.querySelector("[data-session-waiting]");
-    const launchButton = modalElement.querySelector("[data-session-launch]");
-    const captureButton = modalElement.querySelector("[data-session-capture]");
-    const importCurlButton = modalElement.querySelector("[data-session-import-curl]");
-    const curlTextInput = modalElement.querySelector("[data-session-curl-text]");
-    const curlFeedbackNote = modalElement.querySelector("[data-session-curl-feedback]");
-    const revokeButton = modalElement.querySelector("[data-session-revoke]");
-    const stateUrl = modalElement.getAttribute("data-session-state-url") || "/LinkedInSession/State";
-    const launchUrl = modalElement.getAttribute("data-session-launch-url") || "/LinkedInSession/Launch";
-    const captureUrl = modalElement.getAttribute("data-session-capture-url") || "/LinkedInSession/Capture";
-    const importCurlUrl = modalElement.getAttribute("data-session-import-curl-url") || "/LinkedInSession/ImportCurl";
-    const verifyUrl = modalElement.getAttribute("data-session-verify-url") || "/LinkedInSession/Verify";
-    const revokeUrl = modalElement.getAttribute("data-session-revoke-url") || "/LinkedInSession/Revoke";
     const showToast = window.appToast?.show ?? (() => {});
     const setButtonLoading = window.appButtons?.setLoading ?? (() => {});
 
-    let autoCloseArmed = false;
-    let autoVerifyInFlight = false;
-    let pollTimer = null;
+    const stateUrl = modalElement.getAttribute("data-session-state-url") || "/LinkedInSession/State";
+    const importCurlUrl = modalElement.getAttribute("data-session-import-curl-url") || "/LinkedInSession/ImportCurl";
+    const revokeUrl = modalElement.getAttribute("data-session-revoke-url") || "/LinkedInSession/Revoke";
 
-    const setBusy = (busy, activeButton = null, busyText = null) => {
-        [launchButton, captureButton, importCurlButton, revokeButton].forEach((button) => {
-            if (button) {
-                if (button === activeButton) {
-                    setButtonLoading(button, busy, busyText);
-                } else {
-                    button.disabled = busy;
-                    if (!busy) {
-                        setButtonLoading(button, false);
-                    }
-                }
-            }
-        });
+    const statusLabel = modalElement.querySelector("[data-session-status-label]");
+    const capturedAt = modalElement.querySelector("[data-session-captured-at]");
+    const source = modalElement.querySelector("[data-session-source]");
+    const expiration = modalElement.querySelector("[data-session-expiration]");
+    const resetNote = modalElement.querySelector("[data-session-reset-note]");
+    const connectedPanel = modalElement.querySelector("[data-session-connected-panel]");
+    const curlPanel = modalElement.querySelector("[data-session-curl-panel]");
+    const startReplaceButton = modalElement.querySelector("[data-session-start-replace]");
+    const cancelReplaceButton = modalElement.querySelector("[data-session-cancel-replace]");
+    const importCurlButton = modalElement.querySelector("[data-session-import-curl]");
+    const revokeButton = modalElement.querySelector("[data-session-revoke]");
+    const curlTextInput = modalElement.querySelector("[data-session-curl-text]");
+    const curlFeedbackNote = modalElement.querySelector("[data-session-curl-feedback]");
+    const curlBrowserHint = modalElement.querySelector("[data-session-curl-browser-hint]");
+    const curlGuideCards = modalElement.querySelectorAll("[data-session-curl-guide-card]");
+    let replacingSession = false;
+    let currentState = null;
 
-        if (curlTextInput) {
-            curlTextInput.disabled = busy;
+    const resolveSessionIndicator = (state) => {
+        if (state?.resetRequirement?.required) {
+            return {
+                label: "Reset Required",
+                cssClass: "session-state-missing"
+            };
         }
+
+        if (state?.storedSessionAvailable) {
+            return {
+                label: "Connected",
+                cssClass: "session-state-connected"
+            };
+        }
+
+        return {
+            label: "Missing",
+            cssClass: "session-state-missing"
+        };
     };
 
-    const setFeedback = (message, success, shouldToast) => {
-        if (shouldToast && message) {
-            showToast(message, success);
+    const setResetMessage = (message) => {
+        if (!resetNote) {
+            return;
         }
+
+        if (!message) {
+            resetNote.classList.add("d-none");
+            resetNote.textContent = "";
+            return;
+        }
+
+        resetNote.classList.remove("d-none");
+        resetNote.textContent = message;
     };
 
     const setCurlFeedback = (message, tone = "subtle") => {
@@ -77,135 +86,199 @@
         curlFeedbackNote.classList.add(tone);
     };
 
-    const setAutoCaptureMessage = (message, active) => {
-        if (!autoCaptureNote) {
-            return;
-        }
+    const setBusy = (busy, activeButton = null, busyText = null) => {
+        [importCurlButton, revokeButton, startReplaceButton, cancelReplaceButton].forEach((button) => {
+            if (!button) {
+                return;
+            }
 
-        if (!message) {
-            autoCaptureNote.classList.add("d-none");
-            autoCaptureNote.textContent = "";
-            autoCaptureNote.classList.remove("active");
-            return;
-        }
+            if (button === activeButton) {
+                setButtonLoading(button, busy, busyText);
+                return;
+            }
 
-        autoCaptureNote.classList.remove("d-none", "active");
-        if (active) {
-            autoCaptureNote.classList.add("active");
+            button.disabled = busy;
+            if (!busy) {
+                setButtonLoading(button, false);
+            }
+        });
+
+        if (curlTextInput) {
+            curlTextInput.disabled = busy;
         }
-        autoCaptureNote.textContent = message;
     };
 
-    const resolveSessionIndicator = (state) => {
-        const autoCaptureRunning = Boolean(state?.autoCaptureActive && state?.browserOpen);
-
-        if (autoCaptureRunning) {
-            return {
-                autoCaptureRunning,
-                label: "Connecting",
-                cssClass: "session-state-connecting"
-            };
+    const formatUtcDateTime = (value) => {
+        const fromSharedFormatter = window.appDateTime?.formatDateTime?.(value);
+        if (fromSharedFormatter) {
+            return fromSharedFormatter;
         }
 
-        if (state?.storedSessionAvailable) {
-            return {
-                autoCaptureRunning,
-                label: "Connected",
-                cssClass: "session-state-connected"
-            };
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) {
+            return null;
         }
 
-        return {
-            autoCaptureRunning,
-            label: "Missing",
-            cssClass: "session-state-missing"
-        };
+        return new Intl.DateTimeFormat(undefined, {
+            dateStyle: "medium",
+            timeStyle: "short"
+        }).format(parsed);
+    };
+
+    const formatSessionSource = (sourceValue) => {
+        if (!sourceValue) {
+            return "Not available";
+        }
+
+        const normalized = String(sourceValue).trim();
+        if (!normalized) {
+            return "Not available";
+        }
+
+        if (normalized.toLowerCase() === "curlimport") {
+            return "cURL Import";
+        }
+
+        return normalized;
+    };
+
+    const isResetRequiredState = (state) => Boolean(state?.resetRequirement?.required);
+
+    const updatePanelVisibility = (state) => {
+        const connectedAndHealthy = Boolean(state?.storedSessionAvailable) && !isResetRequiredState(state);
+        const showConnectedPanel = connectedAndHealthy && !replacingSession;
+        const showCurlPanel = !showConnectedPanel;
+
+        if (connectedPanel) {
+            connectedPanel.classList.toggle("d-none", !showConnectedPanel);
+        }
+
+        if (curlPanel) {
+            curlPanel.classList.toggle("d-none", !showCurlPanel);
+        }
+
+        if (cancelReplaceButton) {
+            cancelReplaceButton.classList.toggle("d-none", !(connectedAndHealthy && replacingSession));
+        }
+    };
+
+    const buildResetRequiredMessage = (state) => {
+        if (!isResetRequiredState(state)) {
+            return null;
+        }
+
+        const reason = state?.resetRequirement?.message ||
+            "LinkedIn refused requests with your stored session.";
+
+        return `${reason} Reset Session, then import a fresh cURL request to continue.`;
+    };
+
+    const detectCurlGuideBrowserFamily = () => {
+        const userAgent = navigator.userAgent || "";
+        const lowerUserAgent = userAgent.toLowerCase();
+
+        if (lowerUserAgent.includes("firefox")) {
+            return "firefox";
+        }
+
+        if (
+            lowerUserAgent.includes("edg/") ||
+            lowerUserAgent.includes("chrome/") ||
+            lowerUserAgent.includes("brave/") ||
+            lowerUserAgent.includes("opr/")
+        ) {
+            return "chromium";
+        }
+
+        return "unknown";
+    };
+
+    const applyCurlGuideRecommendation = () => {
+        if (!curlGuideCards?.length) {
+            return;
+        }
+
+        const browserFamily = detectCurlGuideBrowserFamily();
+        const preferredBrowserFamily = browserFamily === "unknown" ? "chromium" : browserFamily;
+
+        curlGuideCards.forEach((card) => {
+            const cardBrowserFamily = card.getAttribute("data-session-curl-guide-card");
+            if (!cardBrowserFamily) {
+                return;
+            }
+
+            card.open = cardBrowserFamily === preferredBrowserFamily;
+        });
+
+        if (!curlBrowserHint) {
+            return;
+        }
+
+        if (browserFamily === "chromium") {
+            curlBrowserHint.classList.remove("d-none");
+            curlBrowserHint.textContent = "Recommended for your browser: follow Chrome/Edge/Brave steps.";
+            return;
+        }
+
+        if (browserFamily === "firefox") {
+            curlBrowserHint.classList.remove("d-none");
+            curlBrowserHint.textContent = "Recommended for your browser: follow Firefox steps.";
+            return;
+        }
+
+        curlBrowserHint.classList.add("d-none");
+        curlBrowserHint.textContent = "";
     };
 
     const applyState = (state) => {
         if (!state) {
             return;
         }
+
+        currentState = state;
+
+        if (!state.storedSessionAvailable || isResetRequiredState(state)) {
+            replacingSession = false;
+        }
+
         const sessionIndicator = resolveSessionIndicator(state);
-        const waitingVisible = sessionIndicator.autoCaptureRunning;
-
-        if (browserOpen) {
-            browserOpen.textContent = state.browserOpen ? "Open" : "Closed";
-        }
-
-        if (currentPage) {
-            currentPage.textContent = state.currentPageUrl || "Not available";
-        }
-
-        if (capturedAt) {
-            capturedAt.textContent = state.storedSessionCapturedAtUtc
-                ? new Date(state.storedSessionCapturedAtUtc).toISOString().replace("T", " ").replace(".000Z", " UTC")
-                : "Not available";
-        }
-
-        if (source) {
-            source.textContent = state.storedSessionSource || "Not available";
-        }
+        indicatorLabel.textContent = sessionIndicator.label;
+        indicator.classList.remove("session-state-connected", "session-state-connecting", "session-state-missing");
+        indicator.classList.add(sessionIndicator.cssClass);
 
         if (statusLabel) {
             statusLabel.textContent = sessionIndicator.label;
         }
 
-        if (launchButton) {
-            launchButton.textContent = state.primaryActionLabel || "Connect Session";
+        if (capturedAt) {
+            capturedAt.textContent = state.storedSessionCapturedAtUtc
+                ? (formatUtcDateTime(state.storedSessionCapturedAtUtc) || "Not available")
+                : "Not available";
         }
 
-        if (captureButton) {
-            captureButton.classList.toggle("d-none", !state.showManualCaptureAction);
+        if (source) {
+            source.textContent = formatSessionSource(state.storedSessionSource);
+        }
+
+        if (expiration) {
+            if (state.storedSessionEstimatedExpiresAtUtc) {
+                const expiryValue = formatUtcDateTime(state.storedSessionEstimatedExpiresAtUtc) || "Unknown";
+
+                expiration.textContent = state.storedSessionExpirySource
+                    ? `${expiryValue} (${state.storedSessionExpirySource})`
+                    : expiryValue;
+            } else {
+                expiration.textContent = "Unknown";
+            }
         }
 
         if (revokeButton) {
-            revokeButton.classList.toggle("d-none", !state.storedSessionAvailable || waitingVisible);
+            revokeButton.classList.toggle("d-none", !state.storedSessionAvailable);
         }
 
-        if (waitingPanel) {
-            waitingPanel.classList.toggle("d-none", !waitingVisible);
-        }
-
-        indicatorLabel.textContent = sessionIndicator.label;
-        indicator.classList.remove("session-state-connected", "session-state-connecting", "session-state-missing");
-        indicator.classList.add(sessionIndicator.cssClass);
-
+        updatePanelVisibility(state);
+        setResetMessage(buildResetRequiredMessage(state));
         window.dispatchEvent(new CustomEvent("linkedinsession:state", { detail: state }));
-
-        setAutoCaptureMessage(state.autoCaptureStatusMessage, waitingVisible);
-
-        if (autoCloseArmed && state.autoCaptureCompletedSuccessfully && state.storedSessionAvailable && !autoVerifyInFlight) {
-            autoVerifyInFlight = true;
-            void (async () => {
-                try {
-                    await postAction(verifyUrl, true);
-                } finally {
-                    autoVerifyInFlight = false;
-                    autoCloseArmed = false;
-                }
-            })();
-            return;
-        }
-
-        if (autoCloseArmed && state.autoCaptureCompletedSuccessfully && state.storedSessionAvailable) {
-            autoCloseArmed = false;
-            window.clearTimeout(pollTimer);
-            pollTimer = null;
-            modal.hide();
-        }
-
-        if (autoCloseArmed && !state.autoCaptureActive && !state.autoCaptureCompletedSuccessfully) {
-            autoCloseArmed = false;
-            window.clearTimeout(pollTimer);
-            pollTimer = null;
-        }
-
-        if (autoCloseArmed && state.autoCaptureActive && !state.browserOpen && !state.autoCaptureCompletedSuccessfully) {
-            autoCloseArmed = false;
-            window.clearTimeout(pollTimer);
-            pollTimer = null;
-        }
     };
 
     const fetchState = async () => {
@@ -238,7 +311,7 @@
         }
     };
 
-    const postAction = async (path, closeOnSuccess, actionButton = null, busyText = null, formFields = null, shouldToast = true) => {
+    const postAction = async (path, actionButton = null, busyText = null, formFields = null, shouldToast = true) => {
         setBusy(true, actionButton, busyText);
 
         try {
@@ -265,8 +338,10 @@
             const payload = await tryReadJsonPayload(response);
 
             if (!response.ok) {
-                const problemMessage = payload?.detail || payload?.title || "LinkedIn session action failed.";
-                setFeedback(problemMessage, false, shouldToast);
+                const message = payload?.detail || payload?.title || "LinkedIn session action failed.";
+                if (shouldToast) {
+                    showToast(message, false);
+                }
 
                 try {
                     await fetchState();
@@ -275,71 +350,33 @@
 
                 return {
                     success: false,
-                    state: null,
-                    message: problemMessage
+                    message
                 };
             }
 
-            setFeedback(payload.message, payload.success, shouldToast);
-            applyState(payload.state);
-
-            if (closeOnSuccess && payload.success && payload.state?.storedSessionAvailable) {
-                modal.hide();
+            if (shouldToast && payload?.message) {
+                showToast(payload.message, payload.success);
             }
 
+            applyState(payload.state);
             return payload;
         } finally {
             setBusy(false);
         }
     };
 
-    const startPolling = () => {
-        window.clearTimeout(pollTimer);
-
-        const tick = async () => {
-            try {
-                await fetchState();
-            } catch {
-            }
-
-            if (autoCloseArmed) {
-                pollTimer = window.setTimeout(tick, 2000);
-            }
-        };
-
-        pollTimer = window.setTimeout(tick, 1500);
-    };
-
     modalElement.addEventListener("show.bs.modal", () => {
-        autoCloseArmed = false;
-        autoVerifyInFlight = false;
+        replacingSession = false;
         setCurlFeedback(null);
+        applyCurlGuideRecommendation();
         void fetchState();
     });
 
     modalElement.addEventListener("hidden.bs.modal", () => {
-        autoCloseArmed = false;
-        autoVerifyInFlight = false;
-        window.clearTimeout(pollTimer);
-        pollTimer = null;
+        replacingSession = false;
+        currentState = null;
         setCurlFeedback(null);
     });
-
-    if (launchButton) {
-        launchButton.addEventListener("click", async () => {
-            const payload = await postAction(launchUrl, false, launchButton, "Opening browser...");
-            if (payload.success) {
-                autoCloseArmed = true;
-                startPolling();
-            }
-        });
-    }
-
-    if (captureButton) {
-        captureButton.addEventListener("click", async () => {
-            await postAction(captureUrl, true, captureButton, "Capturing session...");
-        });
-    }
 
     if (curlTextInput) {
         curlTextInput.addEventListener("input", () => {
@@ -352,7 +389,7 @@
             const curlText = curlTextInput.value.trim();
 
             if (!curlText) {
-                setCurlFeedback("Paste a LinkedIn Copy as cURL (bash) request first.", "danger");
+                setCurlFeedback("Paste a LinkedIn Copy as cURL request first.", "danger");
                 return;
             }
 
@@ -360,26 +397,49 @@
 
             const payload = await postAction(
                 importCurlUrl,
-                false,
                 importCurlButton,
                 "Validating cURL...",
                 {
                     curlText
                 },
-                false);
+                false
+            );
+
+            if (payload.success) {
+                replacingSession = false;
+            }
 
             setCurlFeedback(
                 payload.message || (payload.success
                     ? "LinkedIn session was imported and verified."
                     : "LinkedIn cURL import failed."),
-                payload.success ? "success" : "danger");
+                payload.success ? "success" : "danger"
+            );
+        });
+    }
+
+    if (startReplaceButton) {
+        startReplaceButton.addEventListener("click", () => {
+            replacingSession = true;
+            updatePanelVisibility(currentState);
+            setCurlFeedback("Paste a fresh LinkedIn cURL request to replace the current session.", "subtle");
+            curlTextInput?.focus();
+        });
+    }
+
+    if (cancelReplaceButton) {
+        cancelReplaceButton.addEventListener("click", () => {
+            replacingSession = false;
+            updatePanelVisibility(currentState);
+            setCurlFeedback(null);
         });
     }
 
     if (revokeButton) {
         revokeButton.addEventListener("click", async () => {
-            autoCloseArmed = false;
-            await postAction(revokeUrl, false, revokeButton, "Revoking session...");
+            replacingSession = false;
+            setCurlFeedback(null);
+            await postAction(revokeUrl, revokeButton, "Resetting session...", null, true);
         });
     }
 })();

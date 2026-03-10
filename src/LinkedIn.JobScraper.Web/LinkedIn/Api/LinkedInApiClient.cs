@@ -2,6 +2,7 @@ using System.Net;
 
 using System.Diagnostics;
 using LinkedIn.JobScraper.Web.Configuration;
+using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using Microsoft.Extensions.Options;
 
 namespace LinkedIn.JobScraper.Web.LinkedIn.Api;
@@ -22,17 +23,23 @@ public sealed class LinkedInApiClient : ILinkedInApiClient
     private readonly HttpClient _httpClient;
     private readonly LinkedInFetchDiagnosticsOptions _fetchDiagnosticsOptions;
     private readonly LinkedInRequestSafetyOptions _requestSafetyOptions;
+    private readonly ILinkedInSessionResetRequirementTracker _linkedInSessionResetRequirementTracker;
+    private readonly ILinkedInSessionStore _linkedInSessionStore;
     private readonly ILogger<LinkedInApiClient> _logger;
 
     public LinkedInApiClient(
         HttpClient httpClient,
         IOptions<LinkedInFetchDiagnosticsOptions> fetchDiagnosticsOptions,
         IOptions<LinkedInRequestSafetyOptions> requestSafetyOptions,
+        ILinkedInSessionResetRequirementTracker linkedInSessionResetRequirementTracker,
+        ILinkedInSessionStore linkedInSessionStore,
         ILogger<LinkedInApiClient> logger)
     {
         _httpClient = httpClient;
         _fetchDiagnosticsOptions = fetchDiagnosticsOptions.Value;
         _requestSafetyOptions = requestSafetyOptions.Value;
+        _linkedInSessionResetRequirementTracker = linkedInSessionResetRequirementTracker;
+        _linkedInSessionStore = linkedInSessionStore;
         _logger = logger;
     }
 
@@ -95,6 +102,7 @@ public sealed class LinkedInApiClient : ILinkedInApiClient
             cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         stopwatch.Stop();
+        await ApplyResetRequirementFromResponseAsync((int)response.StatusCode, cancellationToken);
 
         if (diagnosticsEnabled && _logger.IsEnabled(LogLevel.Information))
         {
@@ -122,6 +130,44 @@ public sealed class LinkedInApiClient : ILinkedInApiClient
         }
 
         return new LinkedInApiResponse((int)response.StatusCode, response.IsSuccessStatusCode, body);
+    }
+
+    private async Task ApplyResetRequirementFromResponseAsync(int statusCode, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (statusCode == (int)HttpStatusCode.Unauthorized)
+            {
+                await _linkedInSessionStore.InvalidateCurrentAsync(cancellationToken);
+                _linkedInSessionResetRequirementTracker.MarkRequired(
+                    LinkedInSessionResetReasonCodes.SessionUnauthorized,
+                    "LinkedIn rejected this session with HTTP 401 (Unauthorized). Reset Session, then reconnect to continue.",
+                    statusCode);
+
+                Log.LinkedInApiTriggeredSessionResetRequirement(
+                    _logger,
+                    statusCode,
+                    LinkedInSessionResetReasonCodes.SessionUnauthorized);
+                return;
+            }
+
+            if (statusCode == (int)HttpStatusCode.Forbidden)
+            {
+                _linkedInSessionResetRequirementTracker.MarkRequired(
+                    LinkedInSessionResetReasonCodes.SessionForbidden,
+                    "LinkedIn rejected this session with HTTP 403 (Forbidden). Reset Session, then reconnect to continue.",
+                    statusCode);
+
+                Log.LinkedInApiTriggeredSessionResetRequirement(
+                    _logger,
+                    statusCode,
+                    LinkedInSessionResetReasonCodes.SessionForbidden);
+            }
+        }
+        catch (Exception exception)
+        {
+            Log.LinkedInApiFailedToApplyResetRequirement(_logger, statusCode, exception);
+        }
     }
 
     private async Task<TimeSpan> WaitForSafetyWindowAsync(
@@ -197,4 +243,22 @@ internal static partial class Log
         int waitMilliseconds,
         int minimumDelayMilliseconds,
         int maxJitterMilliseconds);
+
+    [LoggerMessage(
+        EventId = 3105,
+        Level = LogLevel.Warning,
+        Message = "LinkedIn API response triggered session reset-required state. StatusCode={StatusCode}, ReasonCode={ReasonCode}")]
+    public static partial void LinkedInApiTriggeredSessionResetRequirement(
+        ILogger logger,
+        int statusCode,
+        string reasonCode);
+
+    [LoggerMessage(
+        EventId = 3106,
+        Level = LogLevel.Error,
+        Message = "LinkedIn API failed while applying reset-required state. StatusCode={StatusCode}")]
+    public static partial void LinkedInApiFailedToApplyResetRequirement(
+        ILogger logger,
+        int statusCode,
+        Exception exception);
 }

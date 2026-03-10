@@ -1,5 +1,6 @@
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace LinkedIn.JobScraper.Web.Tests.LinkedIn;
 
@@ -14,12 +15,15 @@ public sealed class LinkedInSessionCurlImportServiceTests
                 DateTimeOffset.UtcNow.AddMinutes(-10),
                 "Existing"));
         var verificationService = new SuccessfulLinkedInSessionVerificationService();
-        var service = new LinkedInSessionCurlImportService(sessionStore, verificationService);
+        var service = new LinkedInSessionCurlImportService(
+            sessionStore,
+            verificationService,
+            NullLogger<LinkedInSessionCurlImportService>.Instance);
 
         const string curlText =
             """
             curl 'https://www.linkedin.com/voyager/api/graphql' \
-              -H 'cookie: li_at=test-cookie' \
+              -H 'cookie: li_at=test-cookie; JSESSIONID="ajax:123"' \
               -H 'csrf-token: ajax:123' \
               -H 'user-agent: test-agent' \
               -H 'referer: https://www.linkedin.com/jobs/search/?keywords=C%23%20.Net' \
@@ -35,7 +39,7 @@ public sealed class LinkedInSessionCurlImportServiceTests
         Assert.True(sessionStore.MarkValidatedCalled);
         Assert.NotNull(sessionStore.CurrentSnapshot);
         Assert.Equal("CurlImport", sessionStore.CurrentSnapshot!.Source);
-        Assert.Equal("li_at=test-cookie", sessionStore.CurrentSnapshot.Headers["Cookie"]);
+        Assert.Equal("li_at=test-cookie; JSESSIONID=\"ajax:123\"", sessionStore.CurrentSnapshot.Headers["Cookie"]);
         Assert.Equal("ajax:123", sessionStore.CurrentSnapshot.Headers["csrf-token"]);
         Assert.Equal("test-agent", sessionStore.CurrentSnapshot.Headers["User-Agent"]);
         Assert.Equal("https://www.linkedin.com/jobs/search/?keywords=C%23%20.Net", sessionStore.CurrentSnapshot.Headers["Referer"]);
@@ -54,7 +58,8 @@ public sealed class LinkedInSessionCurlImportServiceTests
         var sessionStore = new FakeLinkedInSessionStore(existingSnapshot);
         var service = new LinkedInSessionCurlImportService(
             sessionStore,
-            new FailingLinkedInSessionVerificationService());
+            new FailingLinkedInSessionVerificationService(),
+            NullLogger<LinkedInSessionCurlImportService>.Instance);
 
         const string curlText =
             "curl 'https://www.linkedin.com/feed/' -H 'cookie: li_at=test-cookie' -H 'csrf-token: ajax:123'";
@@ -72,10 +77,13 @@ public sealed class LinkedInSessionCurlImportServiceTests
     {
         var sessionStore = new FakeLinkedInSessionStore(null);
         var verificationService = new SuccessfulLinkedInSessionVerificationService();
-        var service = new LinkedInSessionCurlImportService(sessionStore, verificationService);
+        var service = new LinkedInSessionCurlImportService(
+            sessionStore,
+            verificationService,
+            NullLogger<LinkedInSessionCurlImportService>.Instance);
 
         const string curlText =
-            "curl 'https://www.linkedin.com/feed/' -H 'cookie: li_at=test-cookie'";
+            "curl 'https://www.linkedin.com/feed/' -H 'cookie: li_at=test-cookie; JSESSIONID=\"\"'";
 
         var result = await service.ImportAsync(curlText, CancellationToken.None);
 
@@ -83,6 +91,46 @@ public sealed class LinkedInSessionCurlImportServiceTests
         Assert.Contains("csrf-token", result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.False(sessionStore.SaveCalled);
         Assert.Equal(0, verificationService.VerifyCallCount);
+    }
+
+    [Fact]
+    public async Task ImportAsyncDerivesCsrfTokenFromJSessionCookieWhenHeaderIsMissing()
+    {
+        var sessionStore = new FakeLinkedInSessionStore(null);
+        var verificationService = new SuccessfulLinkedInSessionVerificationService();
+        var service = new LinkedInSessionCurlImportService(
+            sessionStore,
+            verificationService,
+            NullLogger<LinkedInSessionCurlImportService>.Instance);
+
+        const string curlText =
+            "curl 'https://www.linkedin.com/voyager/api/graphql' -H 'cookie: li_at=test-cookie; JSESSIONID=\"ajax:789\"'";
+
+        var result = await service.ImportAsync(curlText, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(sessionStore.CurrentSnapshot);
+        Assert.Equal("ajax:789", sessionStore.CurrentSnapshot!.Headers["csrf-token"]);
+    }
+
+    [Fact]
+    public async Task ImportAsyncReturnsActionableMessageForFetchInput()
+    {
+        var sessionStore = new FakeLinkedInSessionStore(null);
+        var verificationService = new SuccessfulLinkedInSessionVerificationService();
+        var service = new LinkedInSessionCurlImportService(
+            sessionStore,
+            verificationService,
+            NullLogger<LinkedInSessionCurlImportService>.Instance);
+
+        const string fetchText =
+            "fetch(\"https://www.linkedin.com/voyager/api/graphql\", { method: \"GET\" })";
+
+        var result = await service.ImportAsync(fetchText, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Contains("Copy as cURL", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(sessionStore.SaveCalled);
     }
 
     private sealed class FakeLinkedInSessionStore : ILinkedInSessionStore

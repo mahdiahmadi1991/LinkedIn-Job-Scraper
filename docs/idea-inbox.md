@@ -24,4 +24,4 @@ Purpose: store "capture-only" ideas that are not approved for immediate implemen
 
 | ID | CapturedOn (UTC) | Type | Title | Status | Notes |
 |---|---|---|---|---|---|
-| - | - | - | - | - | - |
+| IDEA-2026-03-10-01 | 2026-03-10T18:50:51Z | Feature | LinkedIn Client-Side Fetch Mode | Captured | Deferred by product decision; details archived at `docs/archive/ideas/linkedin-client-side-fetch-mode.md`; do not implement unless explicitly re-approved. |

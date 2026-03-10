@@ -67,3 +67,69 @@
         setLoading
     };
 })();
+
+(() => {
+    const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short"
+    });
+    const dateTimeWithSecondsFormatter = new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium",
+        timeStyle: "medium"
+    });
+
+    const parseDate = (value) => {
+        if (!value) {
+            return null;
+        }
+
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) {
+            return null;
+        }
+
+        return parsed;
+    };
+
+    const formatDateTime = (value, includeSeconds = false) => {
+        const parsed = parseDate(value);
+        if (!parsed) {
+            return null;
+        }
+
+        return includeSeconds
+            ? dateTimeWithSecondsFormatter.format(parsed)
+            : dateTimeFormatter.format(parsed);
+    };
+
+    const hydrateUtcDisplays = (scope = document) => {
+        if (!(scope instanceof Document || scope instanceof Element)) {
+            return;
+        }
+
+        const displays = scope.querySelectorAll("[data-utc-display]");
+        for (const element of displays) {
+            if (!(element instanceof HTMLElement)) {
+                continue;
+            }
+
+            const utcValue = element.dataset.utcDisplay || "";
+            const emptyValue = element.dataset.utcEmpty || "-";
+            const formatted = formatDateTime(utcValue);
+            element.textContent = formatted || emptyValue;
+        }
+    };
+
+    window.appDateTime = {
+        formatDateTime,
+        hydrateUtcDisplays
+    };
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", () => {
+            hydrateUtcDisplays(document);
+        }, { once: true });
+    } else {
+        hydrateUtcDisplays(document);
+    }
+})();

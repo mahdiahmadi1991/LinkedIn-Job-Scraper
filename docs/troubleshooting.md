@@ -18,9 +18,9 @@ Likely cause:
 What to do:
 
 1. Open the top-right session control.
-2. Launch the controlled browser again.
-3. Complete login manually.
-4. Let auto-capture store a fresh session.
+2. Click `Reset Session`.
+3. Follow the in-modal guide and copy an authenticated LinkedIn request as `cURL`.
+4. Paste it into the cURL field and click `Validate & Import cURL`.
 5. Re-run the workflow.
 
 ### Symptom: Session looks disconnected in the UI
@@ -28,28 +28,28 @@ What to do:
 Likely cause:
 
 - there is no active stored session
-- the last stored session was revoked or invalidated
+- the last stored session was reset or invalidated
 
 What to do:
 
-1. Use `Connect Session` or `Refresh Session`.
-2. Complete LinkedIn login in the controlled browser.
-3. Wait for auto-capture to complete.
+1. Open the top-right session control.
+2. Copy an authenticated LinkedIn `/voyager/api/` request as `cURL` from DevTools > Network.
+3. Paste and run `Validate & Import cURL`.
 
-### Symptom: Session modal keeps waiting and does not auto-close
+### Symptom: cURL import fails with format or parsing error
 
 Likely cause:
 
-- LinkedIn login is not fully complete yet
-- a challenge page (2FA / verification) is still open
-- authenticated cookies were not observed yet
+- pasted text is not `Copy as cURL` format (for example `fetch(...)` or PowerShell)
+- copied request is not authenticated
+- selected request is not a LinkedIn `/voyager/api/` call
 
 What to do:
 
-1. Finish any verification steps in the controlled browser.
-2. Wait for the final authenticated page to load.
-3. If the modal still does not complete, use the fallback manual capture action if shown.
-4. If needed, revoke and start the session flow again.
+1. Open LinkedIn while signed in.
+2. In DevTools > Network, pick a request containing `/voyager/api/`.
+3. Use `Copy as cURL` and paste the full command into the modal. In Chromium browsers use `Copy -> Copy as cURL (bash)` (or `cmd`). In Firefox use `Copy Value -> Copy as cURL (POSIX)` (or `Windows`).
+4. If it still fails, reset session and repeat with a fresh request.
 
 ## 2. LinkedIn Fetch Problems
 
@@ -327,3 +327,13 @@ What to do:
   - Failure pattern: integration-style actions (release version/changelog and commit readiness assumptions) were applied before user completed review and explicitly requested merge.
   - Stable fix: never commit unless explicitly requested in the current thread; keep release versioning only for the `develop` integration step.
   - Guardrail: intermediate work is unversioned at release level; bump/tag/changelog only at squash+merge to `develop` after explicit user instruction.
+
+- 2026-03-10: Static-web-assets cache lock during concurrent local commands
+  - Failure pattern: running build and test in parallel caused file-lock contention on `obj/Debug/net10.0/rpswa.dswa.cache.json`.
+  - Stable fix: run dotnet validation commands sequentially when static-web-assets generation is involved.
+  - Guardrail: avoid parallel local build/test command execution against the same project output path.
+
+- 2026-03-10: Static-web-assets lock repeated during parallel validation
+  - Failure pattern: even after stopping the app instance, running build and tests in parallel still reintroduced `rpswa.dswa.cache.json` lock contention.
+  - Stable fix: run `dotnet test` and `dotnet build` strictly one after another for this project.
+  - Guardrail: never parallelize local validation commands that touch the same ASP.NET static-web-assets pipeline.

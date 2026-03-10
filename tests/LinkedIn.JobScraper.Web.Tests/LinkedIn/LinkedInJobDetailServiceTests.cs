@@ -28,7 +28,7 @@ public sealed class LinkedInJobDetailServiceTests
         Assert.False(result.Success);
         Assert.Equal(502, result.StatusCode);
         Assert.Contains("No active LinkedIn session is available", result.Message, StringComparison.Ordinal);
-        Assert.Contains("Connect Session", result.Message, StringComparison.Ordinal);
+        Assert.Contains("import cURL", result.Message, StringComparison.Ordinal);
         Assert.Null(result.Job);
     }
 

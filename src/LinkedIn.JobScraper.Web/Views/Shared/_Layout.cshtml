@@ -2,7 +2,9 @@
 @using LinkedIn.JobScraper.Web.Models
 @using LinkedIn.JobScraper.Web.LinkedIn.Session
 @using LinkedIn.JobScraper.Web.Versioning
-@inject ILinkedInBrowserLoginService LinkedInBrowserLoginService
+@using System.Globalization
+@inject ILinkedInSessionStore LinkedInSessionStore
+@inject ILinkedInSessionResetRequirementTracker LinkedInSessionResetRequirementTracker
 @inject IAppVersionProvider AppVersionProvider
 @{
     LinkedInSessionPageViewModel linkedInSessionViewModel;
@@ -10,18 +12,17 @@
 
     try
     {
-        var linkedInSessionState = await LinkedInBrowserLoginService.GetStateAsync(Context.RequestAborted);
+        var linkedInSessionSnapshot = await LinkedInSessionStore.GetCurrentAsync(Context.RequestAborted);
+        var resetRequirement = LinkedInSessionResetRequirementTracker.GetCurrent();
 
         linkedInSessionViewModel = new LinkedInSessionPageViewModel
         {
-            BrowserOpen = linkedInSessionState.BrowserOpen,
-            CurrentPageUrl = linkedInSessionState.CurrentPageUrl,
-            StoredSessionAvailable = linkedInSessionState.StoredSessionAvailable,
-            StoredSessionCapturedAtUtc = linkedInSessionState.StoredSessionCapturedAtUtc,
-            StoredSessionSource = linkedInSessionState.StoredSessionSource,
-            AutoCaptureActive = linkedInSessionState.AutoCaptureActive,
-            AutoCaptureStatusMessage = linkedInSessionState.AutoCaptureStatusMessage,
-            AutoCaptureCompletedSuccessfully = linkedInSessionState.AutoCaptureCompletedSuccessfully
+            StoredSessionAvailable = linkedInSessionSnapshot is not null,
+            StoredSessionCapturedAtUtc = linkedInSessionSnapshot?.CapturedAtUtc,
+            StoredSessionSource = linkedInSessionSnapshot?.Source,
+            StoredSessionEstimatedExpiresAtUtc = linkedInSessionSnapshot?.EstimatedExpiresAtUtc,
+            StoredSessionExpirySource = linkedInSessionSnapshot?.ExpirySource,
+            ResetRequired = resetRequirement.Required
         };
     }
     catch (Exception exception)
@@ -34,7 +35,7 @@
     }
 }
 <!DOCTYPE html>
-<html lang="en">
+<html lang="@CultureInfo.CurrentUICulture.Name">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

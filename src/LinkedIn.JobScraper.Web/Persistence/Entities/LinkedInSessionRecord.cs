@@ -33,7 +33,7 @@ public sealed class LinkedInSessionRecord
     public string RequestHeadersJson { get; set; } = string.Empty;
 
     /// <summary>
-    /// Capture origin label (for example, "Playwright" or "CurlImport").
+    /// Capture origin label (for example, "CurlImport").
     /// </summary>
     public string Source { get; set; } = string.Empty;
 
@@ -41,6 +41,17 @@ public sealed class LinkedInSessionRecord
     /// UTC timestamp when the session headers were captured.
     /// </summary>
     public DateTimeOffset CapturedAtUtc { get; set; }
+
+    /// <summary>
+    /// Best-effort UTC expiration timestamp inferred from captured session data.
+    /// Null when expiration cannot be extracted.
+    /// </summary>
+    public DateTimeOffset? EstimatedExpiresAtUtc { get; set; }
+
+    /// <summary>
+    /// Metadata source for <see cref="EstimatedExpiresAtUtc"/> (for example "li_at cookie").
+    /// </summary>
+    public string? ExpirySource { get; set; }
 
     /// <summary>
     /// UTC timestamp of the last successful session validation check.

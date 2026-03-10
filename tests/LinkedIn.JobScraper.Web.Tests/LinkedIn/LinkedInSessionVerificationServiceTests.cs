@@ -22,7 +22,7 @@ public sealed class LinkedInSessionVerificationServiceTests
         Assert.False(result.Success);
         Assert.Null(result.StatusCode);
         Assert.Contains("No stored LinkedIn session is available", result.Message, StringComparison.Ordinal);
-        Assert.Contains("Connect Session", result.Message, StringComparison.Ordinal);
+        Assert.Contains("import cURL", result.Message, StringComparison.Ordinal);
         Assert.False(sessionStore.InvalidateCalled);
         Assert.False(sessionStore.MarkValidatedCalled);
         Assert.Equal(0, apiClient.CallCount);
