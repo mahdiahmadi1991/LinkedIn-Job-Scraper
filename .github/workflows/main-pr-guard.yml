@@ -13,6 +13,9 @@ on:
     types:
       - submitted
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 concurrency:
   group: main-pr-guard-${{ github.event.pull_request.number }}
   cancel-in-progress: true
