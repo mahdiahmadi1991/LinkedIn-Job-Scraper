@@ -13,4 +13,5 @@ services:
       DOTNET_RUNNING_IN_CONTAINER: "true"
     volumes:
       - ./data-protection-keys:/app/data-protection-keys
+      - ./app-data:/app/App_Data
       - ./logs:/app/logs

@@ -15,6 +15,11 @@ public sealed record AiGlobalShortlistOverviewResponse(
     string Message,
     AiGlobalShortlistQueueOverviewPayload Overview);
 
+public sealed record AiGlobalShortlistReadinessResponse(
+    bool Success,
+    string Message,
+    bool Ready);
+
 public sealed record AiGlobalShortlistRunResponse(
     bool Success,
     string Message,

@@ -6,6 +6,7 @@ using LinkedIn.JobScraper.Web.Tests.Authentication;
 using LinkedIn.JobScraper.Web.Tests.Persistence;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace LinkedIn.JobScraper.Web.Tests.AI;
 
@@ -209,6 +210,44 @@ public sealed class JobBatchScoringServiceTests
         Assert.Equal(0, gateway.CallCount);
     }
 
+    [Fact]
+    public async Task ScoreJobAsyncReturnsProfessionalMessageWhenGatewayReturnsAuthFailureNoise()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var options = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+
+        await SeedJobsAsync(options, 1);
+
+        await using var seedContext = new LinkedInJobScraperDbContext(options);
+        var jobId = await seedContext.Jobs.Select(static job => job.Id).SingleAsync();
+
+        var gateway = new FailingJobScoringGateway(
+            new JobScoringGatewayResult(
+                false,
+                "OpenAI scoring failed with HTTP 401: HTTP 401 (invalid_request_error) [redacted]- **************************************",
+                StatusCodes.Status401Unauthorized));
+        var service = CreateService(
+            options,
+            gateway,
+            new OpenAiSecurityOptions
+            {
+                ApiKey = "test-key",
+                Model = "gpt-5-mini",
+                MaxConcurrentScoringRequests = 2
+            });
+
+        var result = await service.ScoreJobAsync(jobId, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(StatusCodes.Status401Unauthorized, result.StatusCode);
+        Assert.Contains("authentication failed", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("contact support", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("invalid_request_error", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("**************************************", result.Message, StringComparison.Ordinal);
+    }
+
     private static JobBatchScoringService CreateService(
         DbContextOptions<LinkedInJobScraperDbContext> dbContextOptions,
         IJobScoringGateway jobScoringGateway,
@@ -220,7 +259,8 @@ public sealed class JobBatchScoringServiceTests
             new TestDbContextFactory(dbContextOptions),
             jobScoringGateway,
             new FakeAiBehaviorSettingsService(),
-            new FixedOpenAiEffectiveSecurityOptionsResolver(options));
+            new FixedOpenAiEffectiveSecurityOptionsResolver(options),
+            NullLogger<JobBatchScoringService>.Instance);
     }
 
     private static async Task SeedJobsAsync(
@@ -287,6 +327,23 @@ public sealed class JobBatchScoringServiceTests
                     "Summary",
                     "Why matched",
                     "Concerns"));
+        }
+    }
+
+    private sealed class FailingJobScoringGateway : IJobScoringGateway
+    {
+        private readonly JobScoringGatewayResult _result;
+
+        public FailingJobScoringGateway(JobScoringGatewayResult result)
+        {
+            _result = result;
+        }
+
+        public Task<JobScoringGatewayResult> ScoreAsync(
+            JobScoringGatewayRequest request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_result);
         }
     }
 

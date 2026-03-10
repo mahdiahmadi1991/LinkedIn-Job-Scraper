@@ -609,6 +609,122 @@ public sealed class AiGlobalShortlistServiceTests
     }
 
     [Fact]
+    public async Task GenerateAsyncReturnsServiceUnavailableWhenOpenAiConnectionProbeFails()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var dbOptions = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+
+        var service = CreateService(
+            dbOptions,
+            new SequenceGlobalShortlistGateway([]),
+            new FixedJobScoringGateway(),
+            null,
+            new AiGlobalShortlistOptions
+            {
+                PromptVersion = "v-test",
+                MaxCandidateCount = 10,
+                InterCandidateDelayMilliseconds = 0,
+                AcceptedScoreThreshold = 70,
+                RejectedScoreThreshold = 40,
+                FallbackPerItemCap = 0
+            },
+            new OpenAiSecurityOptions
+            {
+                ApiKey = "sk-invalid-test-key",
+                Model = "gpt-5-mini"
+            },
+            new OpenAiConnectionProbeResult(
+                false,
+                "OpenAI API key was rejected by the server. Verify the key and permissions."));
+
+        var result = await service.GenerateAsync(CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, result.StatusCode);
+        Assert.Contains("unavailable", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("contact support", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(result.RunId);
+
+        await using var verificationContext = new LinkedInJobScraperDbContext(dbOptions);
+        Assert.False(await verificationContext.AiGlobalShortlistRuns.AnyAsync());
+    }
+
+    [Fact]
+    public async Task ResumeAsyncReturnsServiceUnavailableWhenOpenAiConnectionProbeFails()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var dbOptions = new DbContextOptionsBuilder<LinkedInJobScraperDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+
+        var runId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+
+        await using (var seedContext = new LinkedInJobScraperDbContext(dbOptions))
+        {
+            seedContext.AiGlobalShortlistRuns.Add(
+                new AiGlobalShortlistRunRecord
+                {
+                    Id = runId,
+                    AppUserId = 1,
+                    CreatedAtUtc = now.AddMinutes(-4),
+                    Status = "Failed",
+                    CandidateCount = 20,
+                    ProcessedCount = 5,
+                    ShortlistedCount = 2,
+                    NeedsReviewCount = 1,
+                    FailedCount = 2,
+                    NextSequenceNumber = 6
+                });
+
+            await seedContext.SaveChangesAsync();
+        }
+
+        var service = CreateService(
+            dbOptions,
+            new SequenceGlobalShortlistGateway([]),
+            new FixedJobScoringGateway(),
+            null,
+            new AiGlobalShortlistOptions
+            {
+                PromptVersion = "v-test",
+                MaxCandidateCount = 10,
+                InterCandidateDelayMilliseconds = 0,
+                AcceptedScoreThreshold = 70,
+                RejectedScoreThreshold = 40,
+                FallbackPerItemCap = 0
+            },
+            new OpenAiSecurityOptions
+            {
+                ApiKey = "sk-invalid-test-key",
+                Model = "gpt-5-mini"
+            },
+            new OpenAiConnectionProbeResult(
+                false,
+                "OpenAI API key was rejected by the server. Verify the key and permissions."));
+
+        var result = await service.ResumeAsync(runId, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, result.StatusCode);
+        Assert.Equal(runId, result.RunId);
+        Assert.Equal(20, result.CandidateCount);
+        Assert.Equal(5, result.ProcessedCount);
+        Assert.Equal(2, result.ShortlistedCount);
+        Assert.Equal(1, result.NeedsReviewCount);
+        Assert.Equal(2, result.FailedCount);
+        Assert.Contains("unavailable", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("contact support", result.Message, StringComparison.OrdinalIgnoreCase);
+
+        await using var verificationContext = new LinkedInJobScraperDbContext(dbOptions);
+        var persistedRun = await verificationContext.AiGlobalShortlistRuns.SingleAsync(candidate => candidate.Id == runId);
+        Assert.Equal("Failed", persistedRun.Status);
+        Assert.Equal(5, persistedRun.ProcessedCount);
+    }
+
+    [Fact]
     public async Task GetLatestRunAsyncRecoversOrphanedActiveRunAfterRestart()
     {
         var databaseName = Guid.NewGuid().ToString("N");
@@ -722,7 +838,9 @@ public sealed class AiGlobalShortlistServiceTests
         IAiGlobalShortlistGateway shortlistGateway,
         IJobScoringGateway jobScoringGateway,
         IAiGlobalShortlistProgressStateStore? progressStateStore,
-        AiGlobalShortlistOptions shortlistOptions)
+        AiGlobalShortlistOptions shortlistOptions,
+        OpenAiSecurityOptions? openAiSecurityOptions = null,
+        OpenAiConnectionProbeResult? openAiProbeResult = null)
     {
         return new AiGlobalShortlistService(
             new TestCurrentAppUserContext(),
@@ -733,8 +851,12 @@ public sealed class AiGlobalShortlistServiceTests
             jobScoringGateway,
             new FakeAiBehaviorSettingsService(),
             Options.Create(shortlistOptions),
+            new FakeOpenAiConnectionProbeService(
+                openAiProbeResult ?? new OpenAiConnectionProbeResult(
+                    true,
+                    "OpenAI API key verification succeeded.")),
             new FixedOpenAiEffectiveSecurityOptionsResolver(
-                new OpenAiSecurityOptions
+                openAiSecurityOptions ?? new OpenAiSecurityOptions
                 {
                     ApiKey = "test-key",
                     Model = "gpt-5-mini"
@@ -794,6 +916,24 @@ public sealed class AiGlobalShortlistServiceTests
         public Task<AiBehaviorProfile> SaveAsync(AiBehaviorProfile profile, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
+        }
+    }
+
+    private sealed class FakeOpenAiConnectionProbeService : IOpenAiConnectionProbeService
+    {
+        private readonly OpenAiConnectionProbeResult _result;
+
+        public FakeOpenAiConnectionProbeService(OpenAiConnectionProbeResult result)
+        {
+            _result = result;
+        }
+
+        public Task<OpenAiConnectionProbeResult> ProbeAsync(
+            string apiKey,
+            string baseUrl,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_result);
         }
     }
 

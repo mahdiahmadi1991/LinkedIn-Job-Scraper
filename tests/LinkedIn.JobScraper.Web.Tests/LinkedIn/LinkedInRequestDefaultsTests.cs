@@ -21,7 +21,7 @@ public sealed class LinkedInRequestDefaultsTests
         Assert.Equal("/voyager/api/voyagerJobsDashJobCards", uri.AbsolutePath);
         Assert.Contains("count=25", uri.Query, StringComparison.Ordinal);
         Assert.Contains("start=50", uri.Query, StringComparison.Ordinal);
-        Assert.Contains("sortBy:List(R)", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
+        Assert.DoesNotContain("sortBy:List(R)", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
         Assert.DoesNotContain("distance:List(25.0)", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
         Assert.Contains("applyWithLinkedin:List(true)", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
         Assert.Contains("jobType:List(F,C)", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
@@ -38,9 +38,10 @@ public sealed class LinkedInRequestDefaultsTests
             jobTypeCodes: [],
             workplaceTypeCodes: []);
 
-        Assert.Contains("sortBy:List(R)", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
+        Assert.DoesNotContain("sortBy:List(R)", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
         Assert.DoesNotContain("distance:List(25.0)", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
         Assert.DoesNotContain("locationUnion:", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
+        Assert.DoesNotContain("selectedFilters:(", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
         Assert.DoesNotContain("jobType:List(", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
         Assert.DoesNotContain("workplaceType:List(", Uri.UnescapeDataString(uri.Query), StringComparison.Ordinal);
     }

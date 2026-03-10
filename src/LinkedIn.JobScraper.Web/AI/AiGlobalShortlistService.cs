@@ -21,6 +21,8 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
     private const string DecisionRejected = "Rejected";
     private const string DecisionNeedsReview = "NeedsReview";
     private const string CandidateStatusPending = "Pending";
+    private const string OpenAiUnavailableSupportMessage =
+        "AI live review is currently unavailable because the OpenAI connection is not ready. Please contact support.";
 
     private readonly ICurrentAppUserContext _currentAppUserContext;
     private readonly IAiBehaviorSettingsService _behaviorSettingsService;
@@ -30,6 +32,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
     private readonly IAiGlobalShortlistProgressStateStore _progressStateStore;
     private readonly IJobScoringGateway _jobScoringGateway;
     private readonly ILogger<AiGlobalShortlistService> _logger;
+    private readonly IOpenAiConnectionProbeService _openAiConnectionProbeService;
     private readonly IOpenAiEffectiveSecurityOptionsResolver _openAiSecurityOptionsResolver;
     private readonly IOptions<AiGlobalShortlistOptions> _shortlistOptions;
 
@@ -42,6 +45,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
         IJobScoringGateway jobScoringGateway,
         IAiBehaviorSettingsService behaviorSettingsService,
         IOptions<AiGlobalShortlistOptions> shortlistOptions,
+        IOpenAiConnectionProbeService openAiConnectionProbeService,
         IOpenAiEffectiveSecurityOptionsResolver openAiSecurityOptionsResolver,
         ILogger<AiGlobalShortlistService> logger)
     {
@@ -53,6 +57,7 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
         _jobScoringGateway = jobScoringGateway;
         _behaviorSettingsService = behaviorSettingsService;
         _shortlistOptions = shortlistOptions;
+        _openAiConnectionProbeService = openAiConnectionProbeService;
         _openAiSecurityOptionsResolver = openAiSecurityOptionsResolver;
         _logger = logger;
     }
@@ -95,6 +100,21 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
                 activeRun.ShortlistedCount,
                 activeRun.NeedsReviewCount,
                 activeRun.FailedCount);
+        }
+
+        var readiness = await GetReadinessAsync(cancellationToken);
+        if (!readiness.Ready)
+        {
+            Log.AiGlobalShortlistReadinessBlocked(
+                _logger,
+                "start",
+                userId,
+                null,
+                readiness.Message);
+
+            return AiGlobalShortlistRunResult.Failed(
+                readiness.Message,
+                StatusCodes.Status503ServiceUnavailable);
         }
 
         var options = _shortlistOptions.Value;
@@ -203,6 +223,27 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
         if (run.Status == RunStatusCompleted)
         {
             return AiGlobalShortlistRunResult.Succeeded(
+                run.Id,
+                run.CandidateCount,
+                run.ProcessedCount,
+                run.ShortlistedCount,
+                run.NeedsReviewCount,
+                run.FailedCount);
+        }
+
+        var readiness = await GetReadinessAsync(cancellationToken);
+        if (!readiness.Ready)
+        {
+            Log.AiGlobalShortlistReadinessBlocked(
+                _logger,
+                "resume",
+                userId,
+                run.Id,
+                readiness.Message);
+
+            return AiGlobalShortlistRunResult.Failed(
+                readiness.Message,
+                StatusCodes.Status503ServiceUnavailable,
                 run.Id,
                 run.CandidateCount,
                 run.ProcessedCount,
@@ -731,6 +772,37 @@ public sealed class AiGlobalShortlistService : IAiGlobalShortlistService
             Math.Max(eligibleTotal - alreadyReviewed, 0));
     }
 
+    public async Task<AiGlobalShortlistReadinessSnapshot> GetReadinessAsync(CancellationToken cancellationToken)
+    {
+        var securityOptions = await _openAiSecurityOptionsResolver.ResolveAsync(cancellationToken);
+        var validationError = securityOptions.ValidateForScoring();
+        if (validationError is not null)
+        {
+            Log.AiGlobalShortlistReadinessFailed(_logger, validationError);
+
+            return new AiGlobalShortlistReadinessSnapshot(
+                false,
+                OpenAiUnavailableSupportMessage);
+        }
+
+        var probeResult = await _openAiConnectionProbeService.ProbeAsync(
+            securityOptions.ApiKey,
+            securityOptions.BaseUrl,
+            cancellationToken);
+        if (probeResult.Success)
+        {
+            return new AiGlobalShortlistReadinessSnapshot(
+                true,
+                "AI live review is ready.");
+        }
+
+        Log.AiGlobalShortlistReadinessFailed(_logger, probeResult.Message);
+
+        return new AiGlobalShortlistReadinessSnapshot(
+            false,
+            OpenAiUnavailableSupportMessage);
+    }
+
     private async Task RecoverOrphanedActiveRunsAsync(
         LinkedInJobScraperDbContext dbContext,
         int userId,
@@ -1215,4 +1287,23 @@ internal static partial class Log
     public static partial void AiGlobalShortlistRecoveredOrphanedRuns(
         ILogger logger,
         int recoveredCount);
+
+    [LoggerMessage(
+        EventId = 4016,
+        Level = LogLevel.Warning,
+        Message = "AI live review readiness check failed. Reason={Reason}")]
+    public static partial void AiGlobalShortlistReadinessFailed(
+        ILogger logger,
+        string reason);
+
+    [LoggerMessage(
+        EventId = 4017,
+        Level = LogLevel.Warning,
+        Message = "AI live review request was blocked by readiness guard. Operation={Operation}, UserId={UserId}, RunId={RunId}, Reason={Reason}")]
+    public static partial void AiGlobalShortlistReadinessBlocked(
+        ILogger logger,
+        string operation,
+        int userId,
+        Guid? runId,
+        string reason);
 }
