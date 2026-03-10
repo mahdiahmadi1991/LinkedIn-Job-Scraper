@@ -36,12 +36,9 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysDirectory))
 builder.Services.AddControllersWithViews();
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
-    var supportedCultures = CultureInfo
-        .GetCultures(CultureTypes.AllCultures)
-        .Where(static culture => !string.IsNullOrWhiteSpace(culture.Name))
-        .ToList();
+    var supportedCultures = new[] { CultureInfo.GetCultureInfo("en-US") };
 
-    options.DefaultRequestCulture = new RequestCulture("en-US");
+    options.DefaultRequestCulture = new RequestCulture(supportedCultures[0]);
     options.SupportedCultures = supportedCultures;
     options.SupportedUICultures = supportedCultures;
 });

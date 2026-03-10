@@ -252,6 +252,7 @@ The following rules are locked:
   - increased `VERSION`,
   - matching `CHANGELOG.md` section for that version (`## [v.X.Y.Z] - YYYY-MM-DD`),
   - annotated tag `v.X.Y.Z` created immediately on the `develop` merge commit.
+- Exception for explicit user-approved emergency `hotfix/*` merged directly to `main`: release `VERSION` + versioned `CHANGELOG.md` + annotated tag are created on the `main` hotfix merge commit, then synchronized into `develop` by cherry-picking hotfix commit(s) without a second bump.
 - During active implementation, continuously maintain `CHANGELOG.md` `Unreleased` notes for completed items.
 - Never apply release-version bump/tag/changelog during intermediate work-branch commits; these are integration-time actions only.
 - Squashed work commit merged into `develop` must follow Conventional Commits (`type(scope)!: summary`) and version bump must be compatible with the commit signal.
@@ -271,6 +272,7 @@ The following rules are locked:
 - Module observability is mandatory: every newly implemented module/flow must include strong structured logging with actionable runtime context for debugging, while preserving sensitive-data redaction rules.
 - Changelog audience policy is mandatory: `CHANGELOG.md` entries must be business/user-facing and understandable by end users; avoid low-level technical implementation wording.
 - Context-stability policy is mandatory for large tasks: when context usage is already high and a mid-task automatic compaction is likely, proactively compact first, then re-onboard from authoritative docs (`AGENTS.md`, relevant idea file, `docs/plan.md`) before making edits.
+- Documentation-clarity guardrail is mandatory: when a blocker/failure root cause is missing or ambiguous repository documentation, update the relevant docs in the same turn before continuing.
 
 ## Post-Delivery Workflow (Locked)
 
@@ -296,6 +298,7 @@ After implementation completes, this sequence is mandatory for every feature/fix
 
 - Finalized changes are committed on a work branch (never directly on `main`).
 - Allowed prefixes: `feature/*`, `fix/*`, `bugfix/*`.
+- Exception: for explicit user-approved emergency direct-to-`main` fixes, use `hotfix/*` created from current `main`.
 - Keep `CHANGELOG.md` `Unreleased` notes synchronized with completed work in this gate.
 - No release version bump/versioned changelog entry/tag in this gate.
 
@@ -308,26 +311,33 @@ After implementation completes, this sequence is mandatory for every feature/fix
 
 1. Main Merge Gate
 
-- Merge `develop` into `main` only via PR.
+- Standard path: merge `develop` into `main` via PR.
+- Emergency path (explicit user-approved only): merge `hotfix/*` into `main` via PR for urgent production incidents or urgent `main` PR blocker fixes.
 - After PR creation, enable auto-merge with merge-commit strategy; do not perform manual immediate merge.
-- Copilot review gate is mandatory on PRs targeting `main`.
-- If Copilot reports issues, fix on `develop`, push updates, and keep the same PR until all required checks pass and auto-merge completes.
+- Copilot approval gate is mandatory on PRs targeting `main`.
+- If Copilot requests changes or does not approve, fix on `develop`, push updates, and keep the same PR until all required checks pass and auto-merge completes.
+- In emergency hotfix path, fix on the same `hotfix/*` PR branch and keep scope minimal.
 - PR merge strategy must be `Create a merge commit` (no squash, no rebase).
 - Main pipeline validates versioning artifacts; creating missing release tag (`v.X.Y.Z`) is fallback-only when develop-tagging was missed.
-- PRs targeting `main` must pass all required guard checks (including versioning and Copilot gates) before merge.
+- PRs targeting `main` must pass all required guard checks (including versioning and Copilot approval gate) before merge.
+- Copilot guard behavior is deterministic: poll only until first Copilot review on latest head; `APPROVED` passes, `COMMENTED`/`CHANGES_REQUESTED` fails immediately.
+- After emergency `hotfix/* -> main` merge, immediately cherry-pick hotfix commit(s) into `develop`.
 
 1. Post-Main Sync Gate
 
-- Immediately sync `develop` with `main` after `main` merge so long-lived divergence does not accumulate.
+- Do not merge `main` into `develop`.
+- If `main` received an emergency `hotfix/*`, immediately cherry-pick those hotfix commit(s) into `develop`.
 
 ## Git Graph Rules (Locked)
 
 - Only `develop` and `main` are long-lived branches.
-- Temporary branches are `feature/*`, `fix/*`, or `bugfix/*` and must be removed after integration.
-- Every work branch must be created from `develop`.
+- Temporary branches are `feature/*`, `fix/*`, `bugfix/*`, or `hotfix/*` and must be removed after integration.
+- Standard rule: every work branch is created from `develop`; exception: explicit user-approved emergency `hotfix/*` starts from `main`.
+- Reverse merge policy: parent-to-child merges are forbidden; never merge `main` into `develop`.
 - Release/integration branch chains are not used unless explicitly approved by the user.
 - `feature/*|fix/*|bugfix/* -> develop`: squash integration without PR.
-- `develop -> main`: PR required with merge commit.
+- `develop -> main` (standard): PR required with merge commit.
+- `hotfix/* -> main` (explicit emergency only): PR required with merge commit, then immediate cherry-pick sync into `develop`.
 
 ## Historical Note
 

@@ -13,12 +13,14 @@
 - For bug fixes or improvements of existing capabilities, a dedicated idea file is not required unless the user explicitly requests one.
 - Keep "capture-only" (not-now) ideas in `docs/idea-inbox.md` with status tracking so they can be listed and selected later.
 - After any meaningful failure (runtime, integration, release, or workflow mistake), record a short lessons-learned entry in `docs/troubleshooting.md` under `Lessons Learned Log` (failure pattern, root cause, stable fix, guardrail).
+- If a blocker or failure is caused by missing/ambiguous documentation, update the relevant docs in the same turn before continuing.
 - When a net-new feature idea file exists, it must contain state-based execution steps, acceptance criteria, assumptions, and out-of-scope items; implementation must continuously reference that file to avoid drift.
 - Project versioning is mandatory and must use root `VERSION` with format `v.MAJOR.MINOR.PATCH`.
 - Every work integration into `develop` must include:
   - a bumped `VERSION`,
   - a matching `CHANGELOG.md` entry for that version,
   - an annotated git tag with the same version (`v.X.Y.Z`) created immediately on the `develop` merge commit.
+- Exception for user-approved emergency `hotfix/*` merged directly to `main`: release `VERSION` + versioned `CHANGELOG.md` + annotated tag are created on the `main` hotfix merge commit, then synchronized into `develop` by cherry-picking hotfix commit(s) without a second bump.
 - While implementation is in progress, continuously record completed changes in `CHANGELOG.md` under an `Unreleased` section so nothing is forgotten before integration.
 - Do not bump `VERSION`, update release `CHANGELOG.md`, or create version tags during intermediate work-branch commits.
 - Version bump + release changelog + version tag are integration-time actions and must happen only when user explicitly asks to merge into `develop`.
@@ -30,15 +32,18 @@
   - `PATCH` for bugfixes/improvements.
 - Never create commits on `main` directly.
 - All implementation work must start on a non-`main` branch.
-- Every work branch must be created from the current `develop` branch head.
+- Every work branch must be created from the current `develop` branch head, except explicit user-approved emergency `hotfix/*` branches which must start from the current `main` head.
 - Branch naming is mandatory:
   - `feature/<slug>` for net-new capabilities
   - `fix/<slug>` for improvements to existing capabilities
   - `bugfix/<slug>` for bug fixes
+  - `hotfix/<slug>` for explicit user-approved emergency fixes that must go directly to `main`
 - Integration from work branches into `develop` does not require PR and must produce a merge commit on `develop`; squash work-branch commits to one commit before merging.
 - Before any merge into `develop`, Codex must run the project locally for user validation and receive explicit user approval in the same thread; without that approval, merging to `develop` is not allowed.
 - `main` merge is never implicit: Codex may merge into `main` only when the user explicitly requests `merge to main` in the current thread; requests like "continue" or "merge to develop" must never be interpreted as `main` approval.
-- Integration from `develop` into `main` must always use PR with a merge commit (no squash, no rebase).
+- Standard main integration path is `develop` -> `main` via PR with a merge commit (no squash, no rebase).
+- Emergency exception: with explicit user approval in the same thread, use `hotfix/*` -> `main` via PR for urgent production incidents or urgent `main` PR blocker fixes.
+- Reverse merge from parent to child is forbidden: never merge `main` into `develop`; propagate hotfixes to `develop` via cherry-pick only.
 - `develop` intentionally has no CI pipeline; do not block `develop` integration waiting for CI checks.
 - Main PR merge flow is auto-merge-driven: Codex must create/open the PR and enable auto-merge; do not perform manual immediate merge.
 - Never force merge to `main` (`--admin` or equivalent) except with explicit user authorization in the same thread.
@@ -96,6 +101,7 @@ After implementation (feature/fix/bugfix) is finished, follow this exact sequenc
 
 4. Work Branch + Commit Gate
 - Create/use a work branch with the required prefix (`feature/*`, `fix/*`, `bugfix/*`).
+- Only for explicit user-approved emergencies targeting `main`, use `hotfix/*` from `main`.
 - Commit the finalized changes on that branch.
 - Keep `CHANGELOG.md` `Unreleased` notes updated in this gate.
 - Do not perform release-version bump/tag/versioned release-entry in this gate.
@@ -120,24 +126,30 @@ After implementation (feature/fix/bugfix) is finished, follow this exact sequenc
 
 7. Main Merge Gate
 - Require explicit user instruction for `main` merge in the current thread before opening/merging a PR to `main`.
-- Merge `develop` into `main` only via PR.
+- Standard path: merge `develop` into `main` via PR.
+- Emergency path (explicit user-approved only): merge `hotfix/*` into `main` via PR, with minimal scoped changes.
 - After opening PR, enable auto-merge with merge commit strategy (no manual immediate merge).
-- Copilot review gate must pass before merge is allowed.
-- If Copilot reports issues, fix on `develop`, push updates, and keep the same PR until gates pass and auto-merge completes.
+- Copilot approval gate must pass before merge is allowed.
+- If Copilot requests changes or does not approve, fix on `develop`, push updates, and keep the same PR until gates pass and auto-merge completes.
+- In emergency hotfix path, fix on the same `hotfix/*` PR branch and keep scope minimal.
 - PR merge strategy must be `Create a merge commit` (no squash, no rebase).
 - Main pipeline must validate `VERSION`/`CHANGELOG.md`; tag creation on `main` is fallback-only if a required version tag is unexpectedly missing.
 - Main PR guard checks must enforce:
   - `VERSION` + `CHANGELOG.md` presence
-  - Copilot review on the latest PR head commit
+  - Copilot approval on the latest PR head commit
+  - Gate behavior: poll only until Copilot posts the first review on latest head; `APPROVED` passes, `COMMENTED`/`CHANGES_REQUESTED` fails immediately.
+- After any emergency `hotfix/* -> main` merge, immediately cherry-pick the hotfix commit(s) into `develop` before starting new feature/fix work.
 
 8. Post-Main Sync Gate
-- Immediately sync `develop` with `main` after the `main` merge so no long-lived divergence remains.
+- Do not merge `main` into `develop`.
+- If `main` received an emergency `hotfix/*`, immediately cherry-pick those hotfix commit(s) into `develop`.
 
 ## Git Graph Policy (Mandatory)
 
 - Long-lived branches are only `develop` and `main`.
-- Temporary branches are allowed only for active work (`feature/*`, `fix/*`, `bugfix/*`) and must be deleted after integration.
-- Every work branch must originate from `develop` (never from `main` or detached historical commits).
+- Temporary branches are allowed only for active work (`feature/*`, `fix/*`, `bugfix/*`, `hotfix/*`) and must be deleted after integration.
+- Standard rule: every work branch originates from `develop`; exception: explicit user-approved emergency `hotfix/*` originates from `main`.
+- Reverse merge policy: parent-to-child merges are disallowed across the repository graph; do not merge `main` into `develop`.
 - Do not introduce release/integration branch chains unless explicitly approved by the user.
 - Keep each work branch compact by squashing branch commits, then preserve integration visibility on `develop` with merge commits.
-- Keep release history explicit on `main` using PR merge commits from `develop`.
+- Keep release history explicit on `main` using PR merge commits (`develop` or approved emergency `hotfix/*`), and sync hotfixes into `develop` by cherry-pick.

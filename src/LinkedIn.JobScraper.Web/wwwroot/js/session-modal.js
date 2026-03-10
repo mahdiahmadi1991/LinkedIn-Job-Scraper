@@ -167,10 +167,20 @@
             return null;
         }
 
-        const reason = state?.resetRequirement?.message ||
-            "LinkedIn refused requests with your stored session.";
+        const reason = typeof state?.resetRequirement?.message === "string"
+            ? state.resetRequirement.message.trim()
+            : "";
+        const guidanceSuffix = "Reset Session, then import a fresh cURL request to continue.";
 
-        return `${reason} Reset Session, then import a fresh cURL request to continue.`;
+        if (!reason) {
+            return `LinkedIn refused requests with your stored session. ${guidanceSuffix}`;
+        }
+
+        const hasResetGuidance =
+            /reset|reconnect|re-import|reimport/i.test(reason) ||
+            /copy as cURL|import.*cURL|fresh cURL/i.test(reason);
+
+        return hasResetGuidance ? reason : `${reason} ${guidanceSuffix}`;
     };
 
     const detectCurlGuideBrowserFamily = () => {

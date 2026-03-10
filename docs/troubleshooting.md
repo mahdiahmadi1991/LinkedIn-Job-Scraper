@@ -337,3 +337,23 @@ What to do:
   - Failure pattern: even after stopping the app instance, running build and tests in parallel still reintroduced `rpswa.dswa.cache.json` lock contention.
   - Stable fix: run `dotnet test` and `dotnet build` strictly one after another for this project.
   - Guardrail: never parallelize local validation commands that touch the same ASP.NET static-web-assets pipeline.
+
+- 2026-03-10: No emergency lane for urgent main fixes
+  - Failure pattern: workflow policy allowed only `develop`-origin branches, which created friction for urgent production fixes or urgent Copilot-blocker fixes on `main` PRs.
+  - Stable fix: define an explicit emergency exception using `hotfix/*` from `main` with PR-based merge to `main`, then immediate cherry-pick sync into `develop`.
+  - Guardrail: use this lane only with explicit user approval and keep scope minimal.
+
+- 2026-03-10: Documentation ambiguity repeated across threads
+  - Failure pattern: recurring execution mistakes traced back to implicit/unclear repo policy wording.
+  - Stable fix: add same-turn documentation-clarity rule in governing docs whenever doc ambiguity is identified as a root cause.
+  - Guardrail: do not defer policy/documentation fixes when they are part of the root cause.
+
+- 2026-03-10: Reverse merge drift risk after hotfix
+  - Failure pattern: using `main -> develop` merge for hotfix backport risks unintended parent-history carryover and policy violations.
+  - Stable fix: prohibit parent-to-child merge and backport only with `git cherry-pick` of hotfix commit(s) into `develop`.
+  - Guardrail: never merge `main` into `develop`; apply deterministic cherry-pick sync immediately after hotfix merge to `main`.
+
+- 2026-03-10: Local validation startup blocked by port conflicts
+  - Failure pattern: app startup failed with `address already in use` on common local validation ports (`5058`, `5059`) while another instance was already running.
+  - Stable fix: run validation instance on a dedicated free port without stopping active user-owned processes.
+  - Guardrail: if startup fails with port-in-use and process-stop is not explicitly approved, switch to a free local port for validation.
