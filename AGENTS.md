@@ -12,6 +12,16 @@
 - For bug fixes or improvements of existing capabilities, a dedicated idea file is not required unless the user explicitly requests one.
 - Keep "capture-only" (not-now) ideas in `docs/idea-inbox.md` with status tracking so they can be listed and selected later.
 - When a net-new feature idea file exists, it must contain state-based execution steps, acceptance criteria, assumptions, and out-of-scope items; implementation must continuously reference that file to avoid drift.
+- Project versioning is mandatory and must use root `VERSION` with format `v.MAJOR.MINOR.PATCH`.
+- Every work integration into `develop` must include:
+  - a bumped `VERSION`,
+  - a matching `CHANGELOG.md` entry for that version.
+- Squashed work commit message merged into `develop` must follow Conventional Commits:
+  - `type(scope)!: summary`
+- Default bump policy:
+  - `MAJOR` for breaking changes,
+  - `MINOR` for net-new features,
+  - `PATCH` for bugfixes/improvements.
 - Never create commits on `main` directly.
 - All implementation work must start on a non-`main` branch.
 - Every work branch must be created from the current `develop` branch head.
@@ -86,6 +96,8 @@ After implementation (feature/fix/bugfix) is finished, follow this exact sequenc
 6. Main Merge Gate
 - Merge `develop` into `main` only via PR.
 - PR merge strategy must be `Create a merge commit` (no squash, no rebase).
+- Main pipeline must validate `VERSION`/`CHANGELOG.md` and register git tag for the active version when missing.
+- Main PR guard check must enforce `VERSION` + `CHANGELOG.md` presence before merge.
 
 7. Post-Main Sync Gate
 - Immediately sync `develop` with `main` after the `main` merge so no long-lived divergence remains.

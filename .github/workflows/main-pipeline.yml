@@ -44,9 +44,63 @@ jobs:
           path: artifacts/test-results
           if-no-files-found: error
 
+  versioning:
+    needs:
+      - build-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout (full history for tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate Version Artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/versioning-guard.sh validate
+
+      - name: Create Version Tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(bash scripts/versioning-guard.sh current)"
+          git fetch --tags --force
+
+          if git rev-parse "refs/tags/$VERSION" >/dev/null 2>&1; then
+            echo "Tag $VERSION already exists. Skipping."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
+
+      - name: Create GitHub Release (Auto Notes)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(bash scripts/versioning-guard.sh current)"
+
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "Release $VERSION already exists. Skipping."
+            exit 0
+          fi
+
+          gh release create "$VERSION" --title "$VERSION" --generate-notes
+
   deploy:
     needs:
       - build-test
+      - versioning
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production

@@ -166,6 +166,8 @@ public sealed class AdminUsersUiContractsTests
         Assert.Contains("asp-action=\"Index\"", layoutContent, StringComparison.Ordinal);
         Assert.Contains("asp-route-tab=\"users\"", layoutContent, StringComparison.Ordinal);
         Assert.Contains(">Administration</a>", layoutContent, StringComparison.Ordinal);
+        Assert.Contains("data-app-version", layoutContent, StringComparison.Ordinal);
+        Assert.Contains("Version @AppVersionProvider.CurrentVersion", layoutContent, StringComparison.Ordinal);
     }
 
     private static string ReadRepositoryFile(string relativePath)
