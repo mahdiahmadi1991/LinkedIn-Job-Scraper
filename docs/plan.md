@@ -250,8 +250,12 @@ The following rules are locked:
   - format is `v.MAJOR.MINOR.PATCH`.
 - Every work integration into `develop` must include:
   - increased `VERSION`,
-  - matching `CHANGELOG.md` section for that version (`## [v.X.Y.Z] - YYYY-MM-DD`).
+  - matching `CHANGELOG.md` section for that version (`## [v.X.Y.Z] - YYYY-MM-DD`),
+  - annotated tag `v.X.Y.Z` created immediately on the `develop` merge commit.
+- During active implementation, continuously maintain `CHANGELOG.md` `Unreleased` notes for completed items.
+- Never apply release-version bump/tag/changelog during intermediate work-branch commits; these are integration-time actions only.
 - Squashed work commit merged into `develop` must follow Conventional Commits (`type(scope)!: summary`) and version bump must be compatible with the commit signal.
+- `develop` intentionally has no CI pipeline; do not block `develop` integration waiting for CI checks.
 - Default bump guidance:
   - `MAJOR` for breaking changes,
   - `MINOR` for net-new features,
@@ -285,17 +289,23 @@ After implementation completes, this sequence is mandatory for every feature/fix
 4. Work Branch + Commit Gate
 - Finalized changes are committed on a work branch (never directly on `main`).
 - Allowed prefixes: `feature/*`, `fix/*`, `bugfix/*`.
+- Keep `CHANGELOG.md` `Unreleased` notes synchronized with completed work in this gate.
+- No release version bump/versioned changelog entry/tag in this gate.
 
 5. Develop Integration Gate
 - Integrate work branch changes into `develop` without PR.
 - Use squash integration so each work branch becomes one integration commit on `develop`.
+- Only in this gate: convert `Unreleased` notes into release `CHANGELOG.md` entry, bump `VERSION`, and create annotated tag `v.X.Y.Z` on that `develop` merge commit in the same integration step.
 - Delete the work branch after successful integration.
 
 6. Main Merge Gate
 - Merge `develop` into `main` only via PR.
+- After PR creation, enable auto-merge with merge-commit strategy; do not perform manual immediate merge.
+- Copilot review gate is mandatory on PRs targeting `main`.
+- If Copilot reports issues, fix on `develop`, push updates, and keep the same PR until all required checks pass and auto-merge completes.
 - PR merge strategy must be `Create a merge commit` (no squash, no rebase).
-- Main pipeline validates versioning artifacts and creates release tag (`v.X.Y.Z`) if missing.
-- PRs targeting `main` must pass the versioning guard check that enforces `VERSION` and `CHANGELOG.md` updates.
+- Main pipeline validates versioning artifacts; creating missing release tag (`v.X.Y.Z`) is fallback-only when develop-tagging was missed.
+- PRs targeting `main` must pass all required guard checks (including versioning and Copilot gates) before merge.
 
 7. Post-Main Sync Gate
 - Immediately sync `develop` with `main` after `main` merge so long-lived divergence does not accumulate.

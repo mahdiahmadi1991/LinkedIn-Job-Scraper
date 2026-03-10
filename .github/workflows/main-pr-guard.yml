@@ -4,6 +4,11 @@ on:
   pull_request:
     branches:
       - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
 
 jobs:
   versioning-pr-guard:
@@ -37,3 +42,81 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/versioning-guard.sh validate
+
+  copilot-review-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Ensure Copilot reviewed current PR head
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pullRequest = context.payload.pull_request;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pullNumber = pullRequest.number;
+            const headSha = pullRequest.head.sha;
+
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner,
+              repo,
+              pull_number: pullNumber,
+              per_page: 100
+            });
+
+            const isCopilotLogin = (login) => {
+              if (!login) return false;
+              const normalized = login.toLowerCase();
+              return normalized.includes("copilot");
+            };
+
+            const copilotReviews = reviews.filter((review) => isCopilotLogin(review.user?.login));
+            if (copilotReviews.length === 0) {
+              core.setFailed("Copilot review is required before merging to main.");
+              return;
+            }
+
+            const copilotReviewsOnCurrentHead = copilotReviews.filter(
+              (review) => review.commit_id === headSha
+            );
+
+            if (copilotReviewsOnCurrentHead.length === 0) {
+              core.setFailed(
+                `Copilot has not reviewed the latest PR head commit (${headSha}).`
+              );
+              return;
+            }
+
+            const blockingStates = new Set(["CHANGES_REQUESTED"]);
+            const blockingReview = copilotReviewsOnCurrentHead.find((review) =>
+              blockingStates.has((review.state ?? "").toUpperCase())
+            );
+
+            if (blockingReview) {
+              core.setFailed(
+                `Copilot requested changes on the latest head commit (${headSha}). Resolve and re-run review before merge.`
+              );
+              return;
+            }
+
+            core.info(
+              `Copilot review gate passed on head ${headSha} with ${copilotReviewsOnCurrentHead.length} review(s).`
+            );
+
+  enable-auto-merge:
+    if: github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'develop' && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Enable auto-merge (merge commit)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PR_NUMBER='${{ github.event.pull_request.number }}'
+          gh pr merge "$PR_NUMBER" --auto --merge

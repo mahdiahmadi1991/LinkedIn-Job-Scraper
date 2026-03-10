@@ -22,15 +22,25 @@ For every work branch merged into `develop`:
 2. Add matching changelog section to `CHANGELOG.md`:
    - `## [v.X.Y.Z] - YYYY-MM-DD`
 3. Merge to `develop` with merge commit after squash.
+4. Immediately create annotated tag on that `develop` merge commit:
+   - `git tag -a v.X.Y.Z <develop-merge-commit> -m "Release v.X.Y.Z"`
+5. Push `develop` and the new tag in the same integration step.
+
+Important guardrail:
+
+- Do not bump `VERSION`, update release changelog, or create version tags during intermediate work-branch commits.
+- Apply release versioning only at develop-integration time (squash + merge), and only after explicit user instruction to merge into `develop`.
+- During implementation, continuously capture completed work in `CHANGELOG.md` under `## [Unreleased]` so release notes are not lost.
+- At develop integration, move/reshape `Unreleased` notes into the new versioned section (`## [v.X.Y.Z] - YYYY-MM-DD`).
 
 Local `pre-push` enforces these checks on `develop`.
 
 ## Git Graph And Tags
 
-- On `main` pipeline, current `VERSION` is validated.
-- If a tag with that version does not exist, pipeline creates and pushes:
-  - `v.X.Y.Z`
-- Main pipeline also creates a GitHub Release for that tag using auto-generated release notes.
+- Version tags are created at `develop` integration time (same moment as version bump).
+- `main` pipeline validates current `VERSION` and expects matching tag to already exist.
+- If a matching tag is unexpectedly missing, pipeline may create it as a safety fallback to keep release automation unblocked.
+- Main pipeline creates a GitHub Release for that tag using auto-generated release notes.
 - Auto notes are grouped by PR labels via `.github/release.yml`.
 
 ## Conventional Commit Signal
@@ -55,6 +65,7 @@ This keeps version milestones visible in git history.
 ## Changelog Standard
 
 - `CHANGELOG.md` follows Keep a Changelog style.
+- `CHANGELOG.md` must always include `## [Unreleased]` at the top for in-progress notes.
 - Every released version must have:
   - heading with version + date
   - concise, user-facing change summary
@@ -65,5 +76,7 @@ This keeps version milestones visible in git history.
   - `VERSION` change
   - `CHANGELOG.md` change
   - valid version/changelog contract
+  - Copilot review on latest PR head commit
 - Recommended GitHub branch protection on `main`:
   - require status check: `Main PR Guard / versioning-pr-guard`
+  - require status check: `Main PR Guard / copilot-review-gate`

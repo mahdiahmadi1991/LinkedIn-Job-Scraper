@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+### Changed
+- _No unreleased changes yet._
+
+## [v.3.14.30] - 2026-03-10
+### Added
+- Main PR guard now includes a dedicated `copilot-review-gate` check that requires Copilot review coverage on the latest PR head commit and blocks when Copilot marks the latest head as `CHANGES_REQUESTED`.
+
+### Changed
+- Main PR auto-merge enablement is now consolidated into `main-pr-guard.yml` (single PR governance workflow for `main`).
+- Workflow policy now explicitly forbids manual immediate merge for `main` PRs; the required flow is PR creation + auto-merge enablement.
+- Main branch protection required checks now include both `versioning-pr-guard` and `copilot-review-gate`.
+- Operational plan documentation was synchronized with the new auto-merge + Copilot-gated main-merge flow.
+- Develop integration now mandates matching version tag creation on the develop merge commit, enforced by local pre-push checks.
+- Workflow/docs now require continuous changelog capture under `Unreleased` during implementation; versioned entries are finalized only at develop integration.
+
 ## [v.3.14.29] - 2026-03-10
 ### Changed
 - Workflow governance now explicitly records that `develop` has no CI by design and must not be blocked waiting for CI checks.

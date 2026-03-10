@@ -317,3 +317,13 @@ What to do:
   - Failure pattern: launching local app on port `5060` caused Firefox error `This address is restricted`.
   - Stable fix: run local validation on launch-profile ports (`5058` / `7145`).
   - Guardrail: do not choose browser-restricted ports for user manual validation links.
+
+- 2026-03-10: Missing tag on develop version bump
+  - Failure pattern: version was bumped during `develop` integration, but matching git tag was not created immediately, causing release traceability drift.
+  - Stable fix: make tag creation mandatory at `develop` merge time and reject `develop` push when `v.X.Y.Z` tag is missing or points to a different commit.
+  - Guardrail: always create annotated tag on the `develop` merge commit in the same integration step as `VERSION`/`CHANGELOG` update.
+
+- 2026-03-10: Premature commit/versioning before user merge approval
+  - Failure pattern: integration-style actions (release version/changelog and commit readiness assumptions) were applied before user completed review and explicitly requested merge.
+  - Stable fix: never commit unless explicitly requested in the current thread; keep release versioning only for the `develop` integration step.
+  - Guardrail: intermediate work is unversioned at release level; bump/tag/changelog only at squash+merge to `develop` after explicit user instruction.
