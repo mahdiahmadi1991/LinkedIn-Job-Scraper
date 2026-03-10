@@ -13,7 +13,7 @@
 - Never create commits on `main` directly.
 - Feature work must start on a non-`main` branch.
 - Every `feature/*` branch must be created from the current `develop` branch head.
-- Integration from feature branches into `develop` does not require PR and must use squash integration.
+- Integration from feature branches into `develop` does not require PR and must produce a merge commit on `develop`; squash feature branch commits to one commit before merging.
 - Integration from `develop` into `main` must always use PR with a merge commit (no squash, no rebase).
 - Never watch GitHub pipelines by default. After triggering CI/CD, ask the user to check status unless the user explicitly asks for monitoring.
 
@@ -73,7 +73,8 @@ After feature implementation is finished, follow this exact sequence:
 
 5. Develop Integration Gate
 - Integrate the feature branch into `develop` without PR.
-- Use squash integration so each feature appears as one integration commit on `develop`.
+- First squash feature branch commits into one feature commit.
+- Then merge into `develop` with a merge commit (`--no-ff`) so the graph explicitly shows feature integration.
 - Delete the feature branch after successful integration.
 
 6. Main Merge Gate
@@ -89,5 +90,5 @@ After feature implementation is finished, follow this exact sequence:
 - Temporary branches are allowed only for active feature work and must be deleted after integration.
 - Every feature branch must originate from `develop` (never from `main` or detached historical commits).
 - Do not introduce release/integration branch chains unless explicitly approved by the user.
-- Keep history linear on `develop` by squash-integrating feature work.
+- Keep each feature compact by squashing feature-branch commits, then preserve integration visibility on `develop` with merge commits.
 - Keep release history explicit on `main` using PR merge commits from `develop`.
