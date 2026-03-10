@@ -8,6 +8,7 @@
 - Work in small, reviewable steps.
 - Before editing files for a step, restate the exact outputs for that step.
 - After each approved implementation step, stop and wait for explicit user approval before continuing.
+- Never create any commit unless the user explicitly asks for commit in the current thread.
 - Create a dedicated `docs/ideas/<idea-name>.md` file only for newly approved net-new features (capabilities that do not already exist in the system).
 - For bug fixes or improvements of existing capabilities, a dedicated idea file is not required unless the user explicitly requests one.
 - Keep "capture-only" (not-now) ideas in `docs/idea-inbox.md` with status tracking so they can be listed and selected later.
@@ -16,7 +17,11 @@
 - Project versioning is mandatory and must use root `VERSION` with format `v.MAJOR.MINOR.PATCH`.
 - Every work integration into `develop` must include:
   - a bumped `VERSION`,
-  - a matching `CHANGELOG.md` entry for that version.
+  - a matching `CHANGELOG.md` entry for that version,
+  - an annotated git tag with the same version (`v.X.Y.Z`) created immediately on the `develop` merge commit.
+- While implementation is in progress, continuously record completed changes in `CHANGELOG.md` under an `Unreleased` section so nothing is forgotten before integration.
+- Do not bump `VERSION`, update release `CHANGELOG.md`, or create version tags during intermediate work-branch commits.
+- Version bump + release changelog + version tag are integration-time actions and must happen only when user explicitly asks to merge into `develop`.
 - Squashed work commit message merged into `develop` must follow Conventional Commits:
   - `type(scope)!: summary`
 - Default bump policy:
@@ -35,6 +40,8 @@
 - `main` merge is never implicit: Codex may merge into `main` only when the user explicitly requests `merge to main` in the current thread; requests like "continue" or "merge to develop" must never be interpreted as `main` approval.
 - Integration from `develop` into `main` must always use PR with a merge commit (no squash, no rebase).
 - `develop` intentionally has no CI pipeline; do not block `develop` integration waiting for CI checks.
+- Main PR merge flow is auto-merge-driven: Codex must create/open the PR and enable auto-merge; do not perform manual immediate merge.
+- Never force merge to `main` (`--admin` or equivalent) except with explicit user authorization in the same thread.
 - Never watch GitHub pipelines by default. After triggering CI/CD, ask the user to check status unless the user explicitly asks for monitoring.
 
 ## Product Direction
@@ -90,6 +97,8 @@ After implementation (feature/fix/bugfix) is finished, follow this exact sequenc
 4. Work Branch + Commit Gate
 - Create/use a work branch with the required prefix (`feature/*`, `fix/*`, `bugfix/*`).
 - Commit the finalized changes on that branch.
+- Keep `CHANGELOG.md` `Unreleased` notes updated in this gate.
+- Do not perform release-version bump/tag/versioned release-entry in this gate.
 
 5. Local Run + Approval Gate (Mandatory Before Develop Merge)
 - Run the project locally so the user can manually validate the latest implementation.
@@ -106,14 +115,20 @@ After implementation (feature/fix/bugfix) is finished, follow this exact sequenc
 - Integrate the work branch into `develop` without PR.
 - First squash work-branch commits into one commit.
 - Then merge into `develop` with a merge commit (`--no-ff`) so the graph explicitly shows feature integration.
+- Only in this gate: convert `Unreleased` notes into matching release entry in `CHANGELOG.md`, bump `VERSION`, and create annotated tag `v.X.Y.Z` on the `develop` merge commit; then push branch + tag together.
 - Delete the work branch after successful integration.
 
 7. Main Merge Gate
 - Require explicit user instruction for `main` merge in the current thread before opening/merging a PR to `main`.
 - Merge `develop` into `main` only via PR.
+- After opening PR, enable auto-merge with merge commit strategy (no manual immediate merge).
+- Copilot review gate must pass before merge is allowed.
+- If Copilot reports issues, fix on `develop`, push updates, and keep the same PR until gates pass and auto-merge completes.
 - PR merge strategy must be `Create a merge commit` (no squash, no rebase).
-- Main pipeline must validate `VERSION`/`CHANGELOG.md` and register git tag for the active version when missing.
-- Main PR guard check must enforce `VERSION` + `CHANGELOG.md` presence before merge.
+- Main pipeline must validate `VERSION`/`CHANGELOG.md`; tag creation on `main` is fallback-only if a required version tag is unexpectedly missing.
+- Main PR guard checks must enforce:
+  - `VERSION` + `CHANGELOG.md` presence
+  - Copilot review on the latest PR head commit
 
 8. Post-Main Sync Gate
 - Immediately sync `develop` with `main` after the `main` merge so no long-lived divergence remains.
