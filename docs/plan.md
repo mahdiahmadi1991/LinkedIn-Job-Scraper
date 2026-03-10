@@ -314,13 +314,17 @@ After implementation completes, this sequence is mandatory for every feature/fix
 - Standard path: merge `develop` into `main` via PR.
 - Emergency path (explicit user-approved only): merge `hotfix/*` into `main` via PR for urgent production incidents or urgent `main` PR blocker fixes.
 - After PR creation, enable auto-merge with merge-commit strategy; do not perform manual immediate merge.
-- Copilot approval gate is mandatory on PRs targeting `main`.
-- If Copilot requests changes or does not approve, fix on `develop`, push updates, and keep the same PR until all required checks pass and auto-merge completes.
+- Copilot gate is mandatory on PRs targeting `main`.
+- Copilot policy is one-time-per-PR: once Copilot reviewed at least once, Codex resolves/fixes raised issues and proceeds without requiring a second Copilot re-review.
+- If Copilot review is missing/pending for the latest PR head, Codex proactively re-requests Copilot review (API/CLI) so manual user action is exception-only.
 - In emergency hotfix path, fix on the same `hotfix/*` PR branch and keep scope minimal.
 - PR merge strategy must be `Create a merge commit` (no squash, no rebase).
 - Main pipeline validates versioning artifacts; creating missing release tag (`v.X.Y.Z`) is fallback-only when develop-tagging was missed.
-- PRs targeting `main` must pass all required guard checks (including versioning and Copilot approval gate) before merge.
-- Copilot guard behavior is deterministic: poll only until first Copilot review on latest head; `APPROVED` passes, `COMMENTED`/`CHANGES_REQUESTED` fails immediately.
+- PRs targeting `main` must pass all required guard checks (including versioning and Copilot gate) before merge.
+- Copilot guard behavior is event-driven and fail-fast with no polling loops.
+- Copilot guard acceptance is: at least one Copilot review exists on the PR and no unresolved (non-outdated) Copilot review threads remain.
+- Copilot guard workflow listens to `pull_request`, `pull_request_review`, and `pull_request_review_thread` (`resolved`, `unresolved`) so status refreshes automatically after thread resolution changes.
+- On `pull_request` events, workflow auto-requests Copilot review when missing for the latest head.
 - After emergency `hotfix/* -> main` merge, immediately cherry-pick hotfix commit(s) into `develop`.
 
 1. Post-Main Sync Gate
