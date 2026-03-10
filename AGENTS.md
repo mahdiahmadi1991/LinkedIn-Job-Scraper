@@ -34,6 +34,7 @@
 - Before any merge into `develop`, Codex must run the project locally for user validation and receive explicit user approval in the same thread; without that approval, merging to `develop` is not allowed.
 - `main` merge is never implicit: Codex may merge into `main` only when the user explicitly requests `merge to main` in the current thread; requests like "continue" or "merge to develop" must never be interpreted as `main` approval.
 - Integration from `develop` into `main` must always use PR with a merge commit (no squash, no rebase).
+- `develop` intentionally has no CI pipeline; do not block `develop` integration waiting for CI checks.
 - Never watch GitHub pipelines by default. After triggering CI/CD, ask the user to check status unless the user explicitly asks for monitoring.
 
 ## Product Direction
@@ -92,6 +93,12 @@ After implementation (feature/fix/bugfix) is finished, follow this exact sequenc
 
 5. Local Run + Approval Gate (Mandatory Before Develop Merge)
 - Run the project locally so the user can manually validate the latest implementation.
+- Default local validation launch command:
+  - `dotnet run --launch-profile http --project src/LinkedIn.JobScraper.Web`
+- Default validation URLs to share with the user:
+  - `http://localhost:5058`
+  - `https://localhost:7145`
+- Avoid browser-restricted ports for manual validation links (Firefox may block them with `This address is restricted`).
 - Wait for explicit user approval to merge into `develop`.
 - If explicit approval is not provided, stop and do not merge.
 

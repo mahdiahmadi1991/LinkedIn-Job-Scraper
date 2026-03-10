@@ -4,6 +4,11 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [v.3.14.29] - 2026-03-10
+### Changed
+- Workflow governance now explicitly records that `develop` has no CI by design and must not be blocked waiting for CI checks.
+- Local user-validation defaults are now standardized in agent policy (`dotnet run --launch-profile http`, URLs `5058/7145`, and Firefox restricted-port caution).
+
 ## [v.3.14.28] - 2026-03-10
 ### Fixed
 - Version source resolution now supports source-layout execution (`src/LinkedIn.JobScraper.Web`), so login/layout do not fall back to `v.0.0.0` when repository root `VERSION` is valid.
