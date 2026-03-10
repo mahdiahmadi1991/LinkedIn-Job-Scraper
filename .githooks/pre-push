@@ -11,8 +11,47 @@ cd "$repo_root"
 current_branch="$(git rev-parse --abbrev-ref HEAD)"
 if [[ "$current_branch" == "main" ]]; then
   echo "[pre-push] Direct push from 'main' is blocked."
-  echo "[pre-push] Open a PR from a non-main branch."
+  echo "[pre-push] Open a PR from 'develop' into 'main'."
   exit 1
+fi
+
+if [[ "$current_branch" == "develop" ]]; then
+  upstream_ref="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+  if [[ -z "$upstream_ref" ]]; then
+    upstream_ref="origin/develop"
+  fi
+
+  if git rev-parse --verify --quiet "$upstream_ref" >/dev/null; then
+    range="$upstream_ref..HEAD"
+    non_merge_first_parent="$(git rev-list --first-parent --no-merges "$range")"
+    if [[ -n "$non_merge_first_parent" ]]; then
+      echo "[pre-push] Direct (non-merge) commits detected on 'develop' first-parent history."
+      echo "[pre-push] Integrate feature branches via merge commits (--no-ff)."
+      git log --oneline --decorate --first-parent --no-merges "$range"
+      exit 1
+    fi
+
+    while read -r merge_commit; do
+      [[ -z "$merge_commit" ]] && continue
+      parent_line="$(git show -s --format='%P' "$merge_commit")"
+      parent_one="$(awk '{print $1}' <<<"$parent_line")"
+      parent_two="$(awk '{print $2}' <<<"$parent_line")"
+      [[ -z "$parent_two" ]] && continue
+
+      # Allow develop sync merges that bring main back into develop.
+      if git merge-base --is-ancestor "$parent_two" main; then
+        continue
+      fi
+
+      feature_side_commit_count="$(git rev-list --count "$parent_one..$parent_two")"
+      if [[ "$feature_side_commit_count" -ne 1 ]]; then
+        echo "[pre-push] Merge commit '$merge_commit' violates squash-before-merge policy."
+        echo "[pre-push] Feature side contains $feature_side_commit_count commits; expected exactly 1."
+        echo "[pre-push] Squash feature branch commits before merging into develop."
+        exit 1
+      fi
+    done < <(git rev-list --first-parent --merges "$range")
+  fi
 fi
 
 echo "[pre-push] Running local quality gate..."
