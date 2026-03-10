@@ -28,16 +28,41 @@ public sealed partial class RepositoryVersionProvider : IAppVersionProvider
             return FallbackVersion;
         }
 
-        var versionFilePath = Path.Combine(contentRootPath, "VERSION");
-        if (!File.Exists(versionFilePath))
+        foreach (var versionFilePath in GetVersionFileCandidates(contentRootPath))
         {
-            return FallbackVersion;
+            if (!File.Exists(versionFilePath))
+            {
+                continue;
+            }
+
+            var versionValue = File.ReadAllText(versionFilePath).Trim();
+            if (IsValidVersionFormat(versionValue))
+            {
+                return versionValue;
+            }
         }
 
-        var versionValue = File.ReadAllText(versionFilePath).Trim();
-        return IsValidVersionFormat(versionValue)
-            ? versionValue
-            : FallbackVersion;
+        return FallbackVersion;
+    }
+
+    private static IEnumerable<string> GetVersionFileCandidates(string contentRootPath)
+    {
+        var contentRootAbsolutePath = Path.GetFullPath(contentRootPath);
+        var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var candidate in new[]
+                 {
+                     Path.Combine(contentRootAbsolutePath, "VERSION"),
+                     Path.Combine(contentRootAbsolutePath, "..", "VERSION"),
+                     Path.Combine(contentRootAbsolutePath, "..", "..", "VERSION")
+                 })
+        {
+            var fullPath = Path.GetFullPath(candidate);
+            if (seenPaths.Add(fullPath))
+            {
+                yield return fullPath;
+            }
+        }
     }
 
     [GeneratedRegex(@"^v\.[0-9]+\.[0-9]+\.[0-9]+$", RegexOptions.CultureInvariant)]

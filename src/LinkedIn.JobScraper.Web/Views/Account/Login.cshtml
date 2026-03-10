@@ -30,7 +30,6 @@
                     <div>
                         <h1 class="auth-title">Sign in to continue</h1>
                         <p class="auth-subtitle">Use your local account to access your private LinkedIn job workspace.</p>
-                        <p class="auth-version" data-app-version>Version @AppVersionProvider.CurrentVersion</p>
                     </div>
                 </div>
 
@@ -84,6 +83,9 @@
             </section>
         </div>
     </main>
+    <footer class="auth-page-version" aria-label="Application version">
+        <span data-app-version>@AppVersionProvider.CurrentVersion</span>
+    </footer>
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script src="~/js/login-page.js" asp-append-version="true"></script>
 </body>

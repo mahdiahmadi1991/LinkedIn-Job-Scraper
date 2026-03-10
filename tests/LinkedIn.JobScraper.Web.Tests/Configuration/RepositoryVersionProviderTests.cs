@@ -18,6 +18,21 @@ public sealed class RepositoryVersionProviderTests
     }
 
     [Fact]
+    public void ReadsVersionFromRepositoryRootWhenRunningFromSourceLayout()
+    {
+        using var tempDirectory = CreateTempDirectory();
+        var repositoryRoot = tempDirectory.Path;
+        var projectContentRoot = Path.Combine(repositoryRoot, "src", "LinkedIn.JobScraper.Web");
+        Directory.CreateDirectory(projectContentRoot);
+        File.WriteAllText(Path.Combine(repositoryRoot, "VERSION"), "v.3.14.27");
+
+        var hostEnvironment = new TestHostEnvironment(projectContentRoot);
+        var sut = new RepositoryVersionProvider(hostEnvironment);
+
+        Assert.Equal("v.3.14.27", sut.CurrentVersion);
+    }
+
+    [Fact]
     public void FallsBackWhenVersionFileIsMissing()
     {
         using var tempDirectory = CreateTempDirectory();
