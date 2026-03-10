@@ -120,6 +120,7 @@ public sealed class LinkedInJobScraperDbContext : DbContext
                 entity.Property(static session => session.AppUserId).IsRequired();
                 entity.Property(static session => session.SessionKey).HasMaxLength(128).IsRequired();
                 entity.Property(static session => session.Source).HasMaxLength(128).IsRequired();
+                entity.Property(static session => session.ExpirySource).HasMaxLength(128);
                 entity.Property(static session => session.RequestHeadersJson).IsRequired();
 
                 entity.HasIndex(static session => new { session.AppUserId, session.SessionKey }).IsUnique();

@@ -66,6 +66,7 @@ This keeps version milestones visible in git history.
 
 - `CHANGELOG.md` follows Keep a Changelog style.
 - `CHANGELOG.md` must always include `## [Unreleased]` at the top for in-progress notes.
+- `CHANGELOG.md` entries must be business/user-facing (written for software consumers), not low-level implementation notes.
 - Every released version must have:
   - heading with version + date
   - concise, user-facing change summary

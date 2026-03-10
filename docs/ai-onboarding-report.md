@@ -98,13 +98,12 @@ Instead, it reuses the same internal LinkedIn web endpoints that the browser use
 
 ### Current login/session model
 
-The app uses a controlled browser approach:
+The app uses a cURL import approach:
 
-- a Playwright-controlled browser is launched
-- the user logs in manually inside that browser
-- the app watches for authenticated cookies
-- once cookies such as `li_at` and `JSESSIONID` appear, the session is auto-captured
-- the captured headers/cookies are stored and reused for subsequent LinkedIn API requests
+- the user signs in to LinkedIn in their own browser
+- the user copies an authenticated `Copy as cURL` request from DevTools
+- the app parses required headers/cookies and validates session usability
+- the minimized session payload is stored and reused for subsequent LinkedIn API requests
 
 ### Important safety position
 
@@ -112,10 +111,10 @@ The app deliberately avoids making direct automated credential-post login its pr
 
 The current product direction is:
 
-- user-in-the-loop for login
-- automatic capture after successful login
+- user-in-the-loop for authenticated browser context
+- guided cURL import with in-app instructions
 - light session validation
-- recapture available when the session expires
+- reset + re-import available when the session expires
 
 ## 4. AI Integration Strategy
 
@@ -163,7 +162,7 @@ It is not a heavy clean-architecture implementation, but the code is intentional
 
 ### Why this architecture was chosen
 
-- Fastest path to MVP
+- Fastest path to practical local delivery
 - Easy to run locally
 - Easy to debug
 - Enough separation to keep future refactors manageable
@@ -231,10 +230,10 @@ Dependency registration lives in:
 
 This method registers:
 
-- options binding for SQL Server, OpenAI, and browser automation
+- options binding for SQL Server, OpenAI, and LinkedIn fetch/session settings
 - SignalR
 - session store
-- browser login service
+- session cURL import service
 - session verification
 - LinkedIn search settings and location lookup
 - LinkedIn search and detail services
@@ -255,17 +254,17 @@ Current UX:
 
 Current behavior:
 
-- launch controlled browser
-- wait for login
-- auto-capture authenticated session
-- auto-verify after successful capture
+- show browser-specific cURL copy steps
+- paste and validate authenticated cURL request
+- store and verify authenticated session
+- auto-verify after successful import
 - close modal automatically on successful completion
 - surface action feedback via toast notifications
 
 Recovery behavior:
 
 - if a LinkedIn request returns `401`, the session is invalidated
-- the UI keeps session recapture accessible
+- the UI keeps session re-import accessible
 
 ### 8.2 Search flow
 
@@ -374,8 +373,8 @@ Stores the editable AI behavior profile, including output language.
 
 ### LinkedIn services
 
-- `PlaywrightLinkedInBrowserLoginService`
-  - launches the controlled browser, watches login progress, auto-captures session
+- `LinkedInSessionCurlImportService`
+  - validates `Copy as cURL` payload and extracts reusable session headers/cookies
 - `DatabaseLinkedInSessionStore`
   - persists and invalidates reusable sessions
 - `LinkedInSessionVerificationService`
@@ -475,9 +474,9 @@ Package references:
 - `Microsoft.EntityFrameworkCore.SqlServer` `10.0.3`
 - `Microsoft.EntityFrameworkCore.Design` `10.0.3`
 
-### Browser automation
+### Session onboarding
 
-- `Microsoft.Playwright` `1.58.0`
+- LinkedIn authenticated request import through browser DevTools (`Copy as cURL`)
 
 ### Frontend/runtime libraries
 
@@ -560,9 +559,9 @@ If a new AI assistant takes over this repository, the most important truths are:
 
 - this is a local, per-user-isolated job-triage tool
 - `Jobs` is the core page and default business entry point
-- LinkedIn integration depends on browser-backed session reuse, not official partner APIs
+- LinkedIn integration depends on authenticated cURL-based session reuse, not official partner APIs
 - controllers are intentionally thin; keep logic in services
-- the app is designed for fast MVP iteration, not enterprise layering
+- the app is designed for fast pragmatic iteration, not enterprise layering
 - do not reintroduce direct LinkedIn credential-post login as the primary strategy
 - preserve the conservative pacing and user-in-the-loop posture
 - treat the current uncommitted top-bar refactor as live working state

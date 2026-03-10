@@ -1,6 +1,7 @@
 using System.Net;
 using System.IO;
 using System.Threading.RateLimiting;
+using System.Globalization;
 using LinkedIn.JobScraper.Web.AI;
 using LinkedIn.JobScraper.Web.Composition;
 using LinkedIn.JobScraper.Web.Configuration;
@@ -9,6 +10,7 @@ using LinkedIn.JobScraper.Web.Logging;
 using LinkedIn.JobScraper.Web.Middleware;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -32,6 +34,17 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysDirectory))
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    var supportedCultures = CultureInfo
+        .GetCultures(CultureTypes.AllCultures)
+        .Where(static culture => !string.IsNullOrWhiteSpace(culture.Name))
+        .ToList();
+
+    options.DefaultRequestCulture = new RequestCulture("en-US");
+    options.SupportedCultures = supportedCultures;
+    options.SupportedUICultures = supportedCultures;
+});
 builder.Services.AddHealthChecks()
     .AddCheck<ConfigurationReadinessHealthCheck>(
         "configuration_readiness",
@@ -60,6 +73,7 @@ var app = builder.Build();
 
 StartupLog.PerRunLogFileInitialized(app.Logger, perRunLogFilePath);
 app.UseForwardedHeaders();
+app.UseRequestLocalization();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

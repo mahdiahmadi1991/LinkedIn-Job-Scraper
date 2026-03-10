@@ -1,4 +1,13 @@
+@using System.Globalization
 @model LinkedIn.JobScraper.Web.Models.LinkedInSessionPageViewModel
+@{
+    static string FormatSessionSource(string? source) => source switch
+    {
+        null or "" => "Not available",
+        "CurlImport" => "cURL Import",
+        _ => source
+    };
+}
 
 <div class="modal fade"
      id="linkedInSessionModal"
@@ -7,107 +16,164 @@
      aria-hidden="true"
      data-linked-in-session-modal
      data-session-state-url="@Url.Action("State", "LinkedInSession")"
-     data-session-launch-url="@Url.Action("Launch", "LinkedInSession")"
-     data-session-capture-url="@Url.Action("Capture", "LinkedInSession")"
      data-session-import-curl-url="@Url.Action("ImportCurl", "LinkedInSession")"
-     data-session-verify-url="@Url.Action("Verify", "LinkedInSession")"
      data-session-revoke-url="@Url.Action("Revoke", "LinkedInSession")">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content session-modal-shell">
             <div class="modal-header border-0 pb-0">
                 <div>
                     <div class="section-label mb-2">Session Capture</div>
-                    <h2 class="modal-title h5 mb-0" id="linkedInSessionModalLabel">LinkedIn Session</h2>
+                    <h2 class="modal-title h5 mb-0" id="linkedInSessionModalLabel">LinkedIn Session (cURL Import)</h2>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body d-flex flex-column gap-3 pt-3">
-                <div class="small text-muted">
-                    Launch the controlled browser, complete login, and let auto-capture save the new session. The dialog closes automatically after capture and verification succeed.
-                </div>
+            <div class="modal-body pt-3">
+                <div class="session-modal-layout" data-session-modal-layout>
+                    <div class="session-modal-main">
+                        <div class="small text-muted">
+                            Paste <strong>Copy as cURL</strong> from an authenticated LinkedIn request. The app validates and stores your session immediately.
+                        </div>
 
-                <div class="session-modal-status-stack">
-                    <div class="session-status-note subtle @(string.IsNullOrWhiteSpace(Model.AutoCaptureStatusMessage) ? "d-none" : string.Empty)" data-session-auto-capture-note>
-                        @Model.AutoCaptureStatusMessage
-                    </div>
-                </div>
+                        <div class="session-status-note danger d-none" data-session-reset-note></div>
 
-                <div class="session-modal-waiting @(Model.IsAutoCaptureRunning ? string.Empty : "d-none")" data-session-waiting>
-                    <span class="session-modal-spinner" aria-hidden="true"></span>
-                    <div class="session-modal-waiting-copy">
-                        <div class="fw-semibold">Waiting for LinkedIn login...</div>
-                        <div class="small text-muted">Auto-capture is watching for authenticated cookies in the controlled browser.</div>
-                    </div>
-                </div>
+                        <section class="selection-card selection-card-tight session-connected-panel @((Model.StoredSessionAvailable && !Model.ResetRequired) ? string.Empty : "d-none")"
+                                 data-session-connected-panel>
+                            <div class="session-connected-heading">Your LinkedIn session is connected.</div>
+                            <div class="small text-muted">
+                                You are ready to run LinkedIn-powered actions. If you want to replace this session, use the button below.
+                            </div>
+                            <div class="session-connected-actions">
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-primary"
+                                    data-session-start-replace>
+                                    Replace Session
+                                </button>
+                            </div>
+                        </section>
 
-                <div class="selection-card selection-card-tight">
-                    <div class="state-grid">
-                        <div class="state-grid-row">
-                            <div class="state-grid-label">Session Status</div>
-                            <div class="state-grid-value" data-session-status-label>@Model.SessionIndicatorLabel</div>
-                        </div>
-                        <div class="state-grid-row">
-                            <div class="state-grid-label">Browser</div>
-                            <div class="state-grid-value" data-session-browser-open>@(Model.BrowserOpen ? "Open" : "Closed")</div>
-                        </div>
-                        <div class="state-grid-row">
-                            <div class="state-grid-label">Current Page</div>
-                            <div class="state-grid-value" data-session-current-page>@(Model.CurrentPageUrl ?? "Not available")</div>
-                        </div>
-                        <div class="state-grid-row">
-                            <div class="state-grid-label">Captured At</div>
-                            <div class="state-grid-value" data-session-captured-at>@(Model.StoredSessionCapturedAtUtc?.ToString("u") ?? "Not available")</div>
-                        </div>
-                        <div class="state-grid-row">
-                            <div class="state-grid-label">Source</div>
-                            <div class="state-grid-value" data-session-source>@(Model.StoredSessionSource ?? "Not available")</div>
-                        </div>
-                    </div>
-                </div>
+                        <section class="selection-card selection-card-tight session-curl-import-panel @((Model.StoredSessionAvailable && !Model.ResetRequired) ? "d-none" : string.Empty)"
+                                 data-session-curl-panel>
+                            <div class="state-grid-label">Quick Browser Guide</div>
+                            <div class="session-curl-guide" data-session-curl-guide>
+                                <div class="session-status-note subtle d-none" data-session-curl-browser-hint></div>
 
-                <div class="selection-card selection-card-tight session-curl-import-panel">
-                    <div class="state-grid-label">Import From cURL</div>
-                    <div class="small text-muted">
-                        Paste <strong>Copy as cURL (bash)</strong> from a valid authenticated LinkedIn request. The imported session is verified before it replaces the current stored session.
+                                <details class="session-curl-guide-card" data-session-curl-guide-card="chromium">
+                                    <summary>Chrome / Edge / Brave / Opera</summary>
+                                    <ol class="small text-muted mb-0">
+                                        <li>Open LinkedIn while signed in.</li>
+                                        <li>Open DevTools with <kbd>F12</kbd> and select <strong>Network</strong>.</li>
+                                        <li>Refresh and choose a request containing <code>/voyager/api/</code>.</li>
+                                        <li>Right click request -> <strong>Copy</strong> -> <strong>Copy as cURL (bash)</strong> (or <strong>Copy as cURL (cmd)</strong>).</li>
+                                        <li>Paste below and click <strong>Validate &amp; Import cURL</strong>.</li>
+                                    </ol>
+                                </details>
+
+                                <details class="session-curl-guide-card" data-session-curl-guide-card="firefox">
+                                    <summary>Firefox</summary>
+                                    <ol class="small text-muted mb-0">
+                                        <li>Open LinkedIn while signed in.</li>
+                                        <li>Open Developer Tools with <kbd>F12</kbd> and select <strong>Network</strong>.</li>
+                                        <li>Refresh and choose a request containing <code>/voyager/api/</code>.</li>
+                                        <li>Right click request -> <strong>Copy Value</strong> -> <strong>Copy as cURL (POSIX)</strong> (or <strong>Copy as cURL (Windows)</strong>).</li>
+                                        <li>Paste below and click <strong>Validate &amp; Import cURL</strong>.</li>
+                                    </ol>
+                                </details>
+
+                                <div class="small text-muted">
+                                    Paste full text starting with <code>curl</code>. Avoid fetch/PowerShell formats.
+                                </div>
+                            </div>
+
+                            <div class="session-curl-import-stack">
+                                <textarea
+                                    id="linkedInSessionCurlText"
+                                    class="form-control session-curl-textarea"
+                                    rows="7"
+                                    spellcheck="false"
+                                    data-session-curl-text
+                                    placeholder="curl 'https://www.linkedin.com/voyager/api/...'
+  -H 'cookie: li_at=...; JSESSIONID=&quot;ajax:...&quot;'"></textarea>
+                                <div class="session-status-note subtle d-none" data-session-curl-feedback></div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        class="btn btn-primary"
+                                        data-loading-text="Validating cURL..."
+                                        data-session-import-curl>
+                                        Validate &amp; Import cURL
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="btn btn-outline-primary d-none"
+                                        data-session-cancel-replace>
+                                        Keep Current Session
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="btn btn-outline-secondary @(!Model.StoredSessionAvailable ? "d-none" : string.Empty)"
+                                        data-loading-text="Resetting session..."
+                                        data-session-revoke>
+                                        Reset Session
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
                     </div>
-                    <div class="session-curl-import-stack">
-                        <textarea
-                            id="linkedInSessionCurlText"
-                            class="form-control session-curl-textarea"
-                            rows="6"
-                            spellcheck="false"
-                            data-session-curl-text
-                            placeholder="curl 'https://www.linkedin.com/voyager/api/...'\n  -H 'cookie: li_at=...; JSESSIONID=&quot;ajax:...&quot;'"></textarea>
-                        <div class="session-status-note subtle d-none" data-session-curl-feedback></div>
-                        <button
-                            type="button"
-                            class="btn btn-outline-primary"
-                            data-loading-text="Validating cURL..."
-                            data-session-import-curl>
-                            Validate &amp; Import cURL
-                        </button>
-                    </div>
+
+                    <aside class="selection-card selection-card-tight session-details-panel"
+                           data-session-details-panel>
+                        <div class="session-details-heading">Connection Details</div>
+                        <div class="state-grid">
+                            <div class="state-grid-row">
+                                <div class="state-grid-label">Session Status</div>
+                                <div class="state-grid-value" data-session-status-label>@Model.SessionIndicatorLabel</div>
+                            </div>
+                            <div class="state-grid-row">
+                                <div class="state-grid-label">Captured At</div>
+                                <div class="state-grid-value" data-session-captured-at>
+                                    @if (Model.StoredSessionCapturedAtUtc is DateTimeOffset capturedAtUtc)
+                                    {
+                                        var capturedAtUtcIso = capturedAtUtc.ToString("O", CultureInfo.InvariantCulture);
+                                        <span data-utc-display="@capturedAtUtcIso" data-utc-empty="Not available">
+                                            @capturedAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        @:Not available
+                                    }
+                                </div>
+                            </div>
+                            <div class="state-grid-row">
+                                <div class="state-grid-label">Source</div>
+                                <div class="state-grid-value" data-session-source>@FormatSessionSource(Model.StoredSessionSource)</div>
+                            </div>
+                            <div class="state-grid-row">
+                                <div class="state-grid-label">Expiration</div>
+                                <div class="state-grid-value" data-session-expiration>
+                                    @if (Model.StoredSessionEstimatedExpiresAtUtc is DateTimeOffset expiresAtUtc)
+                                    {
+                                        var expiryUtcIso = expiresAtUtc.ToString("O", CultureInfo.InvariantCulture);
+                                        <span data-utc-display="@expiryUtcIso" data-utc-empty="Unknown">
+                                            @expiresAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+                                        </span>
+                                        @if (!string.IsNullOrWhiteSpace(Model.StoredSessionExpirySource))
+                                        {
+                                            <span> (@Model.StoredSessionExpirySource)</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        @:Unknown
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </aside>
                 </div>
 
                 <form id="linkedInSessionAntiForgeryForm">@Html.AntiForgeryToken()</form>
-
-                <div class="stacked-actions">
-                    <button type="button" class="btn btn-primary" data-session-launch data-loading-text="Opening browser...">@Model.PrimaryActionLabel</button>
-                    <button
-                        type="button"
-                        class="btn btn-outline-primary @(Model.ShowManualCaptureAction ? string.Empty : "d-none")"
-                        data-loading-text="Capturing session..."
-                        data-session-capture>
-                        Capture Manually
-                    </button>
-                    <button
-                        type="button"
-                        class="btn btn-outline-secondary @(!Model.StoredSessionAvailable || Model.IsAutoCaptureRunning ? "d-none" : string.Empty)"
-                        data-loading-text="Revoking session..."
-                        data-session-revoke>
-                        Revoke Session
-                    </button>
-                </div>
             </div>
         </div>
     </div>

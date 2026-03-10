@@ -1,11 +1,13 @@
 using LinkedIn.JobScraper.Web.Controllers;
 using LinkedIn.JobScraper.Web.Contracts;
 using LinkedIn.JobScraper.Web.Jobs;
+using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using LinkedIn.JobScraper.Web.Tests.Authentication;
 using LinkedIn.JobScraper.Web.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace LinkedIn.JobScraper.Web.Tests.Controllers;
 
@@ -17,7 +19,13 @@ public sealed class JobsControllerTests
         var service = new FakeJobsDashboardService();
         var workflowExecutor = new FakeJobsWorkflowExecutor(service);
         var workflowStateStore = new FakeJobsWorkflowStateStore();
-        var controller = new JobsController(new TestCurrentAppUserContext(), service, workflowExecutor, workflowStateStore)
+        var controller = new JobsController(
+            new TestCurrentAppUserContext(),
+            service,
+            workflowExecutor,
+            workflowStateStore,
+            new FakeLinkedInSessionResetRequirementTracker(),
+            NullLogger<JobsController>.Instance)
         {
             ControllerContext = new ControllerContext
             {
@@ -57,7 +65,13 @@ public sealed class JobsControllerTests
     public async Task FetchAndScoreReturnsProblemDetailsForAjaxFailures()
     {
         var service = new FailedJobsDashboardService();
-        var controller = new JobsController(new TestCurrentAppUserContext(), service, new FakeJobsWorkflowExecutor(service), new FakeJobsWorkflowStateStore())
+        var controller = new JobsController(
+            new TestCurrentAppUserContext(),
+            service,
+            new FakeJobsWorkflowExecutor(service),
+            new FakeJobsWorkflowStateStore(),
+            new FakeLinkedInSessionResetRequirementTracker(),
+            NullLogger<JobsController>.Instance)
         {
             ControllerContext = new ControllerContext
             {
@@ -85,7 +99,13 @@ public sealed class JobsControllerTests
     public async Task FetchAndScoreReturnsWarningJsonPayloadForAjaxWarnings()
     {
         var service = new WarningJobsDashboardService();
-        var controller = new JobsController(new TestCurrentAppUserContext(), service, new FakeJobsWorkflowExecutor(service), new FakeJobsWorkflowStateStore())
+        var controller = new JobsController(
+            new TestCurrentAppUserContext(),
+            service,
+            new FakeJobsWorkflowExecutor(service),
+            new FakeJobsWorkflowStateStore(),
+            new FakeLinkedInSessionResetRequirementTracker(),
+            NullLogger<JobsController>.Instance)
         {
             ControllerContext = new ControllerContext
             {
@@ -111,10 +131,55 @@ public sealed class JobsControllerTests
     }
 
     [Fact]
+    public async Task FetchAndScoreReturnsConflictWhenSessionResetIsRequired()
+    {
+        var service = new FakeJobsDashboardService();
+        var resetTracker = new FakeLinkedInSessionResetRequirementTracker();
+        resetTracker.MarkRequired(
+            LinkedInSessionResetReasonCodes.SessionForbidden,
+            "LinkedIn rejected this session with HTTP 403 (Forbidden). Reset Session, then reconnect to continue.",
+            StatusCodes.Status403Forbidden);
+
+        var controller = new JobsController(
+            new TestCurrentAppUserContext(),
+            service,
+            new FakeJobsWorkflowExecutor(service),
+            new FakeJobsWorkflowStateStore(),
+            resetTracker,
+            NullLogger<JobsController>.Instance)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider()),
+            Url = new TestUrlHelper("/Jobs")
+        };
+
+        controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
+
+        var result = await controller.FetchAndScore(new JobsDashboardQuery(), "connection-1", "workflow-1", CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        var payload = Assert.IsType<FetchAndScoreAjaxResponse>(objectResult.Value);
+
+        Assert.Equal(StatusCodes.Status409Conflict, objectResult.StatusCode);
+        Assert.False(payload.Success);
+        Assert.Equal("warning", payload.Severity);
+        Assert.Contains("HTTP 403", payload.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ScoreJobReturnsTypedJsonPayload()
     {
         var service = new FakeJobsDashboardService();
-        var controller = new JobsController(new TestCurrentAppUserContext(), service, new FakeJobsWorkflowExecutor(service), new FakeJobsWorkflowStateStore())
+        var controller = new JobsController(
+            new TestCurrentAppUserContext(),
+            service,
+            new FakeJobsWorkflowExecutor(service),
+            new FakeJobsWorkflowStateStore(),
+            new FakeLinkedInSessionResetRequirementTracker(),
+            NullLogger<JobsController>.Instance)
         {
             ControllerContext = new ControllerContext
             {
@@ -145,7 +210,9 @@ public sealed class JobsControllerTests
             new TestCurrentAppUserContext(),
             new FakeJobsDashboardService(),
             new FakeJobsWorkflowExecutor(new FakeJobsDashboardService()),
-            stateStore);
+            stateStore,
+            new FakeLinkedInSessionResetRequirementTracker(),
+            NullLogger<JobsController>.Instance);
 
         var result = controller.WorkflowProgress("workflow-404");
 
@@ -166,7 +233,9 @@ public sealed class JobsControllerTests
             new TestCurrentAppUserContext(),
             new FakeJobsDashboardService(),
             new FakeJobsWorkflowExecutor(new FakeJobsDashboardService()),
-            stateStore);
+            stateStore,
+            new FakeLinkedInSessionResetRequirementTracker(),
+            NullLogger<JobsController>.Instance);
 
         var result = controller.WorkflowProgress("workflow-1");
 
@@ -183,7 +252,9 @@ public sealed class JobsControllerTests
             new TestCurrentAppUserContext(),
             service,
             new FakeJobsWorkflowExecutor(service),
-            new FakeJobsWorkflowStateStore());
+            new FakeJobsWorkflowStateStore(),
+            new FakeLinkedInSessionResetRequirementTracker(),
+            NullLogger<JobsController>.Instance);
 
         var result = await controller.UpdateStatus(
             Guid.NewGuid(),
@@ -479,6 +550,31 @@ public sealed class JobsControllerTests
 
         public void ReleaseWorkflow(int userId, string workflowId)
         {
+        }
+    }
+
+    private sealed class FakeLinkedInSessionResetRequirementTracker : ILinkedInSessionResetRequirementTracker
+    {
+        private LinkedInSessionResetRequirementState _current = LinkedInSessionResetRequirementState.NotRequired;
+
+        public LinkedInSessionResetRequirementState GetCurrent()
+        {
+            return _current;
+        }
+
+        public void MarkRequired(string reasonCode, string message, int? statusCode)
+        {
+            _current = new LinkedInSessionResetRequirementState(
+                true,
+                reasonCode,
+                message,
+                statusCode,
+                DateTimeOffset.UtcNow);
+        }
+
+        public void Clear()
+        {
+            _current = LinkedInSessionResetRequirementState.NotRequired;
         }
     }
 }

@@ -5,8 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [v.4.0.0] - 2026-03-10
 ### Changed
-- _No unreleased changes yet._
+- LinkedIn session setup is now a single clear path: users import `Copy as cURL (bash)` directly in the app.
+- The session modal is simplified to reduce visual clutter and make first-time connection easier for non-technical users.
+- Browser-specific guidance (Chromium-family and Firefox) now helps users complete cURL import faster with fewer mistakes.
+- Session recovery is clearer: when LinkedIn rejects access (`401/403`), users are guided to reset and reconnect with explicit reasons.
+- Fetch actions are now safely blocked while reset is required, preventing repeated failures with stale sessions.
+- Session details now show capture time, source, and expiration transparency (`Unknown` when unavailable).
+- Legacy browser-automation and extension-based session connect paths were removed to keep onboarding simple and trust-friendly.
+- Session flow tests and QA checklist were updated so manual and automated validation match the new cURL-only experience.
+- When a session is already connected, the modal now shows a clear connected state with a focused `Replace Session` action instead of always showing the full import form.
+- Expired/refused-session states now show stronger reconnect guidance so users know to reset and re-import immediately.
+- Session details are now pinned in a dedicated right-side panel in the modal, so status, capture time, source, and expiration remain visible while users update the session.
+- Date/time values across the UI now follow the user's locale formatting instead of technical UTC strings, improving readability and consistency.
+- Session source labels in the modal are now user-friendly (for example `cURL Import` instead of internal values like `CurlImport`).
 
 ## [v.3.14.30] - 2026-03-10
 ### Added

@@ -54,9 +54,6 @@ public static class ServiceCollectionExtensions
             .Bind(configuration.GetSection(LinkedInRequestSafetyOptions.SectionName))
             .ValidateOnStart();
 
-        services.AddOptions<LinkedInBrowserAutomationOptions>()
-            .Bind(configuration.GetSection(LinkedInBrowserAutomationOptions.SectionName));
-
         services.AddOptions<JobsWorkflowOptions>()
             .Bind(configuration.GetSection(JobsWorkflowOptions.SectionName))
             .ValidateOnStart();
@@ -106,7 +103,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IAdminUserManagementService, AdminUserManagementService>();
         services.AddSingleton<ISqlServerConnectionStringProvider, ConfiguredSqlServerConnectionStringProvider>();
         services.AddSingleton<ILinkedInSessionStore, DatabaseLinkedInSessionStore>();
-        services.AddSingleton<ILinkedInBrowserLoginService, PlaywrightLinkedInBrowserLoginService>();
+        services.AddSingleton<ILinkedInSessionResetRequirementTracker, InMemoryLinkedInSessionResetRequirementTracker>();
         services.AddTransient<ILinkedInSessionCurlImportService, LinkedInSessionCurlImportService>();
         services.AddSingleton<ILinkedInSearchSettingsService, LinkedInSearchSettingsService>();
         services.AddSingleton<IJobsWorkflowStateStore, InMemoryJobsWorkflowStateStore>();

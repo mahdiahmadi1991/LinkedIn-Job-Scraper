@@ -132,7 +132,7 @@ public sealed class LinkedInJobSearchServiceTests
         Assert.True(sessionStore.InvalidateCalled);
         Assert.Equal(2, apiClient.CallCount);
         Assert.Contains("Partial results", result.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Connect Session", result.Message, StringComparison.Ordinal);
+        Assert.Contains("import cURL", result.Message, StringComparison.Ordinal);
     }
 
     [Fact]

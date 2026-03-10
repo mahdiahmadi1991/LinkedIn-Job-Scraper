@@ -30,7 +30,7 @@ If there is tension between broad roadmap intent and step-by-step execution:
 
 - Local-only personal-use application (not a hosted SaaS product)
 - Lightweight local app-user authentication is active and required for per-user data ownership
-- Controlled-browser, user-in-the-loop LinkedIn session capture remains the default
+- User-in-the-loop authenticated LinkedIn cURL import remains the default
 - No direct credential-post login as the primary LinkedIn path
 - No aggressive scraping patterns
 - No business-logic changes without explicit approval
@@ -41,7 +41,7 @@ If there is tension between broad roadmap intent and step-by-step execution:
 
 The current implemented baseline already includes:
 
-- LinkedIn browser-backed session capture and verification
+- LinkedIn cURL-based session import and verification
 - conservative paged job import
 - job detail enrichment
 - OpenAI scoring
@@ -268,37 +268,46 @@ The following rules are locked:
 - After archiving, update `docs/plan.md` so the latest completed queue reference points to the archived path.
 - UI consistency is mandatory: new button/interaction patterns must align with existing project design contracts; introducing a new pattern requires harmonizing related surfaces.
 - Language policy is mandatory: use English-only text across code, UI labels, tests, and documentation; do not add Persian (or other non-English) words in repository content.
+- Module observability is mandatory: every newly implemented module/flow must include strong structured logging with actionable runtime context for debugging, while preserving sensitive-data redaction rules.
+- Changelog audience policy is mandatory: `CHANGELOG.md` entries must be business/user-facing and understandable by end users; avoid low-level technical implementation wording.
+- Context-stability policy is mandatory for large tasks: when context usage is already high and a mid-task automatic compaction is likely, proactively compact first, then re-onboard from authoritative docs (`AGENTS.md`, relevant idea file, `docs/plan.md`) before making edits.
 
 ## Post-Delivery Workflow (Locked)
 
 After implementation completes, this sequence is mandatory for every feature/fix/bugfix:
 
 1. User Test Gate
+
 - User runs manual validation first.
 
-2. Conformance Gate (Codex)
+1. Conformance Gate (Codex)
+
 - Codex verifies implemented behavior against the original approved deal/idea contract.
 - Codex explicitly confirms match or documents deviations and fixes.
 
-3. Integration Sync Gate (Codex)
+1. Integration Sync Gate (Codex)
+
 - Codex performs repository-wide sync for that feature:
   - code/test/doc/config consistency
   - removal of dead or duplicate implementation
   - correction of any drift discovered post-test
 
-4. Work Branch + Commit Gate
+1. Work Branch + Commit Gate
+
 - Finalized changes are committed on a work branch (never directly on `main`).
 - Allowed prefixes: `feature/*`, `fix/*`, `bugfix/*`.
 - Keep `CHANGELOG.md` `Unreleased` notes synchronized with completed work in this gate.
 - No release version bump/versioned changelog entry/tag in this gate.
 
-5. Develop Integration Gate
+1. Develop Integration Gate
+
 - Integrate work branch changes into `develop` without PR.
 - Use squash integration so each work branch becomes one integration commit on `develop`.
 - Only in this gate: convert `Unreleased` notes into release `CHANGELOG.md` entry, bump `VERSION`, and create annotated tag `v.X.Y.Z` on that `develop` merge commit in the same integration step.
 - Delete the work branch after successful integration.
 
-6. Main Merge Gate
+1. Main Merge Gate
+
 - Merge `develop` into `main` only via PR.
 - After PR creation, enable auto-merge with merge-commit strategy; do not perform manual immediate merge.
 - Copilot review gate is mandatory on PRs targeting `main`.
@@ -307,7 +316,8 @@ After implementation completes, this sequence is mandatory for every feature/fix
 - Main pipeline validates versioning artifacts; creating missing release tag (`v.X.Y.Z`) is fallback-only when develop-tagging was missed.
 - PRs targeting `main` must pass all required guard checks (including versioning and Copilot gates) before merge.
 
-7. Post-Main Sync Gate
+1. Post-Main Sync Gate
+
 - Immediately sync `develop` with `main` after `main` merge so long-lived divergence does not accumulate.
 
 ## Git Graph Rules (Locked)

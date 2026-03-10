@@ -13,19 +13,12 @@ public sealed class LinkedInSessionControllerTests
     [Fact]
     public async Task StateReturnsCurrentSessionShape()
     {
-        var browserLoginService = new FakeLinkedInBrowserLoginService();
-        var controller = new LinkedInSessionController(
-            browserLoginService,
-            new FakeLinkedInSessionCurlImportService(),
-            new FakeLinkedInSessionStore(),
-            new FakeLinkedInSessionVerificationService())
-        {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext()
-            },
-            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
-        };
+        var controller = CreateController(
+            linkedInSessionStore: new SnapshotLinkedInSessionStore(
+                new LinkedInSessionSnapshot(
+                    new Dictionary<string, string>(),
+                    new DateTimeOffset(2026, 3, 10, 10, 15, 0, TimeSpan.Zero),
+                    "CurlImport")));
 
         var result = await controller.State(CancellationToken.None);
 
@@ -34,26 +27,15 @@ public sealed class LinkedInSessionControllerTests
 
         Assert.False(payload.Success);
         Assert.True(payload.State.StoredSessionAvailable);
-        Assert.Equal("Refresh Session", payload.State.PrimaryActionLabel);
         Assert.Equal("Connected", payload.State.SessionIndicatorLabel);
         Assert.Equal("session-state-connected", payload.State.SessionIndicatorClass);
+        Assert.False(payload.State.ResetRequirement.Required);
     }
 
     [Fact]
     public async Task StateReturnsMissingSessionShapeWhenNoStoredSessionExists()
     {
-        var controller = new LinkedInSessionController(
-            new MissingSessionLinkedInBrowserLoginService(),
-            new FakeLinkedInSessionCurlImportService(),
-            new FakeLinkedInSessionStore(),
-            new FakeLinkedInSessionVerificationService())
-        {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext()
-            },
-            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
-        };
+        var controller = CreateController(linkedInSessionStore: new SnapshotLinkedInSessionStore(null));
 
         var result = await controller.State(CancellationToken.None);
 
@@ -62,54 +44,35 @@ public sealed class LinkedInSessionControllerTests
 
         Assert.False(payload.Success);
         Assert.False(payload.State.StoredSessionAvailable);
-        Assert.Equal("Connect Session", payload.State.PrimaryActionLabel);
         Assert.Equal("Missing", payload.State.SessionIndicatorLabel);
         Assert.Equal("session-state-missing", payload.State.SessionIndicatorClass);
     }
 
     [Fact]
-    public async Task StateTreatsAutoCaptureAsStoppedWhenBrowserIsClosed()
+    public async Task StateReturnsStoredSessionExpiryMetadataWhenAvailable()
     {
-        var controller = new LinkedInSessionController(
-            new AutoCaptureStaleLinkedInBrowserLoginService(),
-            new FakeLinkedInSessionCurlImportService(),
-            new FakeLinkedInSessionStore(),
-            new FakeLinkedInSessionVerificationService())
-        {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext()
-            },
-            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
-        };
+        var controller = CreateController(
+            linkedInSessionStore: new SnapshotLinkedInSessionStore(
+                new LinkedInSessionSnapshot(
+                    new Dictionary<string, string>(),
+                    new DateTimeOffset(2026, 3, 10, 10, 15, 0, TimeSpan.Zero),
+                    "CurlImport",
+                    new DateTimeOffset(2026, 4, 10, 8, 30, 0, TimeSpan.Zero),
+                    "li_at cookie")));
 
         var result = await controller.State(CancellationToken.None);
 
         var json = Assert.IsType<JsonResult>(result);
         var payload = Assert.IsType<LinkedInSessionActionResponse>(json.Value);
 
-        Assert.False(payload.State.AutoCaptureActive);
-        Assert.Equal("Missing", payload.State.SessionIndicatorLabel);
-        Assert.Equal("session-state-missing", payload.State.SessionIndicatorClass);
-        Assert.True(payload.State.ShowManualCaptureAction);
+        Assert.Equal(new DateTimeOffset(2026, 4, 10, 8, 30, 0, TimeSpan.Zero), payload.State.StoredSessionEstimatedExpiresAtUtc);
+        Assert.Equal("li_at cookie", payload.State.StoredSessionExpirySource);
     }
 
     [Fact]
     public async Task VerifyReturnsProblemDetailsForAjaxFailures()
     {
-        var controller = new LinkedInSessionController(
-            new FakeLinkedInBrowserLoginService(),
-            new FakeLinkedInSessionCurlImportService(),
-            new FakeLinkedInSessionStore(),
-            new FailingLinkedInSessionVerificationService())
-        {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext()
-            },
-            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
-        };
-
+        var controller = CreateController(linkedInSessionVerificationService: new FailingLinkedInSessionVerificationService());
         controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
 
         var result = await controller.Verify(CancellationToken.None);
@@ -125,49 +88,10 @@ public sealed class LinkedInSessionControllerTests
     }
 
     [Fact]
-    public async Task LaunchReturnsProblemDetailsForAjaxFailures()
-    {
-        var controller = new LinkedInSessionController(
-            new FailingLinkedInBrowserLoginService(),
-            new FakeLinkedInSessionCurlImportService(),
-            new FakeLinkedInSessionStore(),
-            new FakeLinkedInSessionVerificationService())
-        {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext()
-            },
-            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
-        };
-
-        controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
-
-        var result = await controller.Launch(CancellationToken.None);
-
-        var problem = Assert.IsType<ObjectResult>(result);
-        var details = Assert.IsType<ProblemDetails>(problem.Value);
-
-        Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
-        Assert.Equal("LinkedIn session action failed", details.Title);
-        Assert.Equal("Browser launch failed.", details.Detail);
-    }
-
-    [Fact]
     public async Task VerifyNormalizesNonErrorFailureStatusCodesToConflict()
     {
-        var controller = new LinkedInSessionController(
-            new FakeLinkedInBrowserLoginService(),
-            new FakeLinkedInSessionCurlImportService(),
-            new FakeLinkedInSessionStore(),
-            new AmbiguousFailingLinkedInSessionVerificationService())
-        {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext()
-            },
-            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
-        };
-
+        var controller = CreateController(
+            linkedInSessionVerificationService: new AmbiguousFailingLinkedInSessionVerificationService());
         controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
 
         var result = await controller.Verify(CancellationToken.None);
@@ -179,110 +103,96 @@ public sealed class LinkedInSessionControllerTests
         Assert.Equal("Payload shape was unexpected.", details.Detail);
     }
 
-    private sealed class FakeLinkedInBrowserLoginService : ILinkedInBrowserLoginService
+    [Fact]
+    public async Task VerifySetsResetRequiredStateWhenLinkedInReturnsForbidden()
     {
-        public Task<LinkedInBrowserLoginActionResult> CaptureAndSaveAsync(CancellationToken cancellationToken)
-        {
-            throw new NotSupportedException();
-        }
+        var resetTracker = new FakeLinkedInSessionResetRequirementTracker();
+        var controller = CreateController(
+            linkedInSessionVerificationService: new ForbiddenLinkedInSessionVerificationService(),
+            linkedInSessionResetRequirementTracker: resetTracker);
 
-        public Task<LinkedInBrowserLoginState> GetStateAsync(CancellationToken cancellationToken)
-        {
-            return Task.FromResult(
-                new LinkedInBrowserLoginState(
-                    BrowserOpen: false,
-                    CurrentPageUrl: null,
-                    StoredSessionAvailable: true,
-                    StoredSessionCapturedAtUtc: DateTimeOffset.UtcNow,
-                    StoredSessionSource: "Test",
-                    AutoCaptureActive: false,
-                    AutoCaptureStatusMessage: null,
-                    AutoCaptureCompletedSuccessfully: false));
-        }
+        controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
 
-        public Task<LinkedInBrowserLoginActionResult> LaunchLoginAsync(CancellationToken cancellationToken)
+        var verifyResult = await controller.Verify(CancellationToken.None);
+        var problem = Assert.IsType<ObjectResult>(verifyResult);
+        Assert.Equal(StatusCodes.Status403Forbidden, problem.StatusCode);
+
+        var stateResult = await controller.State(CancellationToken.None);
+        var json = Assert.IsType<JsonResult>(stateResult);
+        var payload = Assert.IsType<LinkedInSessionActionResponse>(json.Value);
+
+        Assert.True(payload.State.ResetRequirement.Required);
+        Assert.Equal("session_forbidden", payload.State.ResetRequirement.ReasonCode);
+        Assert.Equal(StatusCodes.Status403Forbidden, payload.State.ResetRequirement.StatusCode);
+        Assert.Equal("Reset Required", payload.State.SessionIndicatorLabel);
+    }
+
+    [Fact]
+    public async Task RevokeClearsSessionAndResetRequirement()
+    {
+        var store = new MutableLinkedInSessionStore(
+            new LinkedInSessionSnapshot(
+                new Dictionary<string, string>(),
+                new DateTimeOffset(2026, 3, 10, 10, 15, 0, TimeSpan.Zero),
+                "CurlImport"));
+        var resetTracker = new FakeLinkedInSessionResetRequirementTracker();
+        resetTracker.MarkRequired("session_forbidden", "Reset required", StatusCodes.Status403Forbidden);
+
+        var controller = CreateController(
+            linkedInSessionStore: store,
+            linkedInSessionResetRequirementTracker: resetTracker);
+        controller.ControllerContext.HttpContext.Request.Headers.XRequestedWith = "XMLHttpRequest";
+
+        var result = await controller.Revoke(CancellationToken.None);
+        var json = Assert.IsType<JsonResult>(result);
+        var payload = Assert.IsType<LinkedInSessionActionResponse>(json.Value);
+
+        Assert.True(payload.Success);
+        Assert.False(payload.State.StoredSessionAvailable);
+        Assert.False(payload.State.ResetRequirement.Required);
+        Assert.Equal("Missing", payload.State.SessionIndicatorLabel);
+    }
+
+    private static LinkedInSessionController CreateController(
+        ILinkedInSessionCurlImportService? linkedInSessionCurlImportService = null,
+        ILinkedInSessionResetRequirementTracker? linkedInSessionResetRequirementTracker = null,
+        ILinkedInSessionStore? linkedInSessionStore = null,
+        ILinkedInSessionVerificationService? linkedInSessionVerificationService = null)
+    {
+        return new LinkedInSessionController(
+            linkedInSessionCurlImportService ?? new FakeLinkedInSessionCurlImportService(),
+            linkedInSessionResetRequirementTracker ?? new FakeLinkedInSessionResetRequirementTracker(),
+            linkedInSessionStore ?? new SnapshotLinkedInSessionStore(null),
+            linkedInSessionVerificationService ?? new FakeLinkedInSessionVerificationService())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider())
+        };
+    }
+
+    private sealed class FakeLinkedInSessionCurlImportService : ILinkedInSessionCurlImportService
+    {
+        public Task<LinkedInSessionCurlImportResult> ImportAsync(string? curlText, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
         }
     }
 
-    private sealed class FailingLinkedInBrowserLoginService : ILinkedInBrowserLoginService
+    private sealed class SnapshotLinkedInSessionStore : ILinkedInSessionStore
     {
-        public Task<LinkedInBrowserLoginActionResult> CaptureAndSaveAsync(CancellationToken cancellationToken)
+        private readonly LinkedInSessionSnapshot? _snapshot;
+
+        public SnapshotLinkedInSessionStore(LinkedInSessionSnapshot? snapshot)
         {
-            throw new NotSupportedException();
+            _snapshot = snapshot;
         }
 
-        public Task<LinkedInBrowserLoginState> GetStateAsync(CancellationToken cancellationToken)
-        {
-            throw new NotSupportedException();
-        }
-
-        public Task<LinkedInBrowserLoginActionResult> LaunchLoginAsync(CancellationToken cancellationToken)
-        {
-            return Task.FromResult(new LinkedInBrowserLoginActionResult(false, "Browser launch failed."));
-        }
-    }
-
-    private sealed class MissingSessionLinkedInBrowserLoginService : ILinkedInBrowserLoginService
-    {
-        public Task<LinkedInBrowserLoginActionResult> CaptureAndSaveAsync(CancellationToken cancellationToken)
-        {
-            throw new NotSupportedException();
-        }
-
-        public Task<LinkedInBrowserLoginState> GetStateAsync(CancellationToken cancellationToken)
-        {
-            return Task.FromResult(
-                new LinkedInBrowserLoginState(
-                    BrowserOpen: false,
-                    CurrentPageUrl: null,
-                    StoredSessionAvailable: false,
-                    StoredSessionCapturedAtUtc: null,
-                    StoredSessionSource: null,
-                    AutoCaptureActive: false,
-                    AutoCaptureStatusMessage: null,
-                    AutoCaptureCompletedSuccessfully: false));
-        }
-
-        public Task<LinkedInBrowserLoginActionResult> LaunchLoginAsync(CancellationToken cancellationToken)
-        {
-            throw new NotSupportedException();
-        }
-    }
-
-    private sealed class AutoCaptureStaleLinkedInBrowserLoginService : ILinkedInBrowserLoginService
-    {
-        public Task<LinkedInBrowserLoginActionResult> CaptureAndSaveAsync(CancellationToken cancellationToken)
-        {
-            throw new NotSupportedException();
-        }
-
-        public Task<LinkedInBrowserLoginState> GetStateAsync(CancellationToken cancellationToken)
-        {
-            return Task.FromResult(
-                new LinkedInBrowserLoginState(
-                    BrowserOpen: false,
-                    CurrentPageUrl: null,
-                    StoredSessionAvailable: false,
-                    StoredSessionCapturedAtUtc: null,
-                    StoredSessionSource: null,
-                    AutoCaptureActive: true,
-                    AutoCaptureStatusMessage: "Waiting for LinkedIn login...",
-                    AutoCaptureCompletedSuccessfully: false));
-        }
-
-        public Task<LinkedInBrowserLoginActionResult> LaunchLoginAsync(CancellationToken cancellationToken)
-        {
-            throw new NotSupportedException();
-        }
-    }
-
-    private sealed class FakeLinkedInSessionStore : ILinkedInSessionStore
-    {
         public Task<LinkedInSessionSnapshot?> GetCurrentAsync(CancellationToken cancellationToken)
         {
-            throw new NotSupportedException();
+            return Task.FromResult(_snapshot);
         }
 
         public Task InvalidateCurrentAsync(CancellationToken cancellationToken)
@@ -298,6 +208,38 @@ public sealed class LinkedInSessionControllerTests
         public Task SaveAsync(LinkedInSessionSnapshot sessionSnapshot, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
+        }
+    }
+
+    private sealed class MutableLinkedInSessionStore : ILinkedInSessionStore
+    {
+        private LinkedInSessionSnapshot? _snapshot;
+
+        public MutableLinkedInSessionStore(LinkedInSessionSnapshot? snapshot)
+        {
+            _snapshot = snapshot;
+        }
+
+        public Task<LinkedInSessionSnapshot?> GetCurrentAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_snapshot);
+        }
+
+        public Task InvalidateCurrentAsync(CancellationToken cancellationToken)
+        {
+            _snapshot = null;
+            return Task.CompletedTask;
+        }
+
+        public Task MarkCurrentValidatedAsync(DateTimeOffset validatedAtUtc, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task SaveAsync(LinkedInSessionSnapshot sessionSnapshot, CancellationToken cancellationToken)
+        {
+            _snapshot = sessionSnapshot;
+            return Task.CompletedTask;
         }
     }
 
@@ -329,7 +271,7 @@ public sealed class LinkedInSessionControllerTests
         {
             return Task.FromResult(
                 LinkedInSessionVerificationResult.Failed(
-                "Stored session is no longer valid.",
+                    "Stored session is no longer valid.",
                     StatusCodes.Status503ServiceUnavailable));
         }
     }
@@ -352,11 +294,47 @@ public sealed class LinkedInSessionControllerTests
         }
     }
 
-    private sealed class FakeLinkedInSessionCurlImportService : ILinkedInSessionCurlImportService
+    private sealed class ForbiddenLinkedInSessionVerificationService : ILinkedInSessionVerificationService
     {
-        public Task<LinkedInSessionCurlImportResult> ImportAsync(string? curlText, CancellationToken cancellationToken)
+        public Task<LinkedInSessionVerificationResult> VerifyAsync(
+            LinkedInSessionSnapshot sessionSnapshot,
+            CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
+        }
+
+        public Task<LinkedInSessionVerificationResult> VerifyCurrentAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                LinkedInSessionVerificationResult.Failed(
+                    "Stored session is forbidden.",
+                    StatusCodes.Status403Forbidden));
+        }
+    }
+
+    private sealed class FakeLinkedInSessionResetRequirementTracker : ILinkedInSessionResetRequirementTracker
+    {
+        public LinkedInSessionResetRequirementState Current { get; private set; } =
+            LinkedInSessionResetRequirementState.NotRequired;
+
+        public LinkedInSessionResetRequirementState GetCurrent()
+        {
+            return Current;
+        }
+
+        public void MarkRequired(string reasonCode, string message, int? statusCode = null)
+        {
+            Current = new LinkedInSessionResetRequirementState(
+                true,
+                reasonCode,
+                message,
+                statusCode,
+                DateTimeOffset.UtcNow);
+        }
+
+        public void Clear()
+        {
+            Current = LinkedInSessionResetRequirementState.NotRequired;
         }
     }
 }

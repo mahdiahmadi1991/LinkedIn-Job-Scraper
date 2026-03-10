@@ -6,15 +6,18 @@ public sealed record LinkedInSessionActionResponse(
     LinkedInSessionStateResponse State);
 
 public sealed record LinkedInSessionStateResponse(
-    bool BrowserOpen,
-    string? CurrentPageUrl,
     bool StoredSessionAvailable,
     DateTimeOffset? StoredSessionCapturedAtUtc,
     string? StoredSessionSource,
-    bool AutoCaptureActive,
-    string? AutoCaptureStatusMessage,
-    bool AutoCaptureCompletedSuccessfully,
-    bool ShowManualCaptureAction,
-    string PrimaryActionLabel,
+    DateTimeOffset? StoredSessionEstimatedExpiresAtUtc,
+    string? StoredSessionExpirySource,
     string SessionIndicatorLabel,
-    string SessionIndicatorClass);
+    string SessionIndicatorClass,
+    LinkedInSessionResetRequirementResponse ResetRequirement);
+
+public sealed record LinkedInSessionResetRequirementResponse(
+    bool Required,
+    string? ReasonCode,
+    string? Message,
+    int? StatusCode,
+    DateTimeOffset? RequiredAtUtc);

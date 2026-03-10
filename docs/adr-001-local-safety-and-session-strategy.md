@@ -26,7 +26,7 @@ The project also uses OpenAI for job triage, which introduces separate secret-ha
 The repository will follow these operating decisions:
 
 1. The app remains **local-only** with **lightweight local app-user authentication** and **per-user data isolation**.
-2. LinkedIn authentication is handled through a **controlled browser + user-in-the-loop login**.
+2. LinkedIn authentication is handled through **user-provided authenticated cURL import** (`Copy as cURL`), validated before storage.
 3. The application stores a **reusable captured session**, but keeps it minimal and invalidates it on `401`.
 4. Sensitive runtime configuration such as OpenAI and SQL credentials stays in **user-secrets or environment variables**, not tracked config.
 5. Sensitive local POST actions are treated as higher-risk and receive **anti-forgery + narrow local rate limiting**.

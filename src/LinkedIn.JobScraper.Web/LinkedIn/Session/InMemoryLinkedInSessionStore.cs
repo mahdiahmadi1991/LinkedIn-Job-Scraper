@@ -16,7 +16,9 @@ public sealed class InMemoryLinkedInSessionStore : ILinkedInSessionStore
         _currentSnapshot = new LinkedInSessionSnapshot(
             LinkedInSessionHeaderSanitizer.SanitizeForStorage(sessionSnapshot.Headers),
             sessionSnapshot.CapturedAtUtc,
-            sessionSnapshot.Source);
+            sessionSnapshot.Source,
+            sessionSnapshot.EstimatedExpiresAtUtc,
+            sessionSnapshot.ExpirySource);
         return Task.CompletedTask;
     }
 

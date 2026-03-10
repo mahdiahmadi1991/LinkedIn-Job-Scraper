@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using LinkedIn.JobScraper.Web.Configuration;
 using LinkedIn.JobScraper.Web.Contracts;
+using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -15,18 +16,24 @@ public class JobsController : Controller
     private readonly ICurrentAppUserContext _currentAppUserContext;
     private readonly IJobsDashboardService _jobsDashboardService;
     private readonly IJobsWorkflowExecutor _jobsWorkflowExecutor;
+    private readonly ILinkedInSessionResetRequirementTracker _linkedInSessionResetRequirementTracker;
     private readonly IJobsWorkflowStateStore _jobsWorkflowStateStore;
+    private readonly ILogger<JobsController> _logger;
 
     public JobsController(
         ICurrentAppUserContext currentAppUserContext,
         IJobsDashboardService jobsDashboardService,
         IJobsWorkflowExecutor jobsWorkflowExecutor,
-        IJobsWorkflowStateStore jobsWorkflowStateStore)
+        IJobsWorkflowStateStore jobsWorkflowStateStore,
+        ILinkedInSessionResetRequirementTracker linkedInSessionResetRequirementTracker,
+        ILogger<JobsController> logger)
     {
         _currentAppUserContext = currentAppUserContext;
         _jobsDashboardService = jobsDashboardService;
         _jobsWorkflowExecutor = jobsWorkflowExecutor;
         _jobsWorkflowStateStore = jobsWorkflowStateStore;
+        _linkedInSessionResetRequirementTracker = linkedInSessionResetRequirementTracker;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -73,6 +80,33 @@ public class JobsController : Controller
         var effectiveWorkflowId = string.IsNullOrWhiteSpace(workflowId)
             ? Guid.NewGuid().ToString("N")
             : workflowId.Trim();
+        var redirectUrl = Url.Action(nameof(Index), BuildRouteValues(query)) ?? Url.Action(nameof(Index)) ?? "/Jobs";
+        var resetRequirement = _linkedInSessionResetRequirementTracker.GetCurrent();
+
+        if (resetRequirement.Required)
+        {
+            var message = string.IsNullOrWhiteSpace(resetRequirement.Message)
+                ? "LinkedIn requires a session reset before protected actions can continue. Reset Session and reconnect."
+                : resetRequirement.Message;
+
+            Log.JobsFetchBlockedByResetRequirement(_logger, resetRequirement.ReasonCode, resetRequirement.StatusCode);
+            TempData["JobsAlertMessage"] = message;
+            TempData["JobsAlertSeverity"] = "warning";
+
+            if (Request.Headers.XRequestedWith == "XMLHttpRequest")
+            {
+                return StatusCode(
+                    StatusCodes.Status409Conflict,
+                    new FetchAndScoreAjaxResponse(
+                        false,
+                        "warning",
+                        message,
+                        redirectUrl,
+                        null));
+            }
+
+            return Redirect(redirectUrl);
+        }
 
         var result = await _jobsWorkflowExecutor.RunFetchAndScoreAsync(
             progressConnectionId,
@@ -81,8 +115,6 @@ public class JobsController : Controller
         TempData["JobsAlertMessage"] = result.Message;
         TempData["JobsAlertSeverity"] = result.Severity;
         WriteWorkflowSummary(result);
-
-        var redirectUrl = Url.Action(nameof(Index), BuildRouteValues(query)) ?? Url.Action(nameof(Index)) ?? "/Jobs";
 
         if (Request.Headers.XRequestedWith == "XMLHttpRequest")
         {
@@ -260,4 +292,16 @@ public class JobsController : Controller
             TempData["JobsWorkflowScoringFailedCount"] = result.ScoringResult.FailedCount;
         }
     }
+}
+
+internal static partial class Log
+{
+    [LoggerMessage(
+        EventId = 6201,
+        Level = LogLevel.Warning,
+        Message = "Jobs fetch blocked because LinkedIn session is reset-required. ReasonCode={ReasonCode}, StatusCode={StatusCode}")]
+    public static partial void JobsFetchBlockedByResetRequirement(
+        ILogger logger,
+        string? reasonCode,
+        int? statusCode);
 }
