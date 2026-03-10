@@ -93,8 +93,11 @@ This keeps version milestones visible in git history.
   - `VERSION` change
   - `CHANGELOG.md` change
   - valid version/changelog contract
-  - Copilot approval on latest PR head commit
-  - approval-gate behavior: poll only until first Copilot review on latest head; `APPROVED` passes, `COMMENTED`/`CHANGES_REQUESTED` fails immediately
+  - at least one Copilot review on the PR
+  - no unresolved (non-outdated) Copilot review threads
+  - approval-gate behavior: event-driven fail-fast (no polling loops)
+  - workflow triggers: `pull_request`, `pull_request_review`, `pull_request_review_thread` (`resolved`, `unresolved`)
+  - on `pull_request` events, Copilot review is auto-requested when missing
 - Recommended GitHub branch protection on `main`:
   - require status check: `Main PR Guard / versioning-pr-guard`
   - require status check: `Main PR Guard / copilot-review-gate`

@@ -357,3 +357,18 @@ What to do:
   - Failure pattern: app startup failed with `address already in use` on common local validation ports (`5058`, `5059`) while another instance was already running.
   - Stable fix: run validation instance on a dedicated free port without stopping active user-owned processes.
   - Guardrail: if startup fails with port-in-use and process-stop is not explicitly approved, switch to a free local port for validation.
+
+- 2026-03-10: Copilot review not attached to latest PR head in time
+  - Failure pattern: main PR guard stayed pending/blocked because Copilot review had not been posted for the latest head commit yet.
+  - Stable fix: Codex proactively sends a Copilot re-request on the PR via API/CLI before asking for manual intervention.
+  - Guardrail: user action is fallback-only; first response is always automated re-request by Codex.
+
+- 2026-03-11: Copilot gate polling consumed unnecessary Actions minutes
+  - Failure pattern: polling loop in `copilot-review-gate` kept runners active while waiting for review, wasting compute time on free-tier limits.
+  - Stable fix: switch to event-driven fail-fast gating (no polling) and auto-request Copilot reviewer on `pull_request` events.
+  - Guardrail: keep approval gating trigger-driven (`pull_request`, `pull_request_review`, `pull_request_review_thread`) and avoid wait loops in workflow jobs.
+
+- 2026-03-11: Requiring Copilot re-review on every fix increased PR cost
+  - Failure pattern: gating on latest-head approval forced repeated Copilot passes after each fix, increasing Actions/runtime cost.
+  - Stable fix: use one-time Copilot review policy per PR; gate passes when at least one Copilot review exists and all Copilot threads are resolved/outdated.
+  - Guardrail: after fixing comments, resolve Copilot threads and continue merge flow without forcing another Copilot full review cycle.

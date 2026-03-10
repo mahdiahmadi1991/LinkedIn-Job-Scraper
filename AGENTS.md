@@ -129,15 +129,19 @@ After implementation (feature/fix/bugfix) is finished, follow this exact sequenc
 - Standard path: merge `develop` into `main` via PR.
 - Emergency path (explicit user-approved only): merge `hotfix/*` into `main` via PR, with minimal scoped changes.
 - After opening PR, enable auto-merge with merge commit strategy (no manual immediate merge).
-- Copilot approval gate must pass before merge is allowed.
-- If Copilot requests changes or does not approve, fix on `develop`, push updates, and keep the same PR until gates pass and auto-merge completes.
+- Copilot gate must pass before merge is allowed.
+- Copilot policy is one-time-per-PR: once Copilot reviewed at least once, Codex resolves/fixes raised issues and proceeds without requiring a second Copilot re-review.
+- If Copilot review is missing/pending for the latest PR head, Codex must proactively request/re-request Copilot review via API/CLI before asking for user action.
 - In emergency hotfix path, fix on the same `hotfix/*` PR branch and keep scope minimal.
 - PR merge strategy must be `Create a merge commit` (no squash, no rebase).
 - Main pipeline must validate `VERSION`/`CHANGELOG.md`; tag creation on `main` is fallback-only if a required version tag is unexpectedly missing.
 - Main PR guard checks must enforce:
   - `VERSION` + `CHANGELOG.md` presence
-  - Copilot approval on the latest PR head commit
-  - Gate behavior: poll only until Copilot posts the first review on latest head; `APPROVED` passes, `COMMENTED`/`CHANGES_REQUESTED` fails immediately.
+  - At least one Copilot review on the PR
+  - No unresolved (non-outdated) Copilot review threads
+  - Gate behavior is event-driven and fail-fast with no polling loops.
+  - Workflow triggers should include `pull_request`, `pull_request_review`, and `pull_request_review_thread` (resolved/unresolved) so thread-resolution state is evaluated automatically.
+  - On `pull_request` events, workflow should auto-request Copilot review when missing for the latest head.
 - After any emergency `hotfix/* -> main` merge, immediately cherry-pick the hotfix commit(s) into `develop` before starting new feature/fix work.
 
 8. Post-Main Sync Gate

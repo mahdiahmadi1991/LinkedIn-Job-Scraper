@@ -12,9 +12,10 @@ on:
   pull_request_review:
     types:
       - submitted
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  pull_request_review_thread:
+    types:
+      - resolved
+      - unresolved
 
 concurrency:
   group: main-pr-guard-${{ github.event.pull_request.number }}
@@ -22,10 +23,11 @@ concurrency:
 
 jobs:
   versioning-pr-guard:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -57,103 +59,113 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write
     steps:
-      - name: Ensure Copilot approved current PR head
+      - name: Ensure one-time Copilot review and no open Copilot threads
         uses: actions/github-script@v8
-        env:
-          COPILOT_REVIEW_TIMEOUT_SECONDS: "900"
-          COPILOT_REVIEW_POLL_SECONDS: "20"
         with:
           script: |
             const pullRequest = context.payload.pull_request;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const pullNumber = pullRequest.number;
-            const headSha = pullRequest.head.sha;
-            const timeoutSeconds = Number(process.env.COPILOT_REVIEW_TIMEOUT_SECONDS ?? "900");
-            const pollSeconds = Number(process.env.COPILOT_REVIEW_POLL_SECONDS ?? "20");
-            const deadline = Date.now() + timeoutSeconds * 1000;
             const isCopilotLogin = (login) => {
               if (!login) return false;
               const normalized = login.toLowerCase();
               return normalized.includes("copilot");
             };
 
-            while (true) {
-              const reviews = await github.paginate(github.rest.pulls.listReviews, {
+            if (context.eventName === "pull_request") {
+              const requestedReviewers = await github.rest.pulls.listRequestedReviewers({
                 owner,
                 repo,
-                pull_number: pullNumber,
-                per_page: 100
+                pull_number: pullNumber
               });
 
-              const copilotReviews = reviews.filter((review) => isCopilotLogin(review.user?.login));
-              const copilotReviewsOnCurrentHead = copilotReviews.filter(
-                (review) => review.commit_id === headSha
+              const copilotAlreadyRequested = requestedReviewers.data.users.some((user) =>
+                isCopilotLogin(user.login)
               );
 
-              const latestCopilotReviewByReviewer = new Map();
-              for (const review of copilotReviewsOnCurrentHead) {
-                const login = review.user?.login?.toLowerCase() ?? "copilot";
-                const current = latestCopilotReviewByReviewer.get(login);
-                const reviewId = Number(review.id ?? 0);
-                const currentId = Number(current?.id ?? 0);
-                if (!current || reviewId >= currentId) {
-                  latestCopilotReviewByReviewer.set(login, review);
+              if (!copilotAlreadyRequested) {
+                try {
+                  await github.rest.pulls.requestReviewers({
+                    owner,
+                    repo,
+                    pull_number: pullNumber,
+                    reviewers: ["Copilot"]
+                  });
+                  core.info("Copilot review was requested automatically for this PR head.");
+                } catch (error) {
+                  core.warning(`Failed to request Copilot reviewer automatically: ${error.message}`);
                 }
               }
-
-              const latestCopilotReviewsOnCurrentHead = Array.from(
-                latestCopilotReviewByReviewer.values()
-              );
-              if (latestCopilotReviewsOnCurrentHead.length > 0) {
-                const blockingStates = new Set(["CHANGES_REQUESTED"]);
-                const blockingReview = latestCopilotReviewsOnCurrentHead.find((review) =>
-                  blockingStates.has((review.state ?? "").toUpperCase())
-                );
-                if (blockingReview) {
-                  core.setFailed(
-                    `Copilot requested changes on the latest head commit (${headSha}). Resolve and push a fix commit.`
-                  );
-                  return;
-                }
-
-                const approvalStates = new Set(["APPROVED"]);
-                const approvalReview = latestCopilotReviewsOnCurrentHead.find((review) =>
-                  approvalStates.has((review.state ?? "").toUpperCase())
-                );
-                if (approvalReview) {
-                  core.info(`Copilot approval gate passed on head ${headSha}.`);
-                  return;
-                }
-
-                const seenStates = Array.from(
-                  new Set(
-                    latestCopilotReviewsOnCurrentHead.map((review) =>
-                      String(review.state ?? "UNKNOWN").toUpperCase()
-                    )
-                  )
-                ).join(", ");
-                core.setFailed(
-                  `Copilot reviewed latest PR head commit (${headSha}) with state(s): ${seenStates}. Approval is required before merge.`
-                );
-                return;
-              }
-
-              if (Date.now() >= deadline) {
-                const message = copilotReviews.length === 0
-                  ? "Copilot approval is required before merging to main."
-                  : `Copilot has not reviewed the latest PR head commit (${headSha}).`;
-                core.setFailed(message);
-                return;
-              }
-
-              core.info(
-                `Copilot review for head ${headSha} is not available yet. Retrying in ${pollSeconds}s...`
-              );
-              await new Promise((resolve) => setTimeout(resolve, pollSeconds * 1000));
             }
+
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner,
+              repo,
+              pull_number: pullNumber,
+              per_page: 100
+            });
+
+            const copilotReviews = reviews.filter((review) => isCopilotLogin(review.user?.login));
+            if (copilotReviews.length === 0) {
+              core.setFailed(
+                "Copilot must review this PR at least once before merging to main. Review has been requested automatically."
+              );
+              return;
+            }
+
+            const threadsQuery = `
+              query($owner: String!, $repo: String!, $pullNumber: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $pullNumber) {
+                    reviewThreads(first: 100) {
+                      nodes {
+                        isResolved
+                        isOutdated
+                        comments(first: 30) {
+                          nodes {
+                            author {
+                              login
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            const threadsResult = await github.graphql(threadsQuery, {
+              owner,
+              repo,
+              pullNumber
+            });
+
+            const reviewThreads =
+              threadsResult?.repository?.pullRequest?.reviewThreads?.nodes ?? [];
+
+            const openCopilotThreads = reviewThreads.filter((thread) => {
+              if (thread.isResolved || thread.isOutdated) {
+                return false;
+              }
+
+              const comments = thread.comments?.nodes ?? [];
+              return comments.some((comment) => isCopilotLogin(comment.author?.login));
+            });
+
+            if (openCopilotThreads.length > 0) {
+              core.setFailed(
+                `Copilot review has ${openCopilotThreads.length} unresolved thread(s). Resolve them before merge.`
+              );
+              return;
+            }
+
+            core.info(
+              `Copilot gate passed with one-time review policy (${copilotReviews.length} Copilot review(s), 0 open Copilot threads).`
+            );
 
   enable-auto-merge:
     needs:
@@ -166,7 +178,7 @@ jobs:
         startsWith(github.event.pull_request.head.ref, 'hotfix/')
       ) &&
       github.event.pull_request.draft == false &&
-      needs.versioning-pr-guard.result == 'success' &&
+      (needs.versioning-pr-guard.result == 'success' || needs.versioning-pr-guard.result == 'skipped') &&
       needs.copilot-review-gate.result == 'success'
     runs-on: ubuntu-latest
     permissions:

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v.4.0.4] - 2026-03-11
+### Changed
+- Main release PR checks now require only one Copilot review per PR; after feedback is addressed, merging can continue without waiting for a full second review cycle.
+- Copilot feedback status now refreshes automatically when review threads are resolved/unresolved, reducing manual reruns and saving GitHub Actions minutes.
+- Release workflow reliability was improved by removing an ineffective runtime flag and using current action versions for checkout steps.
+
 ## [v.4.0.3] - 2026-03-10
 ### Changed
 - GitHub Actions JavaScript-based steps now force Node.js 24 runtime to stay compatible with the upcoming Node.js 20 deprecation.
