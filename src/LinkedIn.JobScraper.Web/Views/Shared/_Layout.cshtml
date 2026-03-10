@@ -91,10 +91,10 @@
                             </li>
                             <li><hr class="dropdown-divider" /></li>
                             <li>
-                                <a class="dropdown-item app-menu-item" asp-area="" asp-controller="AiSettings" asp-action="Index">AI Settings</a>
+                                <a class="dropdown-item app-menu-item" asp-area="" asp-controller="SearchSettings" asp-action="Index">Search Settings</a>
                             </li>
                             <li>
-                                <a class="dropdown-item app-menu-item" asp-area="" asp-controller="SearchSettings" asp-action="Index">Search Settings</a>
+                                <a class="dropdown-item app-menu-item" asp-area="" asp-controller="AiSettings" asp-action="Index">AI Settings</a>
                             </li>
                             @if (isSuperAdmin)
                             {
@@ -110,6 +110,8 @@
                                     <button type="submit" class="dropdown-item app-menu-item">Sign out</button>
                                 </form>
                             </li>
+                            <li><hr class="dropdown-divider" /></li>
+                            <li class="dropdown-item-text app-menu-version" data-app-menu-version>@AppVersionProvider.CurrentVersion</li>
                         </ul>
                     </div>
                 </div>
@@ -126,7 +128,7 @@
         <div class="container app-shell">
             <div class="app-footer-content">
                 <span>&copy; 2026 - LinkedIn Job Scraper</span>
-                <span class="app-version-pill" data-app-version>Version @AppVersionProvider.CurrentVersion</span>
+                <span class="app-version-text" data-app-version>@AppVersionProvider.CurrentVersion</span>
             </div>
         </div>
     </footer>
