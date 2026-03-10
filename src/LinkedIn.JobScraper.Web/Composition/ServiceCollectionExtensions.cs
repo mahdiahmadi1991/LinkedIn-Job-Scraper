@@ -10,6 +10,7 @@ using LinkedIn.JobScraper.Web.LinkedIn.Search;
 using LinkedIn.JobScraper.Web.LinkedIn.Session;
 using LinkedIn.JobScraper.Web.Persistence;
 using LinkedIn.JobScraper.Web.Users;
+using LinkedIn.JobScraper.Web.Versioning;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -62,6 +63,7 @@ public static class ServiceCollectionExtensions
 
         services.AddHostedService<AppUserSeedingStartupService>();
         services.AddHttpContextAccessor();
+        services.AddSingleton<IAppVersionProvider, RepositoryVersionProvider>();
         services.AddAuthentication(AppAuthenticationDefaults.CookieScheme)
             .AddCookie(
                 AppAuthenticationDefaults.CookieScheme,

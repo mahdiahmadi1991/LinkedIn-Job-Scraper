@@ -15,6 +15,8 @@ public sealed class LoginUiContractsTests
         Assert.Contains("auth-password-field", viewContent, StringComparison.Ordinal);
         Assert.Contains("auth-brand-logo", viewContent, StringComparison.Ordinal);
         Assert.Contains("~/favicon.svg", viewContent, StringComparison.Ordinal);
+        Assert.Contains("data-app-version", viewContent, StringComparison.Ordinal);
+        Assert.Contains("Version @AppVersionProvider.CurrentVersion", viewContent, StringComparison.Ordinal);
         Assert.Contains("~/js/login-page.js", viewContent, StringComparison.Ordinal);
         Assert.Contains("~/js/site.js", viewContent, StringComparison.Ordinal);
     }

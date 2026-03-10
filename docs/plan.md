@@ -245,6 +245,17 @@ The following rules are locked:
 - For bug fixes or improvements to existing capabilities, a dedicated idea file is optional and only required when explicitly requested.
 - "Capture-only" ideas (record now, implement later) must be added to `docs/idea-inbox.md` with status tracking.
 - When a dedicated idea file exists, it must include a final explicit state for implementation-review validation against approved scope.
+- Project versioning is mandatory:
+  - source of truth is root `VERSION`,
+  - format is `v.MAJOR.MINOR.PATCH`.
+- Every work integration into `develop` must include:
+  - increased `VERSION`,
+  - matching `CHANGELOG.md` section for that version (`## [v.X.Y.Z] - YYYY-MM-DD`).
+- Squashed work commit merged into `develop` must follow Conventional Commits (`type(scope)!: summary`) and version bump must be compatible with the commit signal.
+- Default bump guidance:
+  - `MAJOR` for breaking changes,
+  - `MINOR` for net-new features,
+  - `PATCH` for bugfixes/improvements.
 - That final validation state must confirm:
   - implemented behavior matches the idea contract
   - no critical regression or side effect remains
@@ -283,6 +294,8 @@ After implementation completes, this sequence is mandatory for every feature/fix
 6. Main Merge Gate
 - Merge `develop` into `main` only via PR.
 - PR merge strategy must be `Create a merge commit` (no squash, no rebase).
+- Main pipeline validates versioning artifacts and creates release tag (`v.X.Y.Z`) if missing.
+- PRs targeting `main` must pass the versioning guard check that enforces `VERSION` and `CHANGELOG.md` updates.
 
 7. Post-Main Sync Gate
 - Immediately sync `develop` with `main` after `main` merge so long-lived divergence does not accumulate.

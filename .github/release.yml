@@ -1,0 +1,30 @@
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+      - no-release-notes
+  categories:
+    - title: Features
+      labels:
+        - feature
+        - enhancement
+        - type:feature
+    - title: Fixes
+      labels:
+        - bug
+        - bugfix
+        - type:fix
+    - title: Maintenance
+      labels:
+        - chore
+        - refactor
+        - dependencies
+        - ci
+    - title: Other
+      labels:
+        - "*"
+
+change-template: "- $TITLE (#$NUMBER) @$AUTHOR"
+template: |
+  ## What's Changed
+  $CHANGES
