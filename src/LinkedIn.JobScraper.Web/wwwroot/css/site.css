@@ -373,6 +373,28 @@ a:hover {
   font-size: 0.9rem;
 }
 
+.app-footer-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.app-version-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.7rem;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid rgba(10, 102, 194, 0.16);
+  border-radius: 999px;
+  background: rgba(232, 243, 255, 0.68);
+  color: var(--app-blue-800);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
 .page-shell {
   display: flex;
   flex-direction: column;
@@ -1888,6 +1910,20 @@ a:hover {
   margin: 0.25rem 0 0;
   color: var(--app-ink-500);
   line-height: 1.5;
+}
+
+.auth-version {
+  display: inline-flex;
+  align-items: center;
+  margin: 0.55rem 0 0;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid rgba(10, 102, 194, 0.16);
+  border-radius: 999px;
+  background: rgba(232, 243, 255, 0.6);
+  color: var(--app-blue-800);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .auth-form {

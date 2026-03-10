@@ -8,10 +8,116 @@ fi
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
+is_valid_version_format() {
+  local version="$1"
+  [[ "$version" =~ ^v\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+}
+
+read_version_at_ref() {
+  local git_ref="$1"
+  git show "$git_ref:VERSION" 2>/dev/null | tr -d '\r\n'
+}
+
+version_is_greater() {
+  local old_version="$1"
+  local new_version="$2"
+  IFS='.' read -r old_major old_minor old_patch <<< "${old_version#v.}"
+  IFS='.' read -r new_major new_minor new_patch <<< "${new_version#v.}"
+
+  if (( new_major > old_major )); then
+    return 0
+  fi
+  if (( new_major < old_major )); then
+    return 1
+  fi
+  if (( new_minor > old_minor )); then
+    return 0
+  fi
+  if (( new_minor < old_minor )); then
+    return 1
+  fi
+  if (( new_patch > old_patch )); then
+    return 0
+  fi
+
+  return 1
+}
+
+changelog_contains_version_at_ref() {
+  local git_ref="$1"
+  local version="$2"
+  git show "$git_ref:CHANGELOG.md" 2>/dev/null | grep -Eq "^## \[$version\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$"
+}
+
+version_bump_level() {
+  local old_version="$1"
+  local new_version="$2"
+
+  IFS='.' read -r old_major old_minor old_patch <<< "${old_version#v.}"
+  IFS='.' read -r new_major new_minor new_patch <<< "${new_version#v.}"
+
+  if (( new_major > old_major )); then
+    echo 3
+    return
+  fi
+
+  if (( new_minor > old_minor )); then
+    echo 2
+    return
+  fi
+
+  if (( new_patch > old_patch )); then
+    echo 1
+    return
+  fi
+
+  echo 0
+}
+
+parse_conventional_commit_type() {
+  local subject="$1"
+  local type=""
+  local bang=""
+  local pattern='^([a-z]+)(\([^)]+\))?(!)?: .+'
+
+  if [[ "$subject" =~ $pattern ]]; then
+    type="${BASH_REMATCH[1]}"
+    bang="${BASH_REMATCH[3]}"
+    echo "$type|$bang"
+    return 0
+  fi
+
+  return 1
+}
+
+required_bump_level_for_commit() {
+  local type="$1"
+  local bang="$2"
+  local body="$3"
+
+  if [[ -n "$bang" ]] || grep -Eq '(^|[[:space:]])BREAKING CHANGE:' <<< "$body"; then
+    echo 3
+    return
+  fi
+
+  if [[ "$type" == "feat" ]]; then
+    echo 2
+    return
+  fi
+
+  echo 1
+}
+
 current_branch="$(git rev-parse --abbrev-ref HEAD)"
 if [[ "$current_branch" == "main" ]]; then
   echo "[pre-push] Direct push from 'main' is blocked."
   echo "[pre-push] Open a PR from 'develop' into 'main'."
+  exit 1
+fi
+
+if [[ "$current_branch" != "develop" && ! "$current_branch" =~ ^(feature|fix|bugfix)/.+$ ]]; then
+  echo "[pre-push] Invalid branch name '$current_branch'."
+  echo "[pre-push] Use one of: feature/<slug>, fix/<slug>, bugfix/<slug>."
   exit 1
 fi
 
@@ -26,7 +132,7 @@ if [[ "$current_branch" == "develop" ]]; then
     non_merge_first_parent="$(git rev-list --first-parent --no-merges "$range")"
     if [[ -n "$non_merge_first_parent" ]]; then
       echo "[pre-push] Direct (non-merge) commits detected on 'develop' first-parent history."
-      echo "[pre-push] Integrate feature branches via merge commits (--no-ff)."
+      echo "[pre-push] Integrate work branches via merge commits (--no-ff)."
       git log --oneline --decorate --first-parent --no-merges "$range"
       exit 1
     fi
@@ -46,12 +152,86 @@ if [[ "$current_branch" == "develop" ]]; then
       feature_side_commit_count="$(git rev-list --count "$parent_one..$parent_two")"
       if [[ "$feature_side_commit_count" -ne 1 ]]; then
         echo "[pre-push] Merge commit '$merge_commit' violates squash-before-merge policy."
-        echo "[pre-push] Feature side contains $feature_side_commit_count commits; expected exactly 1."
-        echo "[pre-push] Squash feature branch commits before merging into develop."
+        echo "[pre-push] Work-branch side contains $feature_side_commit_count commits; expected exactly 1."
+        echo "[pre-push] Squash work-branch commits before merging into develop."
         exit 1
+      fi
+
+      merged_commit_files="$(git diff-tree --no-commit-id --name-only -r "$parent_two")"
+      if ! grep -qx "VERSION" <<<"$merged_commit_files"; then
+        echo "[pre-push] Merge commit '$merge_commit' is missing mandatory VERSION update."
+        echo "[pre-push] Every work integration into develop must bump VERSION."
+        exit 1
+      fi
+      if ! grep -qx "CHANGELOG.md" <<<"$merged_commit_files"; then
+        echo "[pre-push] Merge commit '$merge_commit' is missing mandatory CHANGELOG.md update."
+        echo "[pre-push] Every work integration into develop must include release notes."
+        exit 1
+      fi
+
+      new_version="$(read_version_at_ref "$parent_two")"
+      if ! is_valid_version_format "$new_version"; then
+        echo "[pre-push] Invalid VERSION '$new_version' in merged work commit '$parent_two'."
+        echo "[pre-push] Expected format: v.MAJOR.MINOR.PATCH"
+        exit 1
+      fi
+
+      if ! changelog_contains_version_at_ref "$parent_two" "$new_version"; then
+        echo "[pre-push] CHANGELOG.md in '$parent_two' does not contain heading for '$new_version'."
+        echo "[pre-push] Add: ## [$new_version] - YYYY-MM-DD"
+        exit 1
+      fi
+
+      merged_subject="$(git show -s --format='%s' "$parent_two")"
+      merged_body="$(git show -s --format='%b' "$parent_two")"
+      if ! parsed="$(parse_conventional_commit_type "$merged_subject")"; then
+        echo "[pre-push] Work commit '$parent_two' must use Conventional Commits."
+        echo "[pre-push] Expected pattern: type(scope)!: summary"
+        echo "[pre-push] Actual subject: $merged_subject"
+        exit 1
+      fi
+
+      merged_type="${parsed%%|*}"
+      merged_bang="${parsed#*|}"
+      case "$merged_type" in
+        feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|bugfix) ;;
+        *)
+          echo "[pre-push] Unsupported Conventional Commit type '$merged_type' in '$parent_two'."
+          echo "[pre-push] Allowed types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert, bugfix."
+          exit 1
+          ;;
+      esac
+
+      if git cat-file -e "$parent_one:VERSION" >/dev/null 2>&1; then
+        previous_version="$(read_version_at_ref "$parent_one")"
+        if ! is_valid_version_format "$previous_version"; then
+          echo "[pre-push] Invalid previous VERSION '$previous_version' at '$parent_one'."
+          exit 1
+        fi
+
+        if ! version_is_greater "$previous_version" "$new_version"; then
+          echo "[pre-push] Version must increase on each work integration merge."
+          echo "[pre-push] previous=$previous_version new=$new_version merge=$merge_commit"
+          exit 1
+        fi
+
+        actual_bump_level="$(version_bump_level "$previous_version" "$new_version")"
+        required_bump_level="$(required_bump_level_for_commit "$merged_type" "$merged_bang" "$merged_body")"
+        if (( actual_bump_level < required_bump_level )); then
+          breaking_signal="no"
+          if [[ -n "$merged_bang" ]] || grep -Eq '(^|[[:space:]])BREAKING CHANGE:' <<< "$merged_body"; then
+            breaking_signal="yes"
+          fi
+          echo "[pre-push] Version bump is smaller than required by Conventional Commit signal."
+          echo "[pre-push] previous=$previous_version new=$new_version type=$merged_type breaking=$breaking_signal"
+          echo "[pre-push] Required: feat=>minor, breaking=>major, others=>patch."
+          exit 1
+        fi
       fi
     done < <(git rev-list --first-parent --merges "$range")
   fi
+
+  bash "$repo_root/scripts/versioning-guard.sh" validate
 fi
 
 echo "[pre-push] Running local quality gate..."

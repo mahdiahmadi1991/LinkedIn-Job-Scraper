@@ -1,0 +1,39 @@
+name: Main PR Guard
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  versioning-pr-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure VERSION and CHANGELOG are changed in PR
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA='${{ github.event.pull_request.base.sha }}'
+          HEAD_SHA='${{ github.event.pull_request.head.sha }}'
+          CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+
+          if ! grep -qx "VERSION" <<<"$CHANGED_FILES"; then
+            echo "PR to main must include VERSION update."
+            exit 1
+          fi
+
+          if ! grep -qx "CHANGELOG.md" <<<"$CHANGED_FILES"; then
+            echo "PR to main must include CHANGELOG.md update."
+            exit 1
+          fi
+
+      - name: Validate Version Artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/versioning-guard.sh validate

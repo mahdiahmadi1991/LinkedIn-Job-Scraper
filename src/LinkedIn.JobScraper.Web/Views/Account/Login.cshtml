@@ -1,4 +1,6 @@
 @model LinkedIn.JobScraper.Web.Models.LoginPageViewModel
+@using LinkedIn.JobScraper.Web.Versioning
+@inject IAppVersionProvider AppVersionProvider
 @{
     ViewData["Title"] = "Sign in";
     Layout = null;
@@ -28,6 +30,7 @@
                     <div>
                         <h1 class="auth-title">Sign in to continue</h1>
                         <p class="auth-subtitle">Use your local account to access your private LinkedIn job workspace.</p>
+                        <p class="auth-version" data-app-version>Version @AppVersionProvider.CurrentVersion</p>
                     </div>
                 </div>
 

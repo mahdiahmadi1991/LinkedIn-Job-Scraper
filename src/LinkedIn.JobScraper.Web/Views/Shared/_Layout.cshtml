@@ -1,7 +1,9 @@
 ﻿@using LinkedIn.JobScraper.Web.Authentication
 @using LinkedIn.JobScraper.Web.Models
 @using LinkedIn.JobScraper.Web.LinkedIn.Session
+@using LinkedIn.JobScraper.Web.Versioning
 @inject ILinkedInBrowserLoginService LinkedInBrowserLoginService
+@inject IAppVersionProvider AppVersionProvider
 @{
     LinkedInSessionPageViewModel linkedInSessionViewModel;
     var isSuperAdmin = User.HasClaim(AppUserClaimTypes.IsSuperAdmin, "true");
@@ -122,7 +124,10 @@
 
     <footer class="app-footer">
         <div class="container app-shell">
-            &copy; 2026 - LinkedIn Job Scraper
+            <div class="app-footer-content">
+                <span>&copy; 2026 - LinkedIn Job Scraper</span>
+                <span class="app-version-pill" data-app-version>Version @AppVersionProvider.CurrentVersion</span>
+            </div>
         </div>
     </footer>
     <partial name="_LinkedInSessionModal" model="linkedInSessionViewModel" />
