@@ -251,7 +251,7 @@
                                                     }
                                                 </td>
                                                 <td>
-                                                    <span data-row-view-expires data-utc-display="@userExpiryUtcIso">@(string.IsNullOrWhiteSpace(userExpiryUtcIso) ? "-" : user.ExpiresAtUtc?.ToString("yyyy-MM-dd HH:mm 'UTC'"))</span>
+                                                    <span data-row-view-expires data-utc-display="@userExpiryUtcIso">@(string.IsNullOrWhiteSpace(userExpiryUtcIso) ? "-" : user.ExpiresAtUtc?.ToLocalTime().ToString("g", CultureInfo.CurrentCulture))</span>
                                                     @if (!user.IsSuperAdmin)
                                                     {
                                                         <input type="hidden" data-row-edit-expires-utc value="@editExpiryUtcIso" />

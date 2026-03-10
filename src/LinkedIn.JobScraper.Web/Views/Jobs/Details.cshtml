@@ -1,3 +1,4 @@
+@using System.Globalization
 @model LinkedIn.JobScraper.Web.Jobs.JobDetailsSnapshot
 
 @{
@@ -37,11 +38,19 @@
                 </div>
                 <div class="details-context-item">
                     <span class="details-context-label">First Seen</span>
-                    <span class="details-context-value">@Model.FirstDiscoveredAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</span>
+                    <span class="details-context-value"
+                          data-utc-display="@Model.FirstDiscoveredAtUtc.ToString("O", CultureInfo.InvariantCulture)"
+                          data-utc-empty="Unknown">
+                        @Model.FirstDiscoveredAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+                    </span>
                 </div>
                 <div class="details-context-item">
                     <span class="details-context-label">Last Seen</span>
-                    <span class="details-context-value">@Model.LastSeenAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</span>
+                    <span class="details-context-value"
+                          data-utc-display="@Model.LastSeenAtUtc.ToString("O", CultureInfo.InvariantCulture)"
+                          data-utc-empty="Unknown">
+                        @Model.LastSeenAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+                    </span>
                 </div>
             </div>
         </div>
@@ -65,18 +74,33 @@
                         <div class="details-timeline-item">
                             <div class="details-timeline-label">Listed</div>
                             <div class="details-timeline-value">
-                                @(Model.ListedAtUtc.HasValue
-                                    ? Model.ListedAtUtc.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
-                                    : "Unknown")
+                                @if (Model.ListedAtUtc.HasValue)
+                                {
+                                    <span data-utc-display="@Model.ListedAtUtc.Value.ToString("O", CultureInfo.InvariantCulture)" data-utc-empty="Unknown">
+                                        @Model.ListedAtUtc.Value.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+                                    </span>
+                                }
+                                else
+                                {
+                                    @:Unknown
+                                }
                             </div>
                         </div>
                         <div class="details-timeline-item">
                             <div class="details-timeline-label">First Seen</div>
-                            <div class="details-timeline-value">@Model.FirstDiscoveredAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</div>
+                            <div class="details-timeline-value"
+                                 data-utc-display="@Model.FirstDiscoveredAtUtc.ToString("O", CultureInfo.InvariantCulture)"
+                                 data-utc-empty="Unknown">
+                                @Model.FirstDiscoveredAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+                            </div>
                         </div>
                         <div class="details-timeline-item">
                             <div class="details-timeline-label">Last Seen</div>
-                            <div class="details-timeline-value">@Model.LastSeenAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</div>
+                            <div class="details-timeline-value"
+                                 data-utc-display="@Model.LastSeenAtUtc.ToString("O", CultureInfo.InvariantCulture)"
+                                 data-utc-empty="Unknown">
+                                @Model.LastSeenAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+                            </div>
                         </div>
                         <div class="details-timeline-item">
                             <div class="details-timeline-label">Workflow Status</div>
@@ -85,9 +109,16 @@
                         <div class="details-timeline-item">
                             <div class="details-timeline-label">Scored</div>
                             <div class="details-timeline-value" data-job-scored-at-value>
-                                @(Model.ScoredAtUtc.HasValue
-                                    ? Model.ScoredAtUtc.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
-                                    : "Not yet")
+                                @if (Model.ScoredAtUtc.HasValue)
+                                {
+                                    <span data-utc-display="@Model.ScoredAtUtc.Value.ToString("O", CultureInfo.InvariantCulture)" data-utc-empty="Not yet">
+                                        @Model.ScoredAtUtc.Value.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+                                    </span>
+                                }
+                                else
+                                {
+                                    @:Not yet
+                                }
                             </div>
                         </div>
                     </div>

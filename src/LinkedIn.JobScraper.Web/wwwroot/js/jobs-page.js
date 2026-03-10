@@ -31,6 +31,7 @@
     const sessionOnboardingConnectButton = sessionOnboardingModalElement?.querySelector("[data-session-onboarding-connect]");
     const linkedInSessionModalElement = document.querySelector("[data-linked-in-session-modal]");
     const fetchSessionGuardNote = form.querySelector("[data-fetch-session-guard-note]");
+    const fetchSessionGuardMessage = form.querySelector("[data-fetch-session-guard-message]");
     const fetchSessionGuardConnectButton = form.querySelector("[data-open-session-modal]");
     const sessionOnboardingStateUrl = jobsPage?.dataset.sessionOnboardingStateUrl || "/LinkedInSession/State";
     const sessionOnboardingVerifyUrl = jobsPage?.dataset.sessionOnboardingVerifyUrl || "/LinkedInSession/Verify";
@@ -111,14 +112,32 @@
         return true;
     };
 
+    const isResetRequiredState = (state) => {
+        return Boolean(state?.resetRequirement?.required);
+    };
+
+    const resolveSessionGuardMessage = (state, includeRetryHint) => {
+        if (isResetRequiredState(state)) {
+            return state?.resetRequirement?.message ||
+                "LinkedIn requires a session reset after access was rejected. Reset Session and reconnect before running Fetch Jobs.";
+        }
+
+        if (includeRetryHint) {
+            return "Stored LinkedIn session is no longer valid. Connect a fresh session before running Fetch Jobs.";
+        }
+
+        return "LinkedIn session is missing. Connect a session before running Fetch Jobs.";
+    };
+
     const hasUsableSessionState = (state) => {
-        return Boolean(state?.storedSessionAvailable);
+        return Boolean(state?.storedSessionAvailable) && !isResetRequiredState(state);
     };
 
     const applyFetchSessionGuard = (state, options = {}) => {
         const hasSession = hasUsableSessionState(state);
         const showTransitionToast = Boolean(options.showTransitionToast);
         const includeRetryHint = Boolean(options.includeRetryHint);
+        const guardMessage = resolveSessionGuardMessage(state, includeRetryHint);
 
         if (button) {
             if (!isSubmitting && !activeWorkflowId) {
@@ -136,11 +155,12 @@
             fetchSessionGuardNote.classList.toggle("d-none", hasSession);
         }
 
+        if (fetchSessionGuardMessage instanceof HTMLElement) {
+            fetchSessionGuardMessage.textContent = guardMessage;
+        }
+
         if (showTransitionToast && sessionGuardHasActiveSession && !hasSession) {
-            const message = includeRetryHint
-                ? "Stored LinkedIn session is no longer valid. Connect a fresh session before running Fetch Jobs."
-                : "LinkedIn session is missing. Connect a session before running Fetch Jobs.";
-            showToast(message, false);
+            showToast(guardMessage, false);
         }
 
         if (hasSession) {
@@ -214,12 +234,8 @@
             return;
         }
 
-        if (state?.storedSessionAvailable) {
+        if (hasUsableSessionState(state)) {
             setSessionOnboardingDismissed(false);
-            return;
-        }
-
-        if (state?.autoCaptureActive) {
             return;
         }
 
@@ -1100,6 +1116,7 @@
             const html = await response.text();
             sentinelRow.remove();
             rowsBody.insertAdjacentHTML("beforeend", html);
+            window.appDateTime?.hydrateUtcDisplays?.(rowsBody);
             attachLazySentinel();
         } catch {
             sentinelRow.classList.remove("is-loading");
@@ -1353,12 +1370,20 @@
     };
 
     const formatLocalTimestamp = (isoValue) => {
-        const date = new Date(isoValue);
-        if (Number.isNaN(date.getTime())) {
+        const formatted = window.appDateTime?.formatDateTime?.(isoValue);
+        if (formatted) {
+            return formatted;
+        }
+
+        const parsed = new Date(isoValue);
+        if (Number.isNaN(parsed.getTime())) {
             return "Just now";
         }
 
-        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+        return new Intl.DateTimeFormat(undefined, {
+            dateStyle: "medium",
+            timeStyle: "short"
+        }).format(parsed);
     };
 
     const updateJobUi = (job) => {

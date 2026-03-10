@@ -18,9 +18,9 @@ Likely cause:
 What to do:
 
 1. Open the top-right session control.
-2. Launch the controlled browser again.
-3. Complete login manually.
-4. Let auto-capture store a fresh session.
+2. Click `Reset Session`.
+3. Follow the in-modal guide and copy an authenticated LinkedIn request as `cURL`.
+4. Paste it into the cURL field and click `Validate & Import cURL`.
 5. Re-run the workflow.
 
 ### Symptom: Session looks disconnected in the UI
@@ -28,28 +28,28 @@ What to do:
 Likely cause:
 
 - there is no active stored session
-- the last stored session was revoked or invalidated
+- the last stored session was reset or invalidated
 
 What to do:
 
-1. Use `Connect Session` or `Refresh Session`.
-2. Complete LinkedIn login in the controlled browser.
-3. Wait for auto-capture to complete.
+1. Open the top-right session control.
+2. Copy an authenticated LinkedIn `/voyager/api/` request as `cURL` from DevTools > Network.
+3. Paste and run `Validate & Import cURL`.
 
-### Symptom: Session modal keeps waiting and does not auto-close
+### Symptom: cURL import fails with format or parsing error
 
 Likely cause:
 
-- LinkedIn login is not fully complete yet
-- a challenge page (2FA / verification) is still open
-- authenticated cookies were not observed yet
+- pasted text is not `Copy as cURL` format (for example `fetch(...)` or PowerShell)
+- copied request is not authenticated
+- selected request is not a LinkedIn `/voyager/api/` call
 
 What to do:
 
-1. Finish any verification steps in the controlled browser.
-2. Wait for the final authenticated page to load.
-3. If the modal still does not complete, use the fallback manual capture action if shown.
-4. If needed, revoke and start the session flow again.
+1. Open LinkedIn while signed in.
+2. In DevTools > Network, pick a request containing `/voyager/api/`.
+3. Use `Copy as cURL` and paste the full command into the modal. In Chromium browsers use `Copy -> Copy as cURL (bash)` (or `cmd`). In Firefox use `Copy Value -> Copy as cURL (POSIX)` (or `Windows`).
+4. If it still fails, reset session and repeat with a fresh request.
 
 ## 2. LinkedIn Fetch Problems
 
@@ -317,3 +317,63 @@ What to do:
   - Failure pattern: launching local app on port `5060` caused Firefox error `This address is restricted`.
   - Stable fix: run local validation on launch-profile ports (`5058` / `7145`).
   - Guardrail: do not choose browser-restricted ports for user manual validation links.
+
+- 2026-03-10: Missing tag on develop version bump
+  - Failure pattern: version was bumped during `develop` integration, but matching git tag was not created immediately, causing release traceability drift.
+  - Stable fix: make tag creation mandatory at `develop` merge time and reject `develop` push when `v.X.Y.Z` tag is missing or points to a different commit.
+  - Guardrail: always create annotated tag on the `develop` merge commit in the same integration step as `VERSION`/`CHANGELOG` update.
+
+- 2026-03-10: Premature commit/versioning before user merge approval
+  - Failure pattern: integration-style actions (release version/changelog and commit readiness assumptions) were applied before user completed review and explicitly requested merge.
+  - Stable fix: never commit unless explicitly requested in the current thread; keep release versioning only for the `develop` integration step.
+  - Guardrail: intermediate work is unversioned at release level; bump/tag/changelog only at squash+merge to `develop` after explicit user instruction.
+
+- 2026-03-10: Static-web-assets cache lock during concurrent local commands
+  - Failure pattern: running build and test in parallel caused file-lock contention on `obj/Debug/net10.0/rpswa.dswa.cache.json`.
+  - Stable fix: run dotnet validation commands sequentially when static-web-assets generation is involved.
+  - Guardrail: avoid parallel local build/test command execution against the same project output path.
+
+- 2026-03-10: Static-web-assets lock repeated during parallel validation
+  - Failure pattern: even after stopping the app instance, running build and tests in parallel still reintroduced `rpswa.dswa.cache.json` lock contention.
+  - Stable fix: run `dotnet test` and `dotnet build` strictly one after another for this project.
+  - Guardrail: never parallelize local validation commands that touch the same ASP.NET static-web-assets pipeline.
+
+- 2026-03-10: No emergency lane for urgent main fixes
+  - Failure pattern: workflow policy allowed only `develop`-origin branches, which created friction for urgent production fixes or urgent Copilot-blocker fixes on `main` PRs.
+  - Stable fix: define an explicit emergency exception using `hotfix/*` from `main` with PR-based merge to `main`, then immediate cherry-pick sync into `develop`.
+  - Guardrail: use this lane only with explicit user approval and keep scope minimal.
+
+- 2026-03-10: Documentation ambiguity repeated across threads
+  - Failure pattern: recurring execution mistakes traced back to implicit/unclear repo policy wording.
+  - Stable fix: add same-turn documentation-clarity rule in governing docs whenever doc ambiguity is identified as a root cause.
+  - Guardrail: do not defer policy/documentation fixes when they are part of the root cause.
+
+- 2026-03-10: Reverse merge drift risk after hotfix
+  - Failure pattern: using `main -> develop` merge for hotfix backport risks unintended parent-history carryover and policy violations.
+  - Stable fix: prohibit parent-to-child merge and backport only with `git cherry-pick` of hotfix commit(s) into `develop`.
+  - Guardrail: never merge `main` into `develop`; apply deterministic cherry-pick sync immediately after hotfix merge to `main`.
+
+- 2026-03-10: Local validation startup blocked by port conflicts
+  - Failure pattern: app startup failed with `address already in use` on common local validation ports (`5058`, `5059`) while another instance was already running.
+  - Stable fix: run validation instance on a dedicated free port without stopping active user-owned processes.
+  - Guardrail: if startup fails with port-in-use and process-stop is not explicitly approved, switch to a free local port for validation.
+
+- 2026-03-10: Copilot review not attached to latest PR head in time
+  - Failure pattern: main PR guard stayed pending/blocked because Copilot review had not been posted for the latest head commit yet.
+  - Stable fix: Codex proactively sends a Copilot re-request on the PR via API/CLI before asking for manual intervention.
+  - Guardrail: user action is fallback-only; first response is always automated re-request by Codex.
+
+- 2026-03-11: Copilot gate polling consumed unnecessary Actions minutes
+  - Failure pattern: polling loop in `copilot-review-gate` kept runners active while waiting for review, wasting compute time on free-tier limits.
+  - Stable fix: switch to event-driven fail-fast gating (no polling) and auto-request Copilot reviewer on `pull_request` events.
+  - Guardrail: keep approval gating trigger-driven (`pull_request`, `pull_request_review`) and avoid wait loops in workflow jobs.
+
+- 2026-03-11: Requiring Copilot re-review on every fix increased PR cost
+  - Failure pattern: gating on latest-head approval forced repeated Copilot passes after each fix, increasing Actions/runtime cost.
+  - Stable fix: use one-time Copilot review policy per PR; gate passes when at least one Copilot review exists and all Copilot threads are resolved/outdated.
+  - Guardrail: after fixing comments, resolve Copilot threads and continue merge flow without forcing another Copilot full review cycle.
+
+- 2026-03-11: Unsupported workflow trigger caused no-job failed runs
+  - Failure pattern: adding `pull_request_review_thread` under `on:` made `main-pr-guard.yml` invalid in GitHub Actions for this repo, resulting in failed runs without jobs and blocked PR merge.
+  - Stable fix: remove unsupported trigger and keep guard on supported events (`pull_request`, `pull_request_review`).
+  - Guardrail: validate workflow-event compatibility against current GitHub Actions support before relying on new trigger types.

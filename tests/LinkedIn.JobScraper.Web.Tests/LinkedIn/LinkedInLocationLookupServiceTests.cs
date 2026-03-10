@@ -25,7 +25,7 @@ public sealed class LinkedInLocationLookupServiceTests
         Assert.False(result.Success);
         Assert.Equal(StatusCodes.Status400BadRequest, result.StatusCode);
         Assert.Contains("stored LinkedIn session is required", result.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Connect Session", result.Message, StringComparison.Ordinal);
+        Assert.Contains("import cURL", result.Message, StringComparison.Ordinal);
         Assert.Null(apiClient.LastRequestUri);
     }
 

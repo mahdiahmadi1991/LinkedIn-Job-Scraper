@@ -4,13 +4,26 @@ on:
   pull_request:
     branches:
       - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+  pull_request_review:
+    types:
+      - submitted
+
+concurrency:
+  group: main-pr-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   versioning-pr-guard:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -37,3 +50,142 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/versioning-guard.sh validate
+
+  copilot-review-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Ensure one-time Copilot review and no open Copilot threads
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const pullRequest = context.payload.pull_request;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pullNumber = pullRequest.number;
+            const isCopilotLogin = (login) => {
+              if (!login) return false;
+              const normalized = login.toLowerCase();
+              return normalized.includes("copilot");
+            };
+
+            if (context.eventName === "pull_request") {
+              const requestedReviewers = await github.rest.pulls.listRequestedReviewers({
+                owner,
+                repo,
+                pull_number: pullNumber
+              });
+
+              const copilotAlreadyRequested = requestedReviewers.data.users.some((user) =>
+                isCopilotLogin(user.login)
+              );
+
+              if (!copilotAlreadyRequested) {
+                try {
+                  await github.rest.pulls.requestReviewers({
+                    owner,
+                    repo,
+                    pull_number: pullNumber,
+                    reviewers: ["Copilot"]
+                  });
+                  core.info("Copilot review was requested automatically for this PR head.");
+                } catch (error) {
+                  core.warning(`Failed to request Copilot reviewer automatically: ${error.message}`);
+                }
+              }
+            }
+
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner,
+              repo,
+              pull_number: pullNumber,
+              per_page: 100
+            });
+
+            const copilotReviews = reviews.filter((review) => isCopilotLogin(review.user?.login));
+            if (copilotReviews.length === 0) {
+              core.setFailed(
+                "Copilot must review this PR at least once before merging to main. Review has been requested automatically."
+              );
+              return;
+            }
+
+            const threadsQuery = `
+              query($owner: String!, $repo: String!, $pullNumber: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $pullNumber) {
+                    reviewThreads(first: 100) {
+                      nodes {
+                        isResolved
+                        isOutdated
+                        comments(first: 30) {
+                          nodes {
+                            author {
+                              login
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            const threadsResult = await github.graphql(threadsQuery, {
+              owner,
+              repo,
+              pullNumber
+            });
+
+            const reviewThreads =
+              threadsResult?.repository?.pullRequest?.reviewThreads?.nodes ?? [];
+
+            const openCopilotThreads = reviewThreads.filter((thread) => {
+              if (thread.isResolved || thread.isOutdated) {
+                return false;
+              }
+
+              const comments = thread.comments?.nodes ?? [];
+              return comments.some((comment) => isCopilotLogin(comment.author?.login));
+            });
+
+            if (openCopilotThreads.length > 0) {
+              core.setFailed(
+                `Copilot review has ${openCopilotThreads.length} unresolved thread(s). Resolve them before merge.`
+              );
+              return;
+            }
+
+            core.info(
+              `Copilot gate passed with one-time review policy (${copilotReviews.length} Copilot review(s), 0 open Copilot threads).`
+            );
+
+  enable-auto-merge:
+    needs:
+      - versioning-pr-guard
+      - copilot-review-gate
+    if: >-
+      github.event.pull_request.base.ref == 'main' &&
+      (
+        github.event.pull_request.head.ref == 'develop' ||
+        startsWith(github.event.pull_request.head.ref, 'hotfix/')
+      ) &&
+      github.event.pull_request.draft == false &&
+      (needs.versioning-pr-guard.result == 'success' || needs.versioning-pr-guard.result == 'skipped') &&
+      needs.copilot-review-gate.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Enable auto-merge (merge commit)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PR_NUMBER='${{ github.event.pull_request.number }}'
+          gh pr merge "$PR_NUMBER" --repo '${{ github.repository }}' --auto --merge

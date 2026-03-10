@@ -34,12 +34,12 @@ This idea converts those gaps into explicit scenarios, acceptance criteria, and 
 | S4 | Session expires mid-fetch | Partial behavior depends on stage; user learns late | Inconsistent guidance and guardrail flow |
 | S5 | Search location lookup without valid session | Generic failure toast | No direct recovery instruction to connect session |
 | S6 | Session revoked/invalidated in another tab | Current tab state can remain stale | No session state heartbeat sync |
-| S7 | Auto-capture timeout/challenge flow | Modal notes exist, but no global fallback guidance | Recovery path not unified across main workflows |
+| S7 | cURL import format/auth failure flow | Modal notes exist, but no global fallback guidance | Recovery path not unified across main workflows |
 | S8 | Session-dependent actions while session invalid | Some actions proceed and fail | Missing unified “session-required” guard contract |
 
 ## Identified Delivery Gaps
 
-1. Missing first-login onboarding UX for session capture.
+1. Missing first-login onboarding UX for cURL session import.
 2. Missing periodic session health check and stale-state correction.
 3. Missing proactive UI blocking for session-required actions.
 4. Missing consistent recovery messaging that routes users directly to session modal action.
@@ -85,7 +85,7 @@ This idea converts those gaps into explicit scenarios, acceptance criteria, and 
   - missing session
   - expired session
   - verification unavailable
-  - auto-capture timeout
+  - cURL import format/auth mismatch
 - Every path should point to the same recovery action (session modal connect flow).
 
 ## Acceptance Criteria
@@ -113,7 +113,7 @@ This idea converts those gaps into explicit scenarios, acceptance criteria, and 
   - invalidation path consistency
 - Regression tests for:
   - no impact to per-user session isolation
-  - existing manual connect/capture/revoke flows remain functional
+  - existing manual import/verify/reset flows remain functional
 
 ## Assumptions
 

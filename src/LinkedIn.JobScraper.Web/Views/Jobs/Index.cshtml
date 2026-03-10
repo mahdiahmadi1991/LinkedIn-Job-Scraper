@@ -77,7 +77,7 @@
                 <span class="d-none" data-busy-text>Running fetch and enrichment...</span>
             </button>
             <div class="small text-warning-emphasis mt-2 d-none" data-fetch-session-guard-note>
-                LinkedIn session is missing or expired. Connect a valid session before running Fetch Jobs.
+                <span data-fetch-session-guard-message>LinkedIn session is missing or expired. Connect a valid session before running Fetch Jobs.</span>
                 <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-open-session-modal>Connect now</button>
             </div>
         </form>
@@ -254,7 +254,7 @@
             @if (Model.Jobs.Count == 0)
             {
                 <div class="empty-state-card">
-                    No jobs are stored yet. Capture a LinkedIn session, then run <strong>Fetch Jobs</strong>.
+                    No jobs are stored yet. Import a LinkedIn cURL session, then run <strong>Fetch Jobs</strong>.
                 </div>
             }
             else
@@ -291,23 +291,23 @@
             <div class="modal-header border-0 pb-0">
                 <div>
                     <div class="section-label mb-2">Getting Started</div>
-                    <h2 class="modal-title h5 mb-0" id="jobsSessionOnboardingModalLabel">Connect your LinkedIn session first</h2>
+                    <h2 class="modal-title h5 mb-0" id="jobsSessionOnboardingModalLabel">Import your LinkedIn session first</h2>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body d-flex flex-column gap-3 pt-3">
                 <p class="mb-0 text-muted">
-                    This app needs your active LinkedIn browser session to read jobs safely and replay requests on your behalf.
+                    This app needs an active LinkedIn session imported from <strong>Copy as cURL</strong> to read jobs safely.
                 </p>
                 <ul class="mb-0 small text-muted ps-3">
                     <li><strong>Fetch Jobs</strong> requires an active session.</li>
                     <li>Location suggestions and detail enrichment also depend on that same session.</li>
-                    <li>You can refresh or revoke the session anytime from the top-right session control.</li>
+                    <li>You can reset and re-import the session anytime from the top-right session control.</li>
                 </ul>
             </div>
             <div class="modal-footer border-0 pt-0">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Later</button>
-                <button type="button" class="btn btn-primary" data-session-onboarding-connect>Connect Session</button>
+                <button type="button" class="btn btn-primary" data-session-onboarding-connect>Import cURL Session</button>
             </div>
         </div>
     </div>

@@ -30,7 +30,7 @@ If there is tension between broad roadmap intent and step-by-step execution:
 
 - Local-only personal-use application (not a hosted SaaS product)
 - Lightweight local app-user authentication is active and required for per-user data ownership
-- Controlled-browser, user-in-the-loop LinkedIn session capture remains the default
+- User-in-the-loop authenticated LinkedIn cURL import remains the default
 - No direct credential-post login as the primary LinkedIn path
 - No aggressive scraping patterns
 - No business-logic changes without explicit approval
@@ -41,7 +41,7 @@ If there is tension between broad roadmap intent and step-by-step execution:
 
 The current implemented baseline already includes:
 
-- LinkedIn browser-backed session capture and verification
+- LinkedIn cURL-based session import and verification
 - conservative paged job import
 - job detail enrichment
 - OpenAI scoring
@@ -250,8 +250,13 @@ The following rules are locked:
   - format is `v.MAJOR.MINOR.PATCH`.
 - Every work integration into `develop` must include:
   - increased `VERSION`,
-  - matching `CHANGELOG.md` section for that version (`## [v.X.Y.Z] - YYYY-MM-DD`).
+  - matching `CHANGELOG.md` section for that version (`## [v.X.Y.Z] - YYYY-MM-DD`),
+  - annotated tag `v.X.Y.Z` created immediately on the `develop` merge commit.
+- Exception for explicit user-approved emergency `hotfix/*` merged directly to `main`: release `VERSION` + versioned `CHANGELOG.md` + annotated tag are created on the `main` hotfix merge commit, then synchronized into `develop` by cherry-picking hotfix commit(s) without a second bump.
+- During active implementation, continuously maintain `CHANGELOG.md` `Unreleased` notes for completed items.
+- Never apply release-version bump/tag/changelog during intermediate work-branch commits; these are integration-time actions only.
 - Squashed work commit merged into `develop` must follow Conventional Commits (`type(scope)!: summary`) and version bump must be compatible with the commit signal.
+- `develop` intentionally has no CI pipeline; do not block `develop` integration waiting for CI checks.
 - Default bump guidance:
   - `MAJOR` for breaking changes,
   - `MINOR` for net-new features,
@@ -264,50 +269,79 @@ The following rules are locked:
 - After archiving, update `docs/plan.md` so the latest completed queue reference points to the archived path.
 - UI consistency is mandatory: new button/interaction patterns must align with existing project design contracts; introducing a new pattern requires harmonizing related surfaces.
 - Language policy is mandatory: use English-only text across code, UI labels, tests, and documentation; do not add Persian (or other non-English) words in repository content.
+- Module observability is mandatory: every newly implemented module/flow must include strong structured logging with actionable runtime context for debugging, while preserving sensitive-data redaction rules.
+- Changelog audience policy is mandatory: `CHANGELOG.md` entries must be business/user-facing and understandable by end users; avoid low-level technical implementation wording.
+- Context-stability policy is mandatory for large tasks: when context usage is already high and a mid-task automatic compaction is likely, proactively compact first, then re-onboard from authoritative docs (`AGENTS.md`, relevant idea file, `docs/plan.md`) before making edits.
+- Documentation-clarity guardrail is mandatory: when a blocker/failure root cause is missing or ambiguous repository documentation, update the relevant docs in the same turn before continuing.
 
 ## Post-Delivery Workflow (Locked)
 
 After implementation completes, this sequence is mandatory for every feature/fix/bugfix:
 
 1. User Test Gate
+
 - User runs manual validation first.
 
-2. Conformance Gate (Codex)
+1. Conformance Gate (Codex)
+
 - Codex verifies implemented behavior against the original approved deal/idea contract.
 - Codex explicitly confirms match or documents deviations and fixes.
 
-3. Integration Sync Gate (Codex)
+1. Integration Sync Gate (Codex)
+
 - Codex performs repository-wide sync for that feature:
   - code/test/doc/config consistency
   - removal of dead or duplicate implementation
   - correction of any drift discovered post-test
 
-4. Work Branch + Commit Gate
+1. Work Branch + Commit Gate
+
 - Finalized changes are committed on a work branch (never directly on `main`).
 - Allowed prefixes: `feature/*`, `fix/*`, `bugfix/*`.
+- Exception: for explicit user-approved emergency direct-to-`main` fixes, use `hotfix/*` created from current `main`.
+- Keep `CHANGELOG.md` `Unreleased` notes synchronized with completed work in this gate.
+- No release version bump/versioned changelog entry/tag in this gate.
 
-5. Develop Integration Gate
+1. Develop Integration Gate
+
 - Integrate work branch changes into `develop` without PR.
 - Use squash integration so each work branch becomes one integration commit on `develop`.
+- Only in this gate: convert `Unreleased` notes into release `CHANGELOG.md` entry, bump `VERSION`, and create annotated tag `v.X.Y.Z` on that `develop` merge commit in the same integration step.
 - Delete the work branch after successful integration.
 
-6. Main Merge Gate
-- Merge `develop` into `main` only via PR.
-- PR merge strategy must be `Create a merge commit` (no squash, no rebase).
-- Main pipeline validates versioning artifacts and creates release tag (`v.X.Y.Z`) if missing.
-- PRs targeting `main` must pass the versioning guard check that enforces `VERSION` and `CHANGELOG.md` updates.
+1. Main Merge Gate
 
-7. Post-Main Sync Gate
-- Immediately sync `develop` with `main` after `main` merge so long-lived divergence does not accumulate.
+- Standard path: merge `develop` into `main` via PR.
+- Emergency path (explicit user-approved only): merge `hotfix/*` into `main` via PR for urgent production incidents or urgent `main` PR blocker fixes.
+- After PR creation, enable auto-merge with merge-commit strategy; do not perform manual immediate merge.
+- Copilot gate is mandatory on PRs targeting `main`.
+- Copilot policy is one-time-per-PR: once Copilot reviewed at least once, Codex resolves/fixes raised issues and proceeds without requiring a second Copilot re-review.
+- If Copilot review is missing/pending for the latest PR head, Codex proactively re-requests Copilot review (API/CLI) so manual user action is exception-only.
+- In emergency hotfix path, fix on the same `hotfix/*` PR branch and keep scope minimal.
+- PR merge strategy must be `Create a merge commit` (no squash, no rebase).
+- Main pipeline validates versioning artifacts; creating missing release tag (`v.X.Y.Z`) is fallback-only when develop-tagging was missed.
+- PRs targeting `main` must pass all required guard checks (including versioning and Copilot gate) before merge.
+- Copilot guard behavior is event-driven and fail-fast with no polling loops.
+- Copilot guard acceptance is: at least one Copilot review exists on the PR and no unresolved (non-outdated) Copilot review threads remain.
+- Copilot guard workflow listens to `pull_request` and `pull_request_review` to refresh status automatically after review updates.
+- On `pull_request` events, workflow auto-requests Copilot review when missing for the latest head.
+- After emergency `hotfix/* -> main` merge, immediately cherry-pick hotfix commit(s) into `develop`.
+
+1. Post-Main Sync Gate
+
+- Do not merge `main` into `develop`.
+- If `main` received an emergency `hotfix/*`, immediately cherry-pick those hotfix commit(s) into `develop`.
 
 ## Git Graph Rules (Locked)
 
 - Only `develop` and `main` are long-lived branches.
-- Temporary branches are `feature/*`, `fix/*`, or `bugfix/*` and must be removed after integration.
-- Every work branch must be created from `develop`.
+- Temporary branches are `feature/*`, `fix/*`, `bugfix/*`, or `hotfix/*` and must be removed after integration.
+- Standard rule: every work branch is created from `develop`; exception: explicit user-approved emergency `hotfix/*` starts from `main`.
+- Reverse merge policy: parent-to-child merges are forbidden; never merge `main` into `develop`.
 - Release/integration branch chains are not used unless explicitly approved by the user.
 - `feature/*|fix/*|bugfix/* -> develop`: squash integration without PR.
-- `develop -> main`: PR required with merge commit.
+- `develop -> main` (standard): PR required with merge commit.
+- `hotfix/* -> main` (explicit emergency only): PR required with merge commit, then immediate cherry-pick sync into `develop`.
 
 ## Historical Note
 

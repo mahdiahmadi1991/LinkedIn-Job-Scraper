@@ -116,12 +116,12 @@ Operational migration/backfill and rollback notes for this boundary are document
 ### 1. Session Capture Flow
 
 1. User opens the top-right session control.
-2. The modal launches a Playwright-controlled browser.
-3. The user logs in manually inside the controlled browser.
-4. The app watches for authenticated LinkedIn cookies.
-5. When authentication is detected, the session is auto-captured.
+2. The modal shows browser-specific `Copy as cURL` instructions.
+3. The user copies an authenticated LinkedIn `/voyager/api/` request from DevTools.
+4. The user pastes cURL text and runs `Validate & Import cURL`.
+5. The app validates and stores a minimized reusable session.
 6. The stored session can be reused for later LinkedIn API calls.
-7. If LinkedIn returns `401`, the stored session is invalidated and the user must recapture.
+7. If LinkedIn returns `401` or `403`, reset-required mode is activated and the user must reset/re-import.
 
 ### 2. Fetch and Score Flow
 
@@ -188,7 +188,7 @@ The following remain intentionally deferred or partial:
 
 The most important architectural constraint is stability around the LinkedIn integration:
 
-- prefer user-in-the-loop login
+- prefer user-in-the-loop authenticated cURL import
 - keep pacing conservative
 - isolate unstable endpoint assumptions
 - never make the app depend on diagnostics-only flows for core functionality

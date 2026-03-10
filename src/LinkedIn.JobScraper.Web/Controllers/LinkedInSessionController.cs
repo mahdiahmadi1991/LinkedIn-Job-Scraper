@@ -13,19 +13,19 @@ namespace LinkedIn.JobScraper.Web.Controllers;
 [Authorize(AuthenticationSchemes = AppAuthenticationDefaults.CookieScheme)]
 public class LinkedInSessionController : Controller
 {
-    private readonly ILinkedInBrowserLoginService _linkedInBrowserLoginService;
     private readonly ILinkedInSessionCurlImportService _linkedInSessionCurlImportService;
+    private readonly ILinkedInSessionResetRequirementTracker _linkedInSessionResetRequirementTracker;
     private readonly ILinkedInSessionStore _linkedInSessionStore;
     private readonly ILinkedInSessionVerificationService _linkedInSessionVerificationService;
 
     public LinkedInSessionController(
-        ILinkedInBrowserLoginService linkedInBrowserLoginService,
         ILinkedInSessionCurlImportService linkedInSessionCurlImportService,
+        ILinkedInSessionResetRequirementTracker linkedInSessionResetRequirementTracker,
         ILinkedInSessionStore linkedInSessionStore,
         ILinkedInSessionVerificationService linkedInSessionVerificationService)
     {
-        _linkedInBrowserLoginService = linkedInBrowserLoginService;
         _linkedInSessionCurlImportService = linkedInSessionCurlImportService;
+        _linkedInSessionResetRequirementTracker = linkedInSessionResetRequirementTracker;
         _linkedInSessionStore = linkedInSessionStore;
         _linkedInSessionVerificationService = linkedInSessionVerificationService;
     }
@@ -46,43 +46,20 @@ public class LinkedInSessionController : Controller
     [HttpPost]
     [ValidateAntiForgeryToken]
     [EnableRateLimiting(SecurityRateLimitPolicies.SensitiveLocalActions)]
-    public async Task<IActionResult> Capture(CancellationToken cancellationToken)
-    {
-        var result = await _linkedInBrowserLoginService.CaptureAndSaveAsync(cancellationToken);
-
-        if (!result.Success)
-        {
-            return await BuildActionResponseAsync(result, cancellationToken, StatusCodes.Status409Conflict);
-        }
-
-        return await VerifyAndBuildActionResponseAsync(
-            "LinkedIn session was captured, but automatic verification failed",
-            result.Message,
-            cancellationToken);
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    [EnableRateLimiting(SecurityRateLimitPolicies.SensitiveLocalActions)]
     public async Task<IActionResult> ImportCurl(
         [FromForm] string? curlText,
         CancellationToken cancellationToken)
     {
         var result = await _linkedInSessionCurlImportService.ImportAsync(curlText, cancellationToken);
+        if (result.Success)
+        {
+            _linkedInSessionResetRequirementTracker.Clear();
+        }
 
         return await BuildActionResponseAsync(
             result,
             cancellationToken,
             result.Success ? null : result.StatusCode);
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    [EnableRateLimiting(SecurityRateLimitPolicies.SensitiveLocalActions)]
-    public async Task<IActionResult> Launch(CancellationToken cancellationToken)
-    {
-        var result = await _linkedInBrowserLoginService.LaunchLoginAsync(cancellationToken);
-        return await BuildActionResponseAsync(result, cancellationToken, result.Success ? null : StatusCodes.Status409Conflict);
     }
 
     [HttpPost]
@@ -104,11 +81,12 @@ public class LinkedInSessionController : Controller
         try
         {
             await _linkedInSessionStore.InvalidateCurrentAsync(cancellationToken);
+            _linkedInSessionResetRequirementTracker.Clear();
 
             return await BuildActionResponseAsync(
                 new OperationResult(
                     true,
-                    "The stored LinkedIn session was revoked. Use Connect Session to capture a fresh one."),
+                    "The stored LinkedIn session was reset. Use cURL import to connect a fresh one."),
                 cancellationToken);
         }
         catch (Exception exception)
@@ -116,7 +94,7 @@ public class LinkedInSessionController : Controller
             return await BuildActionResponseAsync(
                 new OperationResult(
                     false,
-                    $"The stored LinkedIn session could not be revoked: {SensitiveDataRedaction.SanitizeForMessage(exception.Message)}"),
+                    $"The stored LinkedIn session could not be reset: {SensitiveDataRedaction.SanitizeForMessage(exception.Message)}"),
                 cancellationToken,
                 StatusCodes.Status500InternalServerError);
         }
@@ -135,16 +113,12 @@ public class LinkedInSessionController : Controller
 
         try
         {
-            var state = await _linkedInBrowserLoginService.GetStateAsync(cancellationToken);
-
-            viewModel.BrowserOpen = state.BrowserOpen;
-            viewModel.CurrentPageUrl = state.CurrentPageUrl;
-            viewModel.StoredSessionAvailable = state.StoredSessionAvailable;
-            viewModel.StoredSessionCapturedAtUtc = state.StoredSessionCapturedAtUtc;
-            viewModel.StoredSessionSource = state.StoredSessionSource;
-            viewModel.AutoCaptureActive = state.AutoCaptureActive;
-            viewModel.AutoCaptureStatusMessage = state.AutoCaptureStatusMessage;
-            viewModel.AutoCaptureCompletedSuccessfully = state.AutoCaptureCompletedSuccessfully;
+            var sessionSnapshot = await _linkedInSessionStore.GetCurrentAsync(cancellationToken);
+            viewModel.StoredSessionAvailable = sessionSnapshot is not null;
+            viewModel.StoredSessionCapturedAtUtc = sessionSnapshot?.CapturedAtUtc;
+            viewModel.StoredSessionSource = sessionSnapshot?.Source;
+            viewModel.StoredSessionEstimatedExpiresAtUtc = sessionSnapshot?.EstimatedExpiresAtUtc;
+            viewModel.StoredSessionExpirySource = sessionSnapshot?.ExpirySource;
         }
         catch (Exception exception)
         {
@@ -155,6 +129,9 @@ public class LinkedInSessionController : Controller
 
             viewModel.StatusSucceeded = false;
         }
+
+        var resetRequirement = _linkedInSessionResetRequirementTracker.GetCurrent();
+        viewModel.ResetRequired = resetRequirement.Required;
 
         return viewModel;
     }
@@ -191,6 +168,7 @@ public class LinkedInSessionController : Controller
         try
         {
             var result = await _linkedInSessionVerificationService.VerifyCurrentAsync(cancellationToken);
+            ApplyResetRequirementState(result);
             var message = result.Success && !string.IsNullOrWhiteSpace(successPrefix)
                 ? $"{successPrefix} {result.Message}"
                 : result.Message;
@@ -213,24 +191,59 @@ public class LinkedInSessionController : Controller
         }
     }
 
-    private static LinkedInSessionActionResponse CreatePayload(LinkedInSessionPageViewModel viewModel)
+    private LinkedInSessionActionResponse CreatePayload(LinkedInSessionPageViewModel viewModel)
     {
+        var resetRequirement = _linkedInSessionResetRequirementTracker.GetCurrent();
+
         return new LinkedInSessionActionResponse(
             viewModel.StatusSucceeded,
             viewModel.StatusMessage,
             new LinkedInSessionStateResponse(
-                viewModel.BrowserOpen,
-                viewModel.CurrentPageUrl,
                 viewModel.StoredSessionAvailable,
                 viewModel.StoredSessionCapturedAtUtc,
                 viewModel.StoredSessionSource,
-                viewModel.IsAutoCaptureRunning,
-                viewModel.AutoCaptureStatusMessage,
-                viewModel.AutoCaptureCompletedSuccessfully,
-                viewModel.ShowManualCaptureAction,
-                viewModel.PrimaryActionLabel,
+                viewModel.StoredSessionEstimatedExpiresAtUtc,
+                viewModel.StoredSessionExpirySource,
                 viewModel.SessionIndicatorLabel,
-                viewModel.SessionIndicatorClass));
+                viewModel.SessionIndicatorClass,
+                CreateResetRequirementResponse(resetRequirement)));
+    }
+
+    private static LinkedInSessionResetRequirementResponse CreateResetRequirementResponse(
+        LinkedInSessionResetRequirementState resetRequirement)
+    {
+        return new LinkedInSessionResetRequirementResponse(
+            resetRequirement.Required,
+            resetRequirement.ReasonCode,
+            resetRequirement.Message,
+            resetRequirement.StatusCode,
+            resetRequirement.RequiredAtUtc);
+    }
+
+    private void ApplyResetRequirementState(LinkedInSessionVerificationResult verificationResult)
+    {
+        if (verificationResult.Success)
+        {
+            _linkedInSessionResetRequirementTracker.Clear();
+            return;
+        }
+
+        if (verificationResult.StatusCode == StatusCodes.Status401Unauthorized)
+        {
+            _linkedInSessionResetRequirementTracker.MarkRequired(
+                LinkedInSessionResetReasonCodes.SessionUnauthorized,
+                "LinkedIn rejected this session with HTTP 401 (Unauthorized). Reset Session, then reconnect to continue.",
+                verificationResult.StatusCode);
+            return;
+        }
+
+        if (verificationResult.StatusCode == StatusCodes.Status403Forbidden)
+        {
+            _linkedInSessionResetRequirementTracker.MarkRequired(
+                LinkedInSessionResetReasonCodes.SessionForbidden,
+                "LinkedIn rejected this session with HTTP 403 (Forbidden). Reset Session, then reconnect to continue.",
+                verificationResult.StatusCode);
+        }
     }
 
     private static int NormalizeFailureStatusCode(int? statusCode)

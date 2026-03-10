@@ -111,7 +111,7 @@ internal static class LinkedInCapturedRequestParser
 
         if (!string.Equals(tokens[0], "curl", StringComparison.Ordinal))
         {
-            return ParsedLinkedInCapturedRequest.Invalid("Only 'Copy as cURL (bash)' input is supported.");
+            return ParsedLinkedInCapturedRequest.Invalid("Only 'Copy as cURL' input is supported.");
         }
 
         Uri? requestUri = null;

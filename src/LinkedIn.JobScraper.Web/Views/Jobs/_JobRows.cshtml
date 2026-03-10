@@ -1,4 +1,5 @@
 @using LinkedIn.JobScraper.Web.Jobs
+@using System.Globalization
 @model JobsRowsChunk
 
 @foreach (var job in Model.Jobs)
@@ -92,15 +93,22 @@
                         <div class="dates-stack">
                             <div>
                                 <strong>Last Seen</strong>
-                                <span>@job.LastSeenAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</span>
+                                <span data-utc-display="@job.LastSeenAtUtc.ToString("O", CultureInfo.InvariantCulture)" data-utc-empty="Unknown">
+                                    @job.LastSeenAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+                                </span>
                             </div>
                             <div>
                                 <strong>Listed</strong>
-                                <span>
-                                    @(job.ListedAtUtc.HasValue
-                                        ? job.ListedAtUtc.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
-                                        : "Unknown")
-                                </span>
+                                @if (job.ListedAtUtc.HasValue)
+                                {
+                                    <span data-utc-display="@job.ListedAtUtc.Value.ToString("O", CultureInfo.InvariantCulture)" data-utc-empty="Unknown">
+                                        @job.ListedAtUtc.Value.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span>Unknown</span>
+                                }
                             </div>
                         </div>
                     </div>

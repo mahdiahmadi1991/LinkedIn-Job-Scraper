@@ -25,8 +25,7 @@ public sealed class SecurityRateLimitPoliciesTests
     }
 
     [Theory]
-    [InlineData(nameof(LinkedInSessionController.Capture))]
-    [InlineData(nameof(LinkedInSessionController.Launch))]
+    [InlineData(nameof(LinkedInSessionController.ImportCurl))]
     [InlineData(nameof(LinkedInSessionController.Verify))]
     [InlineData(nameof(LinkedInSessionController.Revoke))]
     public void LinkedInSessionSensitiveActionsHaveSensitiveRateLimitPolicy(string methodName)

@@ -33,12 +33,8 @@
     const softDeleteCancelButton = softDeleteModalElement?.querySelector("[data-admin-soft-delete-cancel]");
 
     const localDateTimeFormatter = new Intl.DateTimeFormat(undefined, {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZoneName: "short"
+        dateStyle: "medium",
+        timeStyle: "short"
     });
 
     const pad = (value) => String(value).padStart(2, "0");
@@ -106,6 +102,11 @@
     const formatUtcDisplay = (utcIsoValue) => {
         if (!utcIsoValue) {
             return "-";
+        }
+
+        const fromSharedFormatter = window.appDateTime?.formatDateTime?.(utcIsoValue);
+        if (fromSharedFormatter) {
+            return fromSharedFormatter;
         }
 
         const parsed = new Date(utcIsoValue);

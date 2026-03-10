@@ -30,7 +30,7 @@ public sealed class DiagnosticsControllerTests
         Assert.True(payload.Config.OpenAiApiKeyConfigured);
         Assert.True(payload.Config.OpenAiModelConfigured);
         Assert.True(payload.Session.StoredSessionAvailable);
-        Assert.Equal("PlaywrightManualLogin", payload.Session.Source);
+        Assert.Equal("CurlImport", payload.Session.Source);
     }
 
     [Fact]
@@ -188,7 +188,7 @@ public sealed class DiagnosticsControllerTests
                 new LinkedInSessionSnapshot(
                     new Dictionary<string, string> { ["csrf-token"] = "secret" },
                     DateTimeOffset.UtcNow,
-                    "PlaywrightManualLogin"));
+                    "CurlImport"));
         }
 
         public Task InvalidateCurrentAsync(CancellationToken cancellationToken)
