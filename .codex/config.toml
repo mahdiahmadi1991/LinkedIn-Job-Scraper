@@ -4,6 +4,8 @@
 # long-thread settings only for this repository.
 
 profile = "long_threads"
+model = "gpt-5.3-codex"
+model_reasoning_effort = "high"
 
 # GPT-5.4 in Codex supports experimental 1M context.
 # Standard window is 272K; above that usage is billed at 2x.

@@ -300,20 +300,44 @@ public sealed class AiGlobalShortlistControllerTests
         Assert.Equal(85, payload.Overview.QueueRemaining);
     }
 
+    [Fact]
+    public async Task ReadinessReturnsTypedPayload()
+    {
+        var controller = new AiGlobalShortlistController(
+            new TestCurrentAppUserContext(),
+            new FakeAiGlobalShortlistService(
+                AiGlobalShortlistRunResult.Succeeded(Guid.NewGuid(), 0, 0, 0, 0, 0),
+                readiness: new AiGlobalShortlistReadinessSnapshot(
+                    false,
+                    "AI live review is currently unavailable because the OpenAI connection is not ready. Please contact support.")),
+            new InMemoryAiGlobalShortlistProgressStateStore());
+
+        var result = await controller.Readiness(CancellationToken.None);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var payload = Assert.IsType<AiGlobalShortlistReadinessResponse>(json.Value);
+        Assert.True(payload.Success);
+        Assert.False(payload.Ready);
+        Assert.Contains("Please contact support", payload.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class FakeAiGlobalShortlistService : IAiGlobalShortlistService
     {
         private readonly AiGlobalShortlistRunResult _startResult;
         private readonly AiGlobalShortlistRunSnapshot? _run;
         private readonly AiGlobalShortlistQueueOverviewSnapshot _queueOverview;
+        private readonly AiGlobalShortlistReadinessSnapshot _readiness;
 
         public FakeAiGlobalShortlistService(
             AiGlobalShortlistRunResult startResult,
             AiGlobalShortlistRunSnapshot? run = null,
-            AiGlobalShortlistQueueOverviewSnapshot? queueOverview = null)
+            AiGlobalShortlistQueueOverviewSnapshot? queueOverview = null,
+            AiGlobalShortlistReadinessSnapshot? readiness = null)
         {
             _startResult = startResult;
             _run = run;
             _queueOverview = queueOverview ?? new AiGlobalShortlistQueueOverviewSnapshot(0, 0, 0);
+            _readiness = readiness ?? new AiGlobalShortlistReadinessSnapshot(true, "AI live review is ready.");
         }
 
         public Task<AiGlobalShortlistRunResult> GenerateAsync(
@@ -356,6 +380,11 @@ public sealed class AiGlobalShortlistControllerTests
         public Task<AiGlobalShortlistQueueOverviewSnapshot> GetQueueOverviewAsync(CancellationToken cancellationToken)
         {
             return Task.FromResult(_queueOverview);
+        }
+
+        public Task<AiGlobalShortlistReadinessSnapshot> GetReadinessAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_readiness);
         }
     }
 }

@@ -2,16 +2,32 @@ using LinkedIn.JobScraper.Web.Jobs;
 using LinkedIn.JobScraper.Web.Authentication;
 using LinkedIn.JobScraper.Web.Persistence;
 using LinkedIn.JobScraper.Web.Persistence.Entities;
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace LinkedIn.JobScraper.Web.AI;
 
 public sealed class JobBatchScoringService : IJobBatchScoringService
 {
+    private const string OpenAiUnavailableSupportMessage =
+        "AI scoring is currently unavailable (OpenAI configuration/connection is not ready). Please contact support.";
+    private const string OpenAiAuthenticationSupportMessage =
+        "AI scoring is currently unavailable (OpenAI authentication failed). Please contact support.";
+    private const string OpenAiRateLimitedSupportMessage =
+        "AI scoring is temporarily unavailable (OpenAI rate limit). Please retry shortly or contact support.";
+    private const string OpenAiServiceUnavailableSupportMessage =
+        "AI scoring is currently unavailable (OpenAI service issue). Please contact support.";
+    private const string OpenAiTimeoutSupportMessage =
+        "AI scoring timed out while contacting OpenAI. Please retry in a few moments or contact support.";
+    private const string OpenAiUpstreamResponseSupportMessage =
+        "AI scoring could not be completed due to an unexpected OpenAI response. Please retry or contact support.";
+
     private readonly IAiBehaviorSettingsService _behaviorSettingsService;
     private readonly ICurrentAppUserContext _currentAppUserContext;
     private readonly IDbContextFactory<LinkedInJobScraperDbContext> _dbContextFactory;
     private readonly IJobScoringGateway _jobScoringGateway;
+    private readonly ILogger<JobBatchScoringService> _logger;
     private readonly IOpenAiEffectiveSecurityOptionsResolver _openAiSecurityOptionsResolver;
 
     public JobBatchScoringService(
@@ -19,13 +35,15 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
         IDbContextFactory<LinkedInJobScraperDbContext> dbContextFactory,
         IJobScoringGateway jobScoringGateway,
         IAiBehaviorSettingsService behaviorSettingsService,
-        IOpenAiEffectiveSecurityOptionsResolver openAiSecurityOptionsResolver)
+        IOpenAiEffectiveSecurityOptionsResolver openAiSecurityOptionsResolver,
+        ILogger<JobBatchScoringService> logger)
     {
         _currentAppUserContext = currentAppUserContext;
         _dbContextFactory = dbContextFactory;
         _jobScoringGateway = jobScoringGateway;
         _behaviorSettingsService = behaviorSettingsService;
         _openAiSecurityOptionsResolver = openAiSecurityOptionsResolver;
+        _logger = logger;
     }
 
     public async Task<JobBatchScoringResult> ScoreReadyJobsAsync(
@@ -247,16 +265,30 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
                 StatusCodes.Status409Conflict);
         }
 
+        Log.SingleJobScoringStarted(_logger, userId, job.Id);
+        var stopwatch = Stopwatch.StartNew();
         var behaviorProfile = await _behaviorSettingsService.GetActiveAsync(cancellationToken);
         var result = await _jobScoringGateway.ScoreAsync(BuildGatewayRequest(job, behaviorProfile), cancellationToken);
+        stopwatch.Stop();
 
         if (!result.CanScore ||
             !result.Score.HasValue ||
             string.IsNullOrWhiteSpace(result.Label))
         {
+            var statusCode = result.StatusCode ?? StatusCodes.Status502BadGateway;
+            var failure = NormalizeSingleJobScoreFailureMessage(result.Message, statusCode);
+            Log.SingleJobScoringFailed(
+                _logger,
+                userId,
+                job.Id,
+                failure.Category,
+                statusCode,
+                (int)stopwatch.ElapsedMilliseconds,
+                LimitForLog(result.Message));
+
             return SingleJobScoringResult.Failed(
-                result.Message,
-                result.StatusCode ?? StatusCodes.Status502BadGateway);
+                failure.UserMessage,
+                statusCode);
         }
 
         var scoredAtUtc = DateTimeOffset.UtcNow;
@@ -282,6 +314,14 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
                 "The job changed while AI scoring was being saved. Refresh and try again.",
                 StatusCodes.Status409Conflict);
         }
+
+        Log.SingleJobScoringCompleted(
+            _logger,
+            userId,
+            job.Id,
+            result.Score.Value,
+            result.Label,
+            (int)stopwatch.ElapsedMilliseconds);
 
         return SingleJobScoringResult.Succeeded(
             new SingleJobScoringSnapshot(
@@ -375,6 +415,67 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
             AiOutputLanguage.Normalize(outputLanguageCode));
     }
 
+    private static ScoringFailureDescriptor NormalizeSingleJobScoreFailureMessage(string message, int statusCode)
+    {
+        var normalized = message.Trim();
+        var lowerInvariant = normalized.ToLowerInvariant();
+
+        if (statusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden ||
+            lowerInvariant.Contains("invalid_request_error", StringComparison.Ordinal) ||
+            lowerInvariant.Contains("unauthorized", StringComparison.Ordinal) ||
+            lowerInvariant.Contains("forbidden", StringComparison.Ordinal))
+        {
+            return new ScoringFailureDescriptor("authentication", OpenAiAuthenticationSupportMessage);
+        }
+
+        if (statusCode == StatusCodes.Status429TooManyRequests ||
+            lowerInvariant.Contains("rate-limited", StringComparison.Ordinal) ||
+            lowerInvariant.Contains("rate limit", StringComparison.Ordinal))
+        {
+            return new ScoringFailureDescriptor("rate-limit", OpenAiRateLimitedSupportMessage);
+        }
+
+        if (lowerInvariant.Contains("timed out", StringComparison.Ordinal) ||
+            lowerInvariant.Contains("timeout", StringComparison.Ordinal))
+        {
+            return new ScoringFailureDescriptor("timeout", OpenAiTimeoutSupportMessage);
+        }
+
+        if (statusCode >= StatusCodes.Status500InternalServerError)
+        {
+            return new ScoringFailureDescriptor("service-unavailable", OpenAiServiceUnavailableSupportMessage);
+        }
+
+        if (lowerInvariant.Contains("api key is not configured", StringComparison.Ordinal) ||
+            lowerInvariant.Contains("model is not configured", StringComparison.Ordinal) ||
+            lowerInvariant.Contains("configuration", StringComparison.Ordinal))
+        {
+            return new ScoringFailureDescriptor("configuration", OpenAiUnavailableSupportMessage);
+        }
+
+        if (normalized.Length > 220 || normalized.Contains("********", StringComparison.Ordinal))
+        {
+            return new ScoringFailureDescriptor("sanitized-upstream", OpenAiUnavailableSupportMessage);
+        }
+
+        return new ScoringFailureDescriptor("upstream-message", OpenAiUpstreamResponseSupportMessage);
+    }
+
+    private static string LimitForLog(string message)
+    {
+        var normalized = message.Trim();
+        if (normalized.Length <= 1000)
+        {
+            return normalized;
+        }
+
+        return normalized[..1000];
+    }
+
+    private sealed record ScoringFailureDescriptor(
+        string Category,
+        string UserMessage);
+
     private sealed record PendingScoringJob(
         JobRecord Job,
         string DisplayTitle,
@@ -383,4 +484,41 @@ public sealed class JobBatchScoringService : IJobBatchScoringService
     private sealed record CompletedScoringJob(
         PendingScoringJob WorkItem,
         JobScoringGatewayResult Result);
+}
+
+internal static partial class Log
+{
+    [LoggerMessage(
+        EventId = 4020,
+        Level = LogLevel.Information,
+        Message = "Single-job AI scoring started. UserId={UserId}, JobId={JobId}")]
+    public static partial void SingleJobScoringStarted(
+        ILogger logger,
+        int userId,
+        Guid jobId);
+
+    [LoggerMessage(
+        EventId = 4021,
+        Level = LogLevel.Warning,
+        Message = "Single-job AI scoring failed. UserId={UserId}, JobId={JobId}, Category={Category}, StatusCode={StatusCode}, DurationMs={DurationMs}, RawMessage={RawMessage}")]
+    public static partial void SingleJobScoringFailed(
+        ILogger logger,
+        int userId,
+        Guid jobId,
+        string category,
+        int statusCode,
+        int durationMs,
+        string rawMessage);
+
+    [LoggerMessage(
+        EventId = 4022,
+        Level = LogLevel.Information,
+        Message = "Single-job AI scoring completed. UserId={UserId}, JobId={JobId}, Score={Score}, Label={Label}, DurationMs={DurationMs}")]
+    public static partial void SingleJobScoringCompleted(
+        ILogger logger,
+        int userId,
+        Guid jobId,
+        int score,
+        string label,
+        int durationMs);
 }

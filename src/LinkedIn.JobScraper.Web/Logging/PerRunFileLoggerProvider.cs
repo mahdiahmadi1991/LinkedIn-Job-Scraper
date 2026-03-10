@@ -13,7 +13,8 @@ public sealed class PerRunFileLoggerProvider : ILoggerProvider, ISupportExternal
         "LinkedIn.JobScraper.Web.LinkedIn.Api.LinkedInApiClient",
         "LinkedIn.JobScraper.Web.LinkedIn.Search.LinkedInJobSearchService",
         "LinkedIn.JobScraper.Web.Jobs.JobImportService",
-        "LinkedIn.JobScraper.Web.Jobs.JobEnrichmentService"
+        "LinkedIn.JobScraper.Web.Jobs.JobEnrichmentService",
+        "LinkedIn.JobScraper.Web.AI.JobBatchScoringService"
     ];
 
     private readonly StreamWriter _writer;

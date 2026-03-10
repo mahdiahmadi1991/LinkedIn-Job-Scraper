@@ -35,6 +35,7 @@
     const startUrl = root.dataset.startUrl;
     const latestUrl = root.dataset.latestUrl;
     const overviewUrl = root.dataset.overviewUrl;
+    const readinessUrl = root.dataset.readinessUrl;
     const runUrlTemplate = root.dataset.runUrlTemplate;
     const resumeUrlTemplate = root.dataset.resumeUrlTemplate;
     const cancelUrlTemplate = root.dataset.cancelUrlTemplate;
@@ -77,6 +78,9 @@
     let overviewRefreshInFlight = false;
     let runCancellationRequestedAtUtc = null;
     let queueRemainingCount = 0;
+    let readinessSyncPending = true;
+    let readinessReady = false;
+    let readinessMessage = "Checking AI live review availability...";
 
     const seenProgressEvents = new Set();
 
@@ -106,6 +110,30 @@
 
     const getNoReviewableJobsMessage = () =>
         "AI live review cannot start because there are no jobs available for review. Import jobs and sync details first.";
+
+    const getOpenAiUnavailableMessage = () =>
+        "AI live review is currently unavailable because the OpenAI connection is not ready. Please contact support.";
+
+    const isReadinessBlocked = () =>
+        !readinessSyncPending && !readinessReady;
+
+    const getReadinessBlockedMessage = () =>
+        readinessMessage || getOpenAiUnavailableMessage();
+
+    const shouldPinReadinessBlockedStatus = () => {
+        const normalizedState = String(activeRunState || "").toLowerCase();
+        const isRunningLike = normalizedState === "running" || normalizedState === "pending";
+        return isReadinessBlocked() && !isRunningLike;
+    };
+
+    const applyReadinessBlockedStatusIfNeeded = () => {
+        if (!shouldPinReadinessBlockedStatus()) {
+            return false;
+        }
+
+        setStatus(getReadinessBlockedMessage(), true);
+        return true;
+    };
 
     const toDisplayState = (state) => {
         if (typeof state !== "string" || state.length === 0) {
@@ -276,18 +304,34 @@
         const isRunningLike = normalizedState === "running" || normalizedState === "pending";
         const cancellationRequested = Boolean(runCancellationRequestedAtUtc);
         const hasReviewableJobs = queueRemainingCount > 0;
-        const canStart = !isRunningLike && hasReviewableJobs;
-        const canResume = hasRun && (normalizedState === "cancelled" || normalizedState === "failed");
+        const canStart = !isRunningLike && hasReviewableJobs && readinessReady && !readinessSyncPending;
+        const canResume =
+            hasRun &&
+            (normalizedState === "cancelled" || normalizedState === "failed") &&
+            readinessReady &&
+            !readinessSyncPending;
         const canStop = hasRun && isRunningLike && !cancellationRequested;
 
         if (startButton instanceof HTMLButtonElement) {
             startButton.disabled = !canStart;
             startButton.classList.toggle("disabled", !canStart);
+            if (!canStart && isReadinessBlocked()) {
+                startButton.title = getReadinessBlockedMessage();
+            } else if (!canStart && !hasReviewableJobs && !isRunningLike) {
+                startButton.title = getNoReviewableJobsMessage();
+            } else {
+                startButton.removeAttribute("title");
+            }
         }
 
         if (resumeButton instanceof HTMLButtonElement) {
             resumeButton.disabled = !canResume;
             resumeButton.classList.toggle("disabled", !canResume);
+            if (!canResume && isReadinessBlocked()) {
+                resumeButton.title = getReadinessBlockedMessage();
+            } else {
+                resumeButton.removeAttribute("title");
+            }
         }
 
         if (stopButton instanceof HTMLButtonElement) {
@@ -351,6 +395,49 @@
             // best-effort live sync for overview metrics
         } finally {
             overviewRefreshInFlight = false;
+        }
+    };
+
+    const loadReadiness = async () => {
+        if (!readinessUrl) {
+            readinessReady = true;
+            readinessSyncPending = false;
+            readinessMessage = "AI live review is ready.";
+            updateActionButtons();
+            return;
+        }
+
+        readinessSyncPending = true;
+        updateActionButtons();
+
+        try {
+            const response = await fetch(readinessUrl, {
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                credentials: "same-origin"
+            });
+
+            if (!response.ok) {
+                throw new Error(await readErrorMessage(response));
+            }
+
+            const payload = await response.json();
+            if (!payload?.success || typeof payload.ready !== "boolean") {
+                throw new Error("AI live review readiness response was invalid.");
+            }
+
+            readinessReady = payload.ready;
+            readinessMessage = typeof payload.message === "string" && payload.message.length > 0
+                ? payload.message
+                : (payload.ready ? "AI live review is ready." : getOpenAiUnavailableMessage());
+        } catch {
+            readinessReady = false;
+            readinessMessage = getOpenAiUnavailableMessage();
+        } finally {
+            readinessSyncPending = false;
+            updateActionButtons();
+            applyReadinessBlockedStatusIfNeeded();
         }
     };
 
@@ -830,7 +917,9 @@
         }
 
         renderRows();
-        setStatus(run?.summary || `Run ${activeRunState} loaded.`);
+        if (!applyReadinessBlockedStatusIfNeeded()) {
+            setStatus(run?.summary || `Run ${activeRunState} loaded.`);
+        }
 
         if (activeRunId) {
             if (activeRunState === "Running") {
@@ -910,7 +999,9 @@
             scheduleOverviewRefresh();
         }
 
-        setStatus(update.message || `Run ${activeRunState}.`);
+        if (!applyReadinessBlockedStatusIfNeeded()) {
+            setStatus(update.message || `Run ${activeRunState}.`);
+        }
 
         if (terminalStates.has(activeRunState)) {
             runCancellationRequestedAtUtc = null;
@@ -1099,7 +1190,9 @@
                     failedCount: 0
                 });
                 renderRows();
-                if (queueRemainingCount <= 0) {
+                if (shouldPinReadinessBlockedStatus()) {
+                    setStatus(getReadinessBlockedMessage(), true);
+                } else if (queueRemainingCount <= 0) {
                     setStatus(getNoReviewableJobsMessage());
                 } else {
                     setStatus(payload.message || "No run is available yet.");
@@ -1198,6 +1291,18 @@
             return;
         }
 
+        if (readinessSyncPending) {
+            setStatus("Checking AI live review availability...");
+            return;
+        }
+
+        if (!readinessReady) {
+            const message = readinessMessage || getOpenAiUnavailableMessage();
+            setStatus(message, true);
+            showToast(message, false);
+            return;
+        }
+
         if (queueRemainingCount <= 0) {
             const message = getNoReviewableJobsMessage();
             setStatus(message);
@@ -1274,6 +1379,18 @@
     resumeButton?.addEventListener("click", async () => {
         if (isInitialSyncPending) {
             setStatus("Syncing latest run state...");
+            return;
+        }
+
+        if (readinessSyncPending) {
+            setStatus("Checking AI live review availability...");
+            return;
+        }
+
+        if (!readinessReady) {
+            const message = readinessMessage || getOpenAiUnavailableMessage();
+            setStatus(message, true);
+            showToast(message, false);
             return;
         }
 
@@ -1374,6 +1491,7 @@
 
     void ensureSignalRConnection()
         .catch(() => null)
+        .then(() => loadReadiness())
         .then(() => loadLatest())
         .catch((error) => {
             const message = error instanceof Error ? error.message : "Failed to initialize live review page.";

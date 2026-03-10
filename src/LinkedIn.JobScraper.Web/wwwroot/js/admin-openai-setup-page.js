@@ -92,6 +92,26 @@
         return hasFieldErrors;
     };
 
+    const readFirstValidationError = (errors) => {
+        if (!errors || typeof errors !== "object") {
+            return null;
+        }
+
+        const values = Object.values(errors);
+        for (const entry of values) {
+            if (!Array.isArray(entry) || entry.length === 0) {
+                continue;
+            }
+
+            const message = String(entry[0] || "").trim();
+            if (message) {
+                return message;
+            }
+        }
+
+        return null;
+    };
+
     const setConnectionStatus = (message, ready) => {
         if (!(statusNote instanceof HTMLElement)) {
             return;
@@ -213,9 +233,14 @@
 
             const payload = await tryReadProblem(response);
             if (!response.ok) {
-                if (!applyValidationErrors(payload?.errors)) {
-                    showToast(payload?.detail || payload?.title || "OpenAI setup save failed.", false);
-                }
+                applyValidationErrors(payload?.errors);
+                const message =
+                    payload?.detail ||
+                    payload?.title ||
+                    readFirstValidationError(payload?.errors) ||
+                    "OpenAI setup save failed.";
+                showToast(message, false);
+                setConnectionStatus(message, false);
 
                 return;
             }

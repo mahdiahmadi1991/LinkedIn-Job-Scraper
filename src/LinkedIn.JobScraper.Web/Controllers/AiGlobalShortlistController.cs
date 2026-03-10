@@ -125,6 +125,17 @@ public sealed class AiGlobalShortlistController : Controller
                 ToOverviewPayload(overview)));
     }
 
+    [HttpGet("runs/readiness")]
+    public async Task<IActionResult> Readiness(CancellationToken cancellationToken)
+    {
+        var readiness = await _globalShortlistService.GetReadinessAsync(cancellationToken);
+        return Json(
+            new AiGlobalShortlistReadinessResponse(
+                true,
+                readiness.Message,
+                readiness.Ready));
+    }
+
     [HttpGet("runs/latest")]
     public async Task<IActionResult> Latest(CancellationToken cancellationToken)
     {

@@ -22,6 +22,8 @@ public interface IAiGlobalShortlistService
     Task<AiGlobalShortlistRunSnapshot?> GetRunAsync(Guid runId, CancellationToken cancellationToken);
 
     Task<AiGlobalShortlistQueueOverviewSnapshot> GetQueueOverviewAsync(CancellationToken cancellationToken);
+
+    Task<AiGlobalShortlistReadinessSnapshot> GetReadinessAsync(CancellationToken cancellationToken);
 }
 
 public sealed record AiGlobalShortlistRunResult(
@@ -135,3 +137,7 @@ public sealed record AiGlobalShortlistQueueOverviewSnapshot(
     int EligibleTotal,
     int AlreadyReviewed,
     int QueueRemaining);
+
+public sealed record AiGlobalShortlistReadinessSnapshot(
+    bool Ready,
+    string Message);

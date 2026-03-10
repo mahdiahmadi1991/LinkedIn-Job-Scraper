@@ -31,6 +31,7 @@
 - Treat LinkedIn browser-session requests as unstable and subject to change.
 - Prefer a controlled-browser, user-login flow to capture a valid session over direct automated credential submission.
 - Avoid aggressive automation patterns and keep human-in-the-loop where possible.
+- Codex server access is allowed only via `codexops_stage` key (`.secrets/keys/codexops_stage_ed25519`); do not use any other SSH key, user, or access path.
 - Never clear, truncate, or bulk-delete data from any database table unless the user explicitly requests it in the current conversation turn.
 - Never stop, kill, or restart any already-running local app/process instance unless the user explicitly approves it in the current conversation turn.
 
