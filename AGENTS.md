@@ -140,7 +140,7 @@ After implementation (feature/fix/bugfix) is finished, follow this exact sequenc
   - At least one Copilot review on the PR
   - No unresolved (non-outdated) Copilot review threads
   - Gate behavior is event-driven and fail-fast with no polling loops.
-  - Workflow triggers should include `pull_request`, `pull_request_review`, and `pull_request_review_thread` (resolved/unresolved) so thread-resolution state is evaluated automatically.
+  - Workflow triggers should include `pull_request` and `pull_request_review` so review updates re-evaluate guard status automatically.
   - On `pull_request` events, workflow should auto-request Copilot review when missing for the latest head.
 - After any emergency `hotfix/* -> main` merge, immediately cherry-pick the hotfix commit(s) into `develop` before starting new feature/fix work.
 

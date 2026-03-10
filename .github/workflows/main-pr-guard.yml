@@ -12,10 +12,6 @@ on:
   pull_request_review:
     types:
       - submitted
-  pull_request_review_thread:
-    types:
-      - resolved
-      - unresolved
 
 concurrency:
   group: main-pr-guard-${{ github.event.pull_request.number }}

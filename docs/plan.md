@@ -323,7 +323,7 @@ After implementation completes, this sequence is mandatory for every feature/fix
 - PRs targeting `main` must pass all required guard checks (including versioning and Copilot gate) before merge.
 - Copilot guard behavior is event-driven and fail-fast with no polling loops.
 - Copilot guard acceptance is: at least one Copilot review exists on the PR and no unresolved (non-outdated) Copilot review threads remain.
-- Copilot guard workflow listens to `pull_request`, `pull_request_review`, and `pull_request_review_thread` (`resolved`, `unresolved`) so status refreshes automatically after thread resolution changes.
+- Copilot guard workflow listens to `pull_request` and `pull_request_review` to refresh status automatically after review updates.
 - On `pull_request` events, workflow auto-requests Copilot review when missing for the latest head.
 - After emergency `hotfix/* -> main` merge, immediately cherry-pick hotfix commit(s) into `develop`.
 
