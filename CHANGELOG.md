@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v.4.0.3] - 2026-03-10
+### Changed
+- GitHub Actions JavaScript-based steps now force Node.js 24 runtime to stay compatible with the upcoming Node.js 20 deprecation.
+
 ## [v.4.0.2] - 2026-03-10
 ### Changed
 - Main release PRs now require explicit Copilot approval on the latest commit; non-approval feedback blocks merge immediately.
