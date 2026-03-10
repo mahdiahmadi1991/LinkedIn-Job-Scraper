@@ -11,23 +11,33 @@ cd "$repo_root"
 current_branch="$(git rev-parse --abbrev-ref HEAD)"
 if [[ "$current_branch" == "main" ]]; then
   echo "[pre-commit] Direct commits on 'main' are blocked."
-  echo "[pre-commit] Create/switch to a feature branch and commit there."
+  echo "[pre-commit] Create/switch to a work branch and commit there."
   exit 1
+fi
+
+if [[ "$current_branch" != "develop" ]]; then
+  if [[ ! "$current_branch" =~ ^(feature|fix|bugfix)/.+$ ]]; then
+    echo "[pre-commit] Invalid branch name '$current_branch'."
+    echo "[pre-commit] Use one of: feature/<slug>, fix/<slug>, bugfix/<slug>."
+    exit 1
+  fi
 fi
 
 if [[ "$current_branch" == "develop" ]]; then
   if ! git rev-parse -q --verify MERGE_HEAD >/dev/null; then
     echo "[pre-commit] Direct commits on 'develop' are blocked."
-    echo "[pre-commit] Commit on 'feature/*', then merge into 'develop' with '--no-ff'."
+    echo "[pre-commit] Commit on feature/*, fix/*, or bugfix/*, then merge into 'develop' with '--no-ff'."
     exit 1
   fi
 
   merge_head="$(git rev-parse MERGE_HEAD)"
   contains_feature_branch="$(git for-each-ref --format='%(refname:short)' --contains "$merge_head" refs/heads/feature | head -n 1 || true)"
+  contains_fix_branch="$(git for-each-ref --format='%(refname:short)' --contains "$merge_head" refs/heads/fix | head -n 1 || true)"
+  contains_bugfix_branch="$(git for-each-ref --format='%(refname:short)' --contains "$merge_head" refs/heads/bugfix | head -n 1 || true)"
   contains_main_branch="$(git for-each-ref --format='%(refname:short)' --contains "$merge_head" refs/heads/main | head -n 1 || true)"
 
-  if [[ -z "$contains_feature_branch" && -z "$contains_main_branch" ]]; then
-    echo "[pre-commit] Merge commits on 'develop' must come from 'feature/*' (or 'main' for sync)."
+  if [[ -z "$contains_feature_branch" && -z "$contains_fix_branch" && -z "$contains_bugfix_branch" && -z "$contains_main_branch" ]]; then
+    echo "[pre-commit] Merge commits on 'develop' must come from feature/*, fix/*, bugfix/* (or 'main' for sync)."
     echo "[pre-commit] Resolve merge source branch and retry."
     exit 1
   fi

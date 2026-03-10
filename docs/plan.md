@@ -239,21 +239,24 @@ Do not open a queue for cleanup-only refactors.
 
 ## Execution Discipline Additions
 
-The following rules are locked for every new approved idea:
+The following rules are locked:
 
-- Every idea plan must include a final explicit state for implementation-review validation against approved scope.
+- For every approved net-new feature, create and maintain a dedicated idea file in `docs/ideas/<idea-name>.md`.
+- For bug fixes or improvements to existing capabilities, a dedicated idea file is optional and only required when explicitly requested.
+- "Capture-only" ideas (record now, implement later) must be added to `docs/idea-inbox.md` with status tracking.
+- When a dedicated idea file exists, it must include a final explicit state for implementation-review validation against approved scope.
 - That final validation state must confirm:
   - implemented behavior matches the idea contract
   - no critical regression or side effect remains
   - required verification evidence is captured (tests/smoke/manual checks as applicable)
-- After an idea is fully completed, move its file from `docs/ideas/` to `docs/archive/ideas/`.
+- After a dedicated idea is fully completed, move its file from `docs/ideas/` to `docs/archive/ideas/`.
 - After archiving, update `docs/plan.md` so the latest completed queue reference points to the archived path.
 - UI consistency is mandatory: new button/interaction patterns must align with existing project design contracts; introducing a new pattern requires harmonizing related surfaces.
 - Language policy is mandatory: use English-only text across code, UI labels, tests, and documentation; do not add Persian (or other non-English) words in repository content.
 
-## Post-Feature Delivery Workflow (Locked)
+## Post-Delivery Workflow (Locked)
 
-After implementation completes, this sequence is mandatory for every feature:
+After implementation completes, this sequence is mandatory for every feature/fix/bugfix:
 
 1. User Test Gate
 - User runs manual validation first.
@@ -268,13 +271,14 @@ After implementation completes, this sequence is mandatory for every feature:
   - removal of dead or duplicate implementation
   - correction of any drift discovered post-test
 
-4. Feature Branch + Commit Gate
-- Finalized changes are committed on a feature branch (never directly on `main`).
+4. Work Branch + Commit Gate
+- Finalized changes are committed on a work branch (never directly on `main`).
+- Allowed prefixes: `feature/*`, `fix/*`, `bugfix/*`.
 
 5. Develop Integration Gate
-- Integrate feature branch work into `develop` without PR.
-- Use squash integration so each feature becomes one integration commit on `develop`.
-- Delete the feature branch after successful integration.
+- Integrate work branch changes into `develop` without PR.
+- Use squash integration so each work branch becomes one integration commit on `develop`.
+- Delete the work branch after successful integration.
 
 6. Main Merge Gate
 - Merge `develop` into `main` only via PR.
@@ -286,10 +290,10 @@ After implementation completes, this sequence is mandatory for every feature:
 ## Git Graph Rules (Locked)
 
 - Only `develop` and `main` are long-lived branches.
-- Temporary branches are feature-only and must be removed after integration.
-- Every `feature/*` branch must be created from `develop`.
+- Temporary branches are `feature/*`, `fix/*`, or `bugfix/*` and must be removed after integration.
+- Every work branch must be created from `develop`.
 - Release/integration branch chains are not used unless explicitly approved by the user.
-- `feature/* -> develop`: squash integration without PR.
+- `feature/*|fix/*|bugfix/* -> develop`: squash integration without PR.
 - `develop -> main`: PR required with merge commit.
 
 ## Historical Note

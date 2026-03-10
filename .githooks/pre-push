@@ -15,6 +15,12 @@ if [[ "$current_branch" == "main" ]]; then
   exit 1
 fi
 
+if [[ "$current_branch" != "develop" && ! "$current_branch" =~ ^(feature|fix|bugfix)/.+$ ]]; then
+  echo "[pre-push] Invalid branch name '$current_branch'."
+  echo "[pre-push] Use one of: feature/<slug>, fix/<slug>, bugfix/<slug>."
+  exit 1
+fi
+
 if [[ "$current_branch" == "develop" ]]; then
   upstream_ref="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
   if [[ -z "$upstream_ref" ]]; then
@@ -26,7 +32,7 @@ if [[ "$current_branch" == "develop" ]]; then
     non_merge_first_parent="$(git rev-list --first-parent --no-merges "$range")"
     if [[ -n "$non_merge_first_parent" ]]; then
       echo "[pre-push] Direct (non-merge) commits detected on 'develop' first-parent history."
-      echo "[pre-push] Integrate feature branches via merge commits (--no-ff)."
+      echo "[pre-push] Integrate work branches via merge commits (--no-ff)."
       git log --oneline --decorate --first-parent --no-merges "$range"
       exit 1
     fi
@@ -46,8 +52,8 @@ if [[ "$current_branch" == "develop" ]]; then
       feature_side_commit_count="$(git rev-list --count "$parent_one..$parent_two")"
       if [[ "$feature_side_commit_count" -ne 1 ]]; then
         echo "[pre-push] Merge commit '$merge_commit' violates squash-before-merge policy."
-        echo "[pre-push] Feature side contains $feature_side_commit_count commits; expected exactly 1."
-        echo "[pre-push] Squash feature branch commits before merging into develop."
+        echo "[pre-push] Work-branch side contains $feature_side_commit_count commits; expected exactly 1."
+        echo "[pre-push] Squash work-branch commits before merging into develop."
         exit 1
       fi
     done < <(git rev-list --first-parent --merges "$range")

@@ -8,12 +8,18 @@
 - Work in small, reviewable steps.
 - Before editing files for a step, restate the exact outputs for that step.
 - After each approved implementation step, stop and wait for explicit user approval before continuing.
-- For every newly approved feature idea, create a dedicated `docs/ideas/<idea-name>.md` file before implementation starts.
-- The idea file must contain state-based execution steps, acceptance criteria, assumptions, and out-of-scope items; implementation must continuously reference that file to avoid drift.
+- Create a dedicated `docs/ideas/<idea-name>.md` file only for newly approved net-new features (capabilities that do not already exist in the system).
+- For bug fixes or improvements of existing capabilities, a dedicated idea file is not required unless the user explicitly requests one.
+- Keep "capture-only" (not-now) ideas in `docs/idea-inbox.md` with status tracking so they can be listed and selected later.
+- When a net-new feature idea file exists, it must contain state-based execution steps, acceptance criteria, assumptions, and out-of-scope items; implementation must continuously reference that file to avoid drift.
 - Never create commits on `main` directly.
-- Feature work must start on a non-`main` branch.
-- Every `feature/*` branch must be created from the current `develop` branch head.
-- Integration from feature branches into `develop` does not require PR and must produce a merge commit on `develop`; squash feature branch commits to one commit before merging.
+- All implementation work must start on a non-`main` branch.
+- Every work branch must be created from the current `develop` branch head.
+- Branch naming is mandatory:
+  - `feature/<slug>` for net-new capabilities
+  - `fix/<slug>` for improvements to existing capabilities
+  - `bugfix/<slug>` for bug fixes
+- Integration from work branches into `develop` does not require PR and must produce a merge commit on `develop`; squash work-branch commits to one commit before merging.
 - Integration from `develop` into `main` must always use PR with a merge commit (no squash, no rebase).
 - Never watch GitHub pipelines by default. After triggering CI/CD, ask the user to check status unless the user explicitly asks for monitoring.
 
@@ -52,9 +58,9 @@
 - The project must stay warning-free; fix all compiler/analyzer warnings before handing work back.
 - Check NuGet packages regularly and keep dependencies up to date; apply required code synchronization after upgrades.
 
-## Post-Feature Delivery Workflow (Mandatory)
+## Post-Delivery Workflow (Mandatory)
 
-After feature implementation is finished, follow this exact sequence:
+After implementation (feature/fix/bugfix) is finished, follow this exact sequence:
 
 1. User Test Gate
 - Stop and let the user run manual validation.
@@ -67,15 +73,15 @@ After feature implementation is finished, follow this exact sequence:
 - Detect and fix drift across code/tests/docs/config.
 - Remove dead or duplicate code and align all supporting documentation.
 
-4. Feature Branch + Commit Gate
-- Create/use a feature branch.
-- Commit the finalized feature changes on that branch.
+4. Work Branch + Commit Gate
+- Create/use a work branch with the required prefix (`feature/*`, `fix/*`, `bugfix/*`).
+- Commit the finalized changes on that branch.
 
 5. Develop Integration Gate
-- Integrate the feature branch into `develop` without PR.
-- First squash feature branch commits into one feature commit.
+- Integrate the work branch into `develop` without PR.
+- First squash work-branch commits into one commit.
 - Then merge into `develop` with a merge commit (`--no-ff`) so the graph explicitly shows feature integration.
-- Delete the feature branch after successful integration.
+- Delete the work branch after successful integration.
 
 6. Main Merge Gate
 - Merge `develop` into `main` only via PR.
@@ -87,8 +93,8 @@ After feature implementation is finished, follow this exact sequence:
 ## Git Graph Policy (Mandatory)
 
 - Long-lived branches are only `develop` and `main`.
-- Temporary branches are allowed only for active feature work and must be deleted after integration.
-- Every feature branch must originate from `develop` (never from `main` or detached historical commits).
+- Temporary branches are allowed only for active work (`feature/*`, `fix/*`, `bugfix/*`) and must be deleted after integration.
+- Every work branch must originate from `develop` (never from `main` or detached historical commits).
 - Do not introduce release/integration branch chains unless explicitly approved by the user.
-- Keep each feature compact by squashing feature-branch commits, then preserve integration visibility on `develop` with merge commits.
+- Keep each work branch compact by squashing branch commits, then preserve integration visibility on `develop` with merge commits.
 - Keep release history explicit on `main` using PR merge commits from `develop`.
