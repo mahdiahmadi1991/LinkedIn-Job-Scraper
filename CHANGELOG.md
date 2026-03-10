@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v.4.0.5] - 2026-03-11
+### Changed
+- Main merge checks are now stable again and no longer fail due to unsupported workflow trigger configuration.
+- Copilot gate remains cost-efficient (single-review policy, no polling) while staying on supported GitHub Actions events.
+
 ## [v.4.0.4] - 2026-03-11
 ### Changed
 - Main release PR checks now require only one Copilot review per PR; after feedback is addressed, merging can continue without waiting for a full second review cycle.

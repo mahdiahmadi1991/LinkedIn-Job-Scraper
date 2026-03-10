@@ -366,9 +366,14 @@ What to do:
 - 2026-03-11: Copilot gate polling consumed unnecessary Actions minutes
   - Failure pattern: polling loop in `copilot-review-gate` kept runners active while waiting for review, wasting compute time on free-tier limits.
   - Stable fix: switch to event-driven fail-fast gating (no polling) and auto-request Copilot reviewer on `pull_request` events.
-  - Guardrail: keep approval gating trigger-driven (`pull_request`, `pull_request_review`, `pull_request_review_thread`) and avoid wait loops in workflow jobs.
+  - Guardrail: keep approval gating trigger-driven (`pull_request`, `pull_request_review`) and avoid wait loops in workflow jobs.
 
 - 2026-03-11: Requiring Copilot re-review on every fix increased PR cost
   - Failure pattern: gating on latest-head approval forced repeated Copilot passes after each fix, increasing Actions/runtime cost.
   - Stable fix: use one-time Copilot review policy per PR; gate passes when at least one Copilot review exists and all Copilot threads are resolved/outdated.
   - Guardrail: after fixing comments, resolve Copilot threads and continue merge flow without forcing another Copilot full review cycle.
+
+- 2026-03-11: Unsupported workflow trigger caused no-job failed runs
+  - Failure pattern: adding `pull_request_review_thread` under `on:` made `main-pr-guard.yml` invalid in GitHub Actions for this repo, resulting in failed runs without jobs and blocked PR merge.
+  - Stable fix: remove unsupported trigger and keep guard on supported events (`pull_request`, `pull_request_review`).
+  - Guardrail: validate workflow-event compatibility against current GitHub Actions support before relying on new trigger types.
