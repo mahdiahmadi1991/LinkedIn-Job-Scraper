@@ -119,10 +119,7 @@ public static class LinkedInRequestDefaults
         IReadOnlyCollection<string> workplaceTypeCodes)
     {
         var safeKeywords = Uri.EscapeDataString(keywords);
-        var selectedFilters = new List<string>
-        {
-            "sortBy:List(R)"
-        };
+        var selectedFilters = new List<string>();
 
         if (easyApply)
         {
@@ -154,7 +151,11 @@ public static class LinkedInRequestDefaults
             queryParts.Add($"locationUnion:(geoId:{locationGeoId})");
         }
 
-        queryParts.Add($"selectedFilters:({string.Join(',', selectedFilters)})");
+        if (selectedFilters.Count > 0)
+        {
+            queryParts.Add($"selectedFilters:({string.Join(',', selectedFilters)})");
+        }
+
         queryParts.Add("spellCorrectionEnabled:true");
 
         return $"({string.Join(',', queryParts)})";
