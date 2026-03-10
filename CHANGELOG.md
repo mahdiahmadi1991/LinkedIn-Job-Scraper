@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v.4.0.2] - 2026-03-10
+### Changed
+- Main release PRs now require explicit Copilot approval on the latest commit; non-approval feedback blocks merge immediately.
+- LinkedIn session reset guidance is now cleaner and avoids duplicate reconnect instructions in the modal.
+- Locale handling now follows a strict supported baseline for more predictable date/time formatting behavior.
+
 ## [v.4.0.1] - 2026-03-10
 ### Changed
 - Main-merge guard automation is now more resilient: required checks are re-evaluated automatically when PR reviews are submitted, reducing manual rerun steps.
@@ -14,7 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [v.4.0.0] - 2026-03-10
 ### Changed
-- LinkedIn session setup is now a single clear path: users import `Copy as cURL (bash)` directly in the app.
+- LinkedIn session setup is now a single clear path: users import `Copy as cURL` directly in the app.
 - The session modal is simplified to reduce visual clutter and make first-time connection easier for non-technical users.
 - Browser-specific guidance (Chromium-family and Firefox) now helps users complete cURL import faster with fewer mistakes.
 - Session recovery is clearer: when LinkedIn rejects access (`401/403`), users are guided to reset and reconnect with explicit reasons.

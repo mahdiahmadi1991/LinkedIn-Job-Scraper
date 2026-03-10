@@ -56,8 +56,11 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - name: Ensure Copilot reviewed current PR head
-        uses: actions/github-script@v7
+      - name: Ensure Copilot approved current PR head
+        uses: actions/github-script@v8
+        env:
+          COPILOT_REVIEW_TIMEOUT_SECONDS: "900"
+          COPILOT_REVIEW_POLL_SECONDS: "20"
         with:
           script: |
             const pullRequest = context.payload.pull_request;
@@ -65,52 +68,89 @@ jobs:
             const repo = context.repo.repo;
             const pullNumber = pullRequest.number;
             const headSha = pullRequest.head.sha;
-
-            const reviews = await github.paginate(github.rest.pulls.listReviews, {
-              owner,
-              repo,
-              pull_number: pullNumber,
-              per_page: 100
-            });
-
+            const timeoutSeconds = Number(process.env.COPILOT_REVIEW_TIMEOUT_SECONDS ?? "900");
+            const pollSeconds = Number(process.env.COPILOT_REVIEW_POLL_SECONDS ?? "20");
+            const deadline = Date.now() + timeoutSeconds * 1000;
             const isCopilotLogin = (login) => {
               if (!login) return false;
               const normalized = login.toLowerCase();
               return normalized.includes("copilot");
             };
 
-            const copilotReviews = reviews.filter((review) => isCopilotLogin(review.user?.login));
-            if (copilotReviews.length === 0) {
-              core.setFailed("Copilot review is required before merging to main.");
-              return;
-            }
+            while (true) {
+              const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                owner,
+                repo,
+                pull_number: pullNumber,
+                per_page: 100
+              });
 
-            const copilotReviewsOnCurrentHead = copilotReviews.filter(
-              (review) => review.commit_id === headSha
-            );
-
-            if (copilotReviewsOnCurrentHead.length === 0) {
-              core.setFailed(
-                `Copilot has not reviewed the latest PR head commit (${headSha}).`
+              const copilotReviews = reviews.filter((review) => isCopilotLogin(review.user?.login));
+              const copilotReviewsOnCurrentHead = copilotReviews.filter(
+                (review) => review.commit_id === headSha
               );
-              return;
-            }
 
-            const blockingStates = new Set(["CHANGES_REQUESTED"]);
-            const blockingReview = copilotReviewsOnCurrentHead.find((review) =>
-              blockingStates.has((review.state ?? "").toUpperCase())
-            );
+              const latestCopilotReviewByReviewer = new Map();
+              for (const review of copilotReviewsOnCurrentHead) {
+                const login = review.user?.login?.toLowerCase() ?? "copilot";
+                const current = latestCopilotReviewByReviewer.get(login);
+                const reviewId = Number(review.id ?? 0);
+                const currentId = Number(current?.id ?? 0);
+                if (!current || reviewId >= currentId) {
+                  latestCopilotReviewByReviewer.set(login, review);
+                }
+              }
 
-            if (blockingReview) {
-              core.setFailed(
-                `Copilot requested changes on the latest head commit (${headSha}). Resolve and re-run review before merge.`
+              const latestCopilotReviewsOnCurrentHead = Array.from(
+                latestCopilotReviewByReviewer.values()
               );
-              return;
-            }
+              if (latestCopilotReviewsOnCurrentHead.length > 0) {
+                const blockingStates = new Set(["CHANGES_REQUESTED"]);
+                const blockingReview = latestCopilotReviewsOnCurrentHead.find((review) =>
+                  blockingStates.has((review.state ?? "").toUpperCase())
+                );
+                if (blockingReview) {
+                  core.setFailed(
+                    `Copilot requested changes on the latest head commit (${headSha}). Resolve and push a fix commit.`
+                  );
+                  return;
+                }
 
-            core.info(
-              `Copilot review gate passed on head ${headSha} with ${copilotReviewsOnCurrentHead.length} review(s).`
-            );
+                const approvalStates = new Set(["APPROVED"]);
+                const approvalReview = latestCopilotReviewsOnCurrentHead.find((review) =>
+                  approvalStates.has((review.state ?? "").toUpperCase())
+                );
+                if (approvalReview) {
+                  core.info(`Copilot approval gate passed on head ${headSha}.`);
+                  return;
+                }
+
+                const seenStates = Array.from(
+                  new Set(
+                    latestCopilotReviewsOnCurrentHead.map((review) =>
+                      String(review.state ?? "UNKNOWN").toUpperCase()
+                    )
+                  )
+                ).join(", ");
+                core.setFailed(
+                  `Copilot reviewed latest PR head commit (${headSha}) with state(s): ${seenStates}. Approval is required before merge.`
+                );
+                return;
+              }
+
+              if (Date.now() >= deadline) {
+                const message = copilotReviews.length === 0
+                  ? "Copilot approval is required before merging to main."
+                  : `Copilot has not reviewed the latest PR head commit (${headSha}).`;
+                core.setFailed(message);
+                return;
+              }
+
+              core.info(
+                `Copilot review for head ${headSha} is not available yet. Retrying in ${pollSeconds}s...`
+              );
+              await new Promise((resolve) => setTimeout(resolve, pollSeconds * 1000));
+            }
 
   enable-auto-merge:
     needs:
@@ -118,7 +158,10 @@ jobs:
       - copilot-review-gate
     if: >-
       github.event.pull_request.base.ref == 'main' &&
-      github.event.pull_request.head.ref == 'develop' &&
+      (
+        github.event.pull_request.head.ref == 'develop' ||
+        startsWith(github.event.pull_request.head.ref, 'hotfix/')
+      ) &&
       github.event.pull_request.draft == false &&
       needs.versioning-pr-guard.result == 'success' &&
       needs.copilot-review-gate.result == 'success'
