@@ -51,6 +51,222 @@ jobs:
           set -euo pipefail
           bash scripts/versioning-guard.sh validate
 
+  project-governance-gate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      repository-projects: read
+    steps:
+      - name: Enforce project-task governance for main PR
+        uses: actions/github-script@v8
+        env:
+          PROJECT_OWNER: mahdiahmadi1991
+          PROJECT_NUMBER: "1"
+        with:
+          script: |
+            const projectOwner = process.env.PROJECT_OWNER;
+            const projectNumber = Number.parseInt(process.env.PROJECT_NUMBER ?? "", 10);
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pullRequest = context.payload.pull_request;
+            const pullNumber = pullRequest.number;
+            const headRef = pullRequest.head?.ref ?? "";
+            const issueRefRegex = /#(\d+)/g;
+
+            if (!projectOwner || !Number.isInteger(projectNumber) || projectNumber <= 0) {
+              core.setFailed("PROJECT_OWNER/PROJECT_NUMBER are invalid in workflow configuration.");
+              return;
+            }
+
+            const issueReferences = new Set();
+            const referenceText = `${pullRequest.title ?? ""}\n${pullRequest.body ?? ""}`;
+            let match = issueRefRegex.exec(referenceText);
+            while (match) {
+              const issueNumber = Number.parseInt(match[1], 10);
+              if (Number.isInteger(issueNumber) && issueNumber > 0) {
+                issueReferences.add(issueNumber);
+              }
+              match = issueRefRegex.exec(referenceText);
+            }
+
+            if (issueReferences.size === 0) {
+              core.setFailed(
+                "PR to main must reference at least one task issue (e.g. #123) in title or body."
+              );
+              return;
+            }
+
+            if (headRef !== "develop" && !headRef.startsWith("hotfix/")) {
+              core.setFailed(
+                `PR to main must come from 'develop' or 'hotfix/<issue-number>-<slug>'. Found '${headRef}'.`
+              );
+              return;
+            }
+
+            if (headRef.startsWith("hotfix/")) {
+              const hotfixPattern = /^hotfix\/([0-9]+)-[a-z0-9][a-z0-9-]*$/;
+              const hotfixMatch = headRef.match(hotfixPattern);
+              if (!hotfixMatch) {
+                core.setFailed(
+                  `Hotfix branch naming is invalid: '${headRef}'. Use hotfix/<issue-number>-<slug>.`
+                );
+                return;
+              }
+
+              const hotfixIssueNumber = Number.parseInt(hotfixMatch[1], 10);
+              if (!issueReferences.has(hotfixIssueNumber)) {
+                core.setFailed(
+                  `Hotfix branch issue number '${hotfixIssueNumber}' must be referenced in PR body/title.`
+                );
+                return;
+              }
+            }
+
+            const projectLookup = await github.graphql(
+              `
+                query($owner: String!, $number: Int!) {
+                  user(login: $owner) {
+                    projectV2(number: $number) {
+                      id
+                      title
+                    }
+                  }
+                }
+              `,
+              { owner: projectOwner, number: projectNumber }
+            );
+
+            const project = projectLookup?.user?.projectV2;
+            if (!project?.id) {
+              core.setFailed(
+                `Canonical project ${projectOwner}/${projectNumber} is not accessible to this workflow token.`
+              );
+              return;
+            }
+
+            const prLabels = new Set(
+              (pullRequest.labels ?? [])
+                .map((label) => (label?.name ?? "").toLowerCase())
+                .filter(Boolean)
+            );
+            const bypassLocalOpsDocs = prLabels.has("allow-local-ops-docs");
+
+            const changedFiles = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number: pullNumber,
+              per_page: 100
+            });
+
+            const blockedLocalOpsFiles = changedFiles
+              .map((item) => item.filename)
+              .filter((filename) => {
+                if (filename === "docs/ideas/.gitkeep") {
+                  return false;
+                }
+                return (
+                  /^docs\/ideas\/.+\.md$/i.test(filename) ||
+                  /^docs\/archive\/ideas\/.+\.md$/i.test(filename) ||
+                  /^docs\/tmp\/.+\.md$/i.test(filename)
+                );
+              });
+
+            if (blockedLocalOpsFiles.length > 0 && !bypassLocalOpsDocs) {
+              core.setFailed(
+                `Operational markdown drift is blocked by policy: ${blockedLocalOpsFiles.join(", ")}. ` +
+                  "Use GitHub Project issues instead; only explicit exception PRs may use label allow-local-ops-docs."
+              );
+              return;
+            }
+
+            for (const issueNumber of issueReferences) {
+              const issueResponse = await github.rest.issues.get({
+                owner,
+                repo,
+                issue_number: issueNumber
+              });
+
+              const issue = issueResponse.data;
+              if (issue.pull_request) {
+                core.setFailed(`Reference #${issueNumber} is a pull request, not an issue task.`);
+                return;
+              }
+
+              const labelSet = new Set(
+                (issue.labels ?? [])
+                  .map((label) =>
+                    typeof label === "string"
+                      ? label.toLowerCase()
+                      : (label?.name ?? "").toLowerCase()
+                  )
+                  .filter(Boolean)
+              );
+
+              if (!labelSet.has("intake")) {
+                core.setFailed(`Issue #${issueNumber} must include label 'intake'.`);
+                return;
+              }
+
+              if ((issue.state ?? "").toLowerCase() !== "closed") {
+                core.setFailed(
+                  `Issue #${issueNumber} must be closed before merging related changes to main.`
+                );
+                return;
+              }
+
+              const issueProjectLookup = await github.graphql(
+                `
+                  query($issueId: ID!) {
+                    node(id: $issueId) {
+                      ... on Issue {
+                        projectItems(first: 100) {
+                          nodes {
+                            project {
+                              id
+                            }
+                            fieldValueByName(name: "Execution State") {
+                              ... on ProjectV2ItemFieldSingleSelectValue {
+                                name
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                `,
+                { issueId: issue.node_id }
+              );
+
+              const projectItems = issueProjectLookup?.node?.projectItems?.nodes ?? [];
+              const canonicalProjectItem = projectItems.find(
+                (item) => item?.project?.id === project.id
+              );
+
+              if (!canonicalProjectItem) {
+                core.setFailed(
+                  `Issue #${issueNumber} is not linked to canonical project '${project.title}'.`
+                );
+                return;
+              }
+
+              const executionState =
+                canonicalProjectItem?.fieldValueByName?.name ?? "(missing)";
+              if (executionState !== "Done" && executionState !== "Dropped") {
+                core.setFailed(
+                  `Issue #${issueNumber} must be in Execution State Done/Dropped, found '${executionState}'.`
+                );
+                return;
+              }
+            }
+
+            core.info(
+              `Project governance gate passed for PR #${pullNumber} with ${issueReferences.size} referenced task issue(s).`
+            );
+
   copilot-review-gate:
     runs-on: ubuntu-latest
     permissions:
@@ -166,6 +382,7 @@ jobs:
   enable-auto-merge:
     needs:
       - versioning-pr-guard
+      - project-governance-gate
       - copilot-review-gate
     if: >-
       github.event.pull_request.base.ref == 'main' &&
@@ -175,6 +392,7 @@ jobs:
       ) &&
       github.event.pull_request.draft == false &&
       (needs.versioning-pr-guard.result == 'success' || needs.versioning-pr-guard.result == 'skipped') &&
+      (needs.project-governance-gate.result == 'success' || needs.project-governance-gate.result == 'skipped') &&
       needs.copilot-review-gate.result == 'success'
     runs-on: ubuntu-latest
     permissions:

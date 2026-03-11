@@ -1,302 +1,124 @@
 # LinkedIn Job Scraper
 
-Personal-use local ASP.NET Core MVC application for collecting LinkedIn job opportunities, enriching them, and ranking them with OpenAI to speed up manual job triage.
+Local-only ASP.NET Core MVC application for collecting LinkedIn jobs, enriching them, and ranking them with OpenAI to speed up personal job triage.
 
-## What This Project Is
+## Scope
 
-This project is a local-only, single-user decision-support tool.
+This project is intentionally:
 
-It helps the user:
+- local-only
+- a single-user decision-support tool
+- conservative and human-in-the-loop for LinkedIn session handling
 
-- capture a reusable LinkedIn browser-backed session
-- fetch job listings from LinkedIn web endpoints used by the browser
-- enrich stored jobs with additional detail
-- score and summarize jobs with OpenAI
-- review, filter, and track job workflow state in a dashboard
+Out of scope:
 
-The application is intentionally built as a pragmatic modular monolith MVC app. It favors maintainability and local operability over distributed architecture or heavy platform complexity.
+- automated job application
+- aggressive scraping patterns
+- reliance on official LinkedIn partner APIs
+- cloud/SaaS deployment model
 
-## What This Project Is Not
+## Key Features
 
-This repository does **not** aim to:
+- LinkedIn session import and validation from authenticated browser requests
+- Conservative paged job import + job detail enrichment
+- OpenAI-based scoring and summaries
+- Search and AI settings management
+- Dashboard filters, sorting, lazy rows, and workflow states
+- SignalR-backed realtime workflow progress
+- Safe diagnostics (`/health`, `/health/ready`, `/diagnostics/summary`)
 
-- automate applying to jobs
-- use aggressive scraping patterns
-- rely on official LinkedIn partner APIs
-- automate direct credential-post login as the primary authentication path
-- provide internal multi-user authentication
-- act as a cloud-hosted SaaS platform
-
-The current product direction is conservative: keep the user in the loop for LinkedIn login, reuse a valid browser-backed session, and throttle sensitive actions.
-
-## Current Features
-
-- LinkedIn session management through a controlled browser (Playwright-assisted)
-- Automatic session capture after successful manual login
-- Lightweight stored-session validation
-- Conservative paged LinkedIn job import
-- Job detail enrichment
-- OpenAI-based scoring with summary, rationale, concerns, score, and label
-- AI output language support (`English` and `Persian`) with correct `ltr` / `rtl` rendering
-- Search settings UI for LinkedIn query parameters
-- AI settings UI for behavior tuning
-- Jobs dashboard with:
-  - filtering and sorting
-  - lazy-loaded rows
-  - expandable detail rows
-  - workflow status tracking (`New`, `Shortlisted`, `Applied`, `Ignored`, `Archived`)
-- SignalR-backed real-time workflow progress and activity logs
-- Safe diagnostics and health/readiness endpoints
-- CI-safe automated test suite
-- GitHub Actions CI with format, build, test, dependency review, and test artifact publishing
-
-## Architecture
-
-The solution currently follows a pragmatic **Modular Monolith MVC** style:
-
-- **Web layer**
-  - ASP.NET Core MVC controllers, Razor views, static assets
-  - thin controllers, view composition, JSON endpoints
-- **Jobs module**
-  - dashboard orchestration
-  - fetch/enrich/score workflow coordination
-  - status updates and progress notifications
-- **LinkedIn module**
-  - session capture and validation
-  - search and detail request execution
-  - location lookup
-  - conservative pacing
-- **AI module**
-  - OpenAI integration
-  - prompt construction
-  - AI behavior settings
-  - output language handling
-- **Persistence**
-  - EF Core + SQL Server
-  - migrations
-  - entities and DbContext
-- **Diagnostics**
-  - safe reachability checks
-  - configuration/session summary
-
-For a deeper technical walkthrough, see:
-
-- [PLAN_REVISED.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/PLAN_REVISED.md)
-- [ai-onboarding-report.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/ai-onboarding-report.md)
-- [architecture-overview.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/architecture-overview.md)
-- [architecture-diagram.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/architecture-diagram.md)
-- [data-flow-diagram.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/data-flow-diagram.md)
-- [adr-001-local-safety-and-session-strategy.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/adr-001-local-safety-and-session-strategy.md)
-- [adr-002-ci-safe-testing-and-external-boundaries.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/adr-002-ci-safe-testing-and-external-boundaries.md)
-- [project-context.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/project-context.md)
-- [technical-debt.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/technical-debt.md)
-- [audit-report.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/audit-report.md)
-- [troubleshooting.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/troubleshooting.md)
-
-## Documentation Guide
-
-Use the docs in this order, depending on what you need:
-
-### Start Here
-
-- [PLAN_REVISED.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/PLAN_REVISED.md)
-  - active roadmap
-  - milestone expectations
-  - current architecture and quality guardrails
-- [project-context.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/project-context.md)
-  - latest confirmed implementation decisions
-  - recently completed changes
-  - current operating constraints
-
-### Deep Technical Context
-
-- [ai-onboarding-report.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/ai-onboarding-report.md)
-  - broad AI/engineer onboarding
-  - implemented scope
-  - system behavior and technical choices
-- [architecture-overview.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/architecture-overview.md)
-  - modular monolith structure
-  - where code belongs
-  - layering rules
-- [architecture-diagram.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/architecture-diagram.md)
-  - visual module overview
-- [data-flow-diagram.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/data-flow-diagram.md)
-  - visual runtime flow summary
-
-### Decision Records And Operational Support
-
-- [adr-001-local-safety-and-session-strategy.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/adr-001-local-safety-and-session-strategy.md)
-- [adr-002-ci-safe-testing-and-external-boundaries.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/adr-002-ci-safe-testing-and-external-boundaries.md)
-- [troubleshooting.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/troubleshooting.md)
-- [security-logging.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/security-logging.md)
-
-### Planning And Review Artifacts
-
-- [plan.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/plan.md)
-  - active operational execution ledger and queue status
-- [audit-report.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/audit-report.md)
-  - point-in-time evidence snapshot
-- [technical-debt.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/technical-debt.md)
-  - intentionally deferred items still considered real debt
-
-## Technology Stack
-
-- .NET 10
-- ASP.NET Core MVC
-- Razor Views
-- SignalR
-- EF Core 10
-- SQL Server
-- Microsoft Playwright
-- OpenAI HTTP integration
-- xUnit
-- GitHub Actions
-
-## Repository Layout
-
-- `src/LinkedIn.JobScraper.Web`
-  - main runtime application
-- `tests/LinkedIn.JobScraper.Web.Tests`
-  - CI-safe automated tests
-- `docs`
-  - planning, context, onboarding, technical debt, and architecture notes
-- `.github/workflows`
-  - CI workflows
-
-## Local Setup
+## Quick Start
 
 ### Prerequisites
 
 - .NET SDK `10.0.103` (or compatible with `global.json`)
-- SQL Server (local install or another reachable instance)
+- SQL Server (local install or reachable instance)
 - Playwright browser runtime
 
-### Restore dependencies
+### Install and configure
 
-Run:
+```bash
+dotnet restore LinkedIn.JobScraper.sln
+npx playwright install chromium
 
-- `dotnet restore LinkedIn.JobScraper.sln`
+dotnet user-secrets set "SqlServer:ConnectionString" "<your-sql-connection-string>" --project src/LinkedIn.JobScraper.Web
+dotnet user-secrets set "OpenAI:Security:Model" "gpt-5-mini" --project src/LinkedIn.JobScraper.Web
+# optional
+# dotnet user-secrets set "OpenAI:Security:BaseUrl" "https://api.openai.com/v1" --project src/LinkedIn.JobScraper.Web
+```
 
-### Install Playwright browser binaries
+Set the OpenAI API key at runtime from `Administration -> OpenAI Setup`.
 
-Run:
+### Run
 
-- `npx playwright install chromium`
+```bash
+dotnet run --launch-profile http --project src/LinkedIn.JobScraper.Web
+```
 
-### Configure local secrets
+Default local URLs:
 
-This repository now keeps tracked config files secret-free.
+- `http://localhost:5058`
+- `https://localhost:7145`
 
-Set secrets with `dotnet user-secrets`:
+## Local Quality Gate
 
-- `dotnet user-secrets set "SqlServer:ConnectionString" "<your-sql-connection-string>" --project src/LinkedIn.JobScraper.Web`
-- `dotnet user-secrets set "OpenAI:Security:Model" "gpt-5-mini" --project src/LinkedIn.JobScraper.Web`
+Enable hooks:
 
-Optional:
+```bash
+chmod +x .githooks/pre-commit .githooks/pre-push
+git config core.hooksPath .githooks
+```
 
-- `dotnet user-secrets set "OpenAI:Security:BaseUrl" "https://api.openai.com/v1" --project src/LinkedIn.JobScraper.Web`
+Manual equivalent of the `pre-push` gate:
 
-You can also use environment variables instead of user-secrets if preferred.
+```bash
+dotnet restore LinkedIn.JobScraper.sln
+dotnet format LinkedIn.JobScraper.sln --verify-no-changes --no-restore
+dotnet build LinkedIn.JobScraper.sln --configuration Release --no-restore -warnaserror
+dotnet test LinkedIn.JobScraper.sln --configuration Release --no-build
+```
 
-OpenAI API key is no longer configured from `appsettings`/pipeline secrets for normal runtime usage.
-Set and validate the key from `Admin -> OpenAI Setup`, where it is stored in local runtime secrets and applied immediately.
+## Documentation
 
-### Run the app (recommended)
+Canonical documentation map and placement rules:
 
-Run:
+- [docs/README.md](docs/README.md)
 
-- `dotnet run --launch-profile http --project src/LinkedIn.JobScraper.Web`
+Recommended reading order:
 
-Notes:
+1. [context.md](docs/product/context.md)
+2. [roadmap.md](docs/product/roadmap.md)
+3. [overview.md](docs/architecture/overview.md)
+4. [architecture.md](docs/architecture/diagrams/architecture.md)
+5. [data-flow.md](docs/architecture/diagrams/data-flow.md)
+6. [github-project-task-ops.md](docs/governance/github-project-task-ops.md)
+7. [versioning.md](docs/governance/versioning.md)
+8. [troubleshooting.md](docs/operations/troubleshooting.md)
 
-- This uses `src/LinkedIn.JobScraper.Web/Properties/launchSettings.json` and sets `ASPNETCORE_ENVIRONMENT=Development`.
-- Avoid `--no-launch-profile` unless you explicitly provide all required runtime configuration (especially `SqlServer:ConnectionString` and environment values) via user-secrets or environment variables.
+## Repository Layout
 
-### Local quality gate and Git hooks
+- `src/LinkedIn.JobScraper.Web` - runtime application
+- `tests/LinkedIn.JobScraper.Web.Tests` - CI-safe automated tests
+- `docs/` - domain-organized docs (`product`, `architecture`, `operations`, `governance`)
+- `.github/workflows/` - CI and governance workflows
 
-To prevent CI formatting/encoding failures before push, enable the repository hooks:
-
-- `chmod +x scripts/quality-gate.sh .githooks/pre-commit .githooks/pre-push`
-- `git config core.hooksPath .githooks`
-
-Behavior:
-
-- `pre-commit`: blocks commits when `dotnet format --verify-no-changes` fails
-- `pre-push`: runs `scripts/quality-gate.sh` (`restore -> format -> build -warnaserror -> test`)
-
-Manual run:
-
-- `./scripts/quality-gate.sh`
-
-Temporary bypass (only when strictly needed):
-
-- `SKIP_LOCAL_HOOKS=1 git commit ...`
-- `SKIP_LOCAL_HOOKS=1 git push ...`
-
-## Development Notes
-
-### LinkedIn safety posture
-
-- The app does not assume official LinkedIn personal-use APIs are available.
-- It relies on browser-backed authenticated requests after the user completes login manually.
-- Session reuse is intentionally conservative.
-- Sensitive actions are rate-limited locally.
-- A `401` from LinkedIn invalidates the current stored session.
-
-### Secrets and privacy
-
-- Do not commit live API keys or live connection strings.
-- Stored LinkedIn session data should be treated as sensitive local data.
-- If secrets were ever committed previously, treat them as compromised and rotate them.
-
-### Health and diagnostics
-
-- `/health`
-  - simple liveness
-- `/health/ready`
-  - configuration readiness only
-- `/diagnostics/summary`
-  - safe high-level summary of config/session state
-
-These endpoints are intentionally designed to avoid live external calls for normal readiness checks.
-
-## Automated Tests
-
-Run:
-
-- `dotnet test LinkedIn.JobScraper.sln`
-
-The current test suite is intentionally CI-safe:
-
-- no live SQL Server requirement
-- no LinkedIn session requirement
-- no OpenAI credential requirement
-- no external network calls
-
-## CI
+## CI Overview
 
 GitHub Actions currently runs:
 
-- restore
 - format verification
 - build with warnings-as-errors
-- test
+- tests
 - dependency review (PRs)
 - test result and coverage artifact publishing
 
-## Current Priorities
+## Project Management
 
-The current engineering roadmap is tracked in:
+The execution source of truth lives in GitHub Project:
 
-- [PLAN_REVISED.md](/home/mehdi/projects/LinkedIn-Job-Scraper/docs/PLAN_REVISED.md)
+- <https://github.com/users/mahdiahmadi1991/projects/1>
 
-The active direction is to improve:
+Governance policy:
 
-- portfolio quality
-- testability
-- security and configuration hygiene
-- reviewer clarity through strong docs and visual context
-- observability
-- documentation quality
-
-while preserving the current local-only, single-user, conservative product behavior.
+- [plan-bridge.md](docs/governance/plan-bridge.md)
+- [github-project-task-ops.md](docs/governance/github-project-task-ops.md)

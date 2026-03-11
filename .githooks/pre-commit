@@ -16,9 +16,13 @@ if [[ "$current_branch" == "main" ]]; then
 fi
 
 if [[ "$current_branch" != "develop" ]]; then
-  if [[ ! "$current_branch" =~ ^(feature|fix|bugfix)/.+$ ]]; then
+  if [[ ! "$current_branch" =~ ^(feature|fix|bugfix|hotfix)/[0-9]+-[a-z0-9][a-z0-9-]*$ ]]; then
     echo "[pre-commit] Invalid branch name '$current_branch'."
-    echo "[pre-commit] Use one of: feature/<slug>, fix/<slug>, bugfix/<slug>."
+    echo "[pre-commit] Use one of:"
+    echo "[pre-commit]   feature/<issue-number>-<slug>"
+    echo "[pre-commit]   fix/<issue-number>-<slug>"
+    echo "[pre-commit]   bugfix/<issue-number>-<slug>"
+    echo "[pre-commit]   hotfix/<issue-number>-<slug>"
     exit 1
   fi
 fi
@@ -26,7 +30,7 @@ fi
 if [[ "$current_branch" == "develop" ]]; then
   if ! git rev-parse -q --verify MERGE_HEAD >/dev/null; then
     echo "[pre-commit] Direct commits on 'develop' are blocked."
-    echo "[pre-commit] Commit on feature/*, fix/*, or bugfix/*, then merge into 'develop' with '--no-ff'."
+    echo "[pre-commit] Commit on feature/<issue-number>-<slug>, fix/<issue-number>-<slug>, or bugfix/<issue-number>-<slug>, then merge into 'develop' with '--no-ff'."
     exit 1
   fi
 
@@ -37,7 +41,7 @@ if [[ "$current_branch" == "develop" ]]; then
   contains_main_branch="$(git for-each-ref --format='%(refname:short)' --contains "$merge_head" refs/heads/main | head -n 1 || true)"
 
   if [[ -z "$contains_feature_branch" && -z "$contains_fix_branch" && -z "$contains_bugfix_branch" && -z "$contains_main_branch" ]]; then
-    echo "[pre-commit] Merge commits on 'develop' must come from feature/*, fix/*, bugfix/* (or 'main' for sync)."
+    echo "[pre-commit] Merge commits on 'develop' must come from feature/fix/bugfix work branches (or 'main' for sync)."
     echo "[pre-commit] Resolve merge source branch and retry."
     exit 1
   fi

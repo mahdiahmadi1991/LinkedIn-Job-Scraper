@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v.4.0.6] - 2026-03-11
+### Changed
+- Documentation is now organized under canonical domain folders (`product`, `architecture`, `operations`, `governance`) with an explicit documentation map and placement rules.
+- Governance and agent policy now explicitly enforce no-overlap documentation (single canonical source per topic) and script minimalism.
+- Main README was standardized as a concise entry-point document focused on scope, quick start, canonical docs, and project-management links.
+- Governance bridge documents now mark legacy references as historical-only to reduce operational ambiguity.
+- Per-user ownership migration and rollback guidance was consolidated into troubleshooting to remove runbook duplication.
+- Project intake automation now assigns new issues to the repository owner by default and normalizes escaped newline tokens into clean multiline markdown in issue bodies.
+- GitHub text-posting guardrails were tightened: multiline issue/PR comments now require clean formatting paths to prevent literal escaped newline artifacts.
+
+### Removed
+- Redundant/obsolete documentation artifacts were removed after migration and consolidation, including duplicate legacy planning/idea files and temporary operational docs.
+- Deprecated helper wrappers for one-command operations were removed in favor of direct documented commands.
+
 ## [v.4.0.5] - 2026-03-11
 ### Changed
 - Main merge checks are now stable again and no longer fail due to unsupported workflow trigger configuration.
