@@ -192,11 +192,26 @@ Runtime token for automation:
 
 - `secrets.PROJECT_AUTOMATION_TOKEN` if set
 - otherwise fallback to `github.token`
+- local operator env source (for CLI sessions): `.secrets/codex-production-access.env` with key `PROJECT_AUTOMATION_TOKEN` (never commit real token values)
+
+Important for user-owned private Project v2:
+
+- `github.token` may not resolve user Project GraphQL lookups in all repositories.
+- to keep `main-pr-guard` deterministic, set `PROJECT_AUTOMATION_TOKEN` as repository secret.
+- minimum required scopes: `repo`, `read:org`, `project`
 
 If project updates fail due permission scope:
 
 1. create/update `PROJECT_AUTOMATION_TOKEN` secret with `repo`, `read:org`, `project` scopes
 2. re-run failed workflow
+
+Local CLI session example:
+
+```bash
+set -a
+source .secrets/codex-production-access.env
+set +a
+```
 
 ## Operational Rules
 
@@ -242,6 +257,38 @@ If project updates fail due permission scope:
    - `docs/archive/ideas/*.md`
    - `docs/tmp/*.md`
 6. Explicit exception only via PR label `allow-local-ops-docs`.
+7. Workflow is trigger-driven on PR lifecycle updates:
+   - `pull_request`: `opened`, `reopened`, `edited`, `synchronize`, `labeled`, `unlabeled`, `ready_for_review`
+   - `pull_request_review`: `submitted`
+
+## Main Merge Preflight (No Trial-And-Error)
+
+Run this checklist before opening/enabling auto-merge for `develop -> main`:
+
+1. PR content contract:
+   - include `#<issue-number>` reference in title or body
+   - ensure `VERSION` and `CHANGELOG.md` are part of the PR diff
+2. Referenced issue contract:
+   - issue has `intake` label
+   - issue state is `closed`
+   - issue is linked to canonical project item
+   - project field `Execution State` is `Done` or `Dropped`
+3. Docs drift exception contract:
+   - if PR touches `docs/ideas/*`, `docs/archive/ideas/*`, or `docs/tmp/*`, add label `allow-local-ops-docs`
+4. Access contract:
+   - verify `PROJECT_AUTOMATION_TOKEN` secret exists and has `repo`, `read:org`, `project` scopes
+5. Copilot contract:
+   - request reviewer `Copilot` if not already requested
+   - verify reviewer request is actually persisted on PR metadata
+   - ensure no unresolved Copilot threads remain
+
+Recommended one-shot verification commands:
+
+```bash
+gh pr view <pr-number> --json title,body,labels,files
+gh issue view <issue-number> --json state,labels
+gh project item-list 1 --owner mahdiahmadi1991 -L 200 --format json
+```
 
 Develop CI visibility lane:
 
