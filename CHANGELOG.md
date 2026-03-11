@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v.4.0.8] - 2026-03-11
+### Fixed
+- Copilot gate no longer fails solely on missing reviewer-request persistence when a valid Copilot review already exists; it now blocks only when both assignment and review history are missing.
+
+## [v.4.0.7] - 2026-03-11
+### Changed
+- Main PR guard now listens to PR metadata updates (`edited`, `labeled`, `unlabeled`) to avoid stale policy evaluation after title/body/label fixes.
+- Main PR project-governance lookup now uses `PROJECT_AUTOMATION_TOKEN` when configured and returns explicit remediation when Project v2 access is unavailable.
+- Copilot reviewer request flow now fails explicitly when reviewer assignment does not persist, instead of silently continuing.
+- Governance/troubleshooting docs now include preflight guidance for `PROJECT_AUTOMATION_TOKEN` usage from `.secrets/codex-production-access.env` and deterministic Copilot-request verification.
+- Develop policy audit workflow now invokes its script via `bash` to avoid permission-denied failures when executable bit drifts.
+
+## [v.4.0.6] - 2026-03-11
+### Changed
+- Documentation is now organized under canonical domain folders (`product`, `architecture`, `operations`, `governance`) with an explicit documentation map and placement rules.
+- Governance and agent policy now explicitly enforce no-overlap documentation (single canonical source per topic) and script minimalism.
+- Main README was standardized as a concise entry-point document focused on scope, quick start, canonical docs, and project-management links.
+- Governance bridge documents now mark legacy references as historical-only to reduce operational ambiguity.
+- Per-user ownership migration and rollback guidance was consolidated into troubleshooting to remove runbook duplication.
+- Project intake automation now assigns new issues to the repository owner by default and normalizes escaped newline tokens into clean multiline markdown in issue bodies.
+- GitHub text-posting guardrails were tightened: multiline issue/PR comments now require clean formatting paths to prevent literal escaped newline artifacts.
+
+### Removed
+- Redundant/obsolete documentation artifacts were removed after migration and consolidation, including duplicate legacy planning/idea files and temporary operational docs.
+- Deprecated helper wrappers for one-command operations were removed in favor of direct documented commands.
+
 ## [v.4.0.5] - 2026-03-11
 ### Changed
 - Main merge checks are now stable again and no longer fail due to unsupported workflow trigger configuration.

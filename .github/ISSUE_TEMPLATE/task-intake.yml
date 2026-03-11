@@ -1,0 +1,140 @@
+name: Task Intake (Codex Ops)
+description: Create a structured execution task for the Codex-operated GitHub Project flow.
+title: "[Task] "
+labels:
+  - intake
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue form is the canonical intake path for execution work.
+        The linked GitHub Project is the source of truth for lifecycle state.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Short problem statement and expected business outcome.
+      placeholder: Describe what needs to be achieved and why it matters.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Concrete boundaries of this task.
+      placeholder: List what is included in this task.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Use explicit, testable criteria.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: execution_intent
+    attributes:
+      label: Execution Intent
+      description: Decide whether this task is only captured for future or should start now.
+      options:
+        - Capture-Only
+        - Execute-Now
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - Feature
+        - Improvement
+        - Bugfix
+        - Hotfix
+        - Ops
+      default: 1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0
+        - P1
+        - P2
+        - P3
+      default: 2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - LinkedIn
+        - Jobs
+        - AI
+        - Persistence
+        - Security
+        - Docs
+        - DevEx
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk
+      options:
+        - Low
+        - Medium
+        - High
+      default: 1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: effort
+    attributes:
+      label: Effort
+      options:
+        - XS
+        - S
+        - M
+        - L
+        - XL
+      default: 2
+    validations:
+      required: true
+
+  - type: input
+    id: idea_doc_path
+    attributes:
+      label: IdeaDocPath
+      description: Optional path if this task has a supporting repo doc.
+      placeholder: docs/ideas/example.md
+    validations:
+      required: false
+
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out Of Scope
+      description: Explicitly list excluded work to prevent scope drift.
+      placeholder: List excluded items.
+    validations:
+      required: false

@@ -124,9 +124,13 @@ if [[ "$current_branch" == "main" ]]; then
   exit 1
 fi
 
-if [[ "$current_branch" != "develop" && ! "$current_branch" =~ ^(feature|fix|bugfix)/.+$ ]]; then
+if [[ "$current_branch" != "develop" && ! "$current_branch" =~ ^(feature|fix|bugfix|hotfix)/[0-9]+-[a-z0-9][a-z0-9-]*$ ]]; then
   echo "[pre-push] Invalid branch name '$current_branch'."
-  echo "[pre-push] Use one of: feature/<slug>, fix/<slug>, bugfix/<slug>."
+  echo "[pre-push] Use one of:"
+  echo "[pre-push]   feature/<issue-number>-<slug>"
+  echo "[pre-push]   fix/<issue-number>-<slug>"
+  echo "[pre-push]   bugfix/<issue-number>-<slug>"
+  echo "[pre-push]   hotfix/<issue-number>-<slug>"
   exit 1
 fi
 
@@ -153,9 +157,11 @@ if [[ "$current_branch" == "develop" ]]; then
       parent_two="$(awk '{print $2}' <<<"$parent_line")"
       [[ -z "$parent_two" ]] && continue
 
-      # Allow develop sync merges that bring main back into develop.
       if git merge-base --is-ancestor "$parent_two" main; then
-        continue
+        echo "[pre-push] Reverse merge from 'main' into 'develop' is forbidden."
+        echo "[pre-push] Backport hotfixes to 'develop' via cherry-pick only."
+        echo "[pre-push] Do not merge 'main' into 'develop'."
+        exit 1
       fi
 
       feature_side_commit_count="$(git rev-list --count "$parent_one..$parent_two")"
@@ -261,4 +267,7 @@ if [[ "$current_branch" == "develop" ]]; then
 fi
 
 echo "[pre-push] Running local quality gate..."
-"$repo_root/scripts/quality-gate.sh"
+dotnet restore LinkedIn.JobScraper.sln
+dotnet format LinkedIn.JobScraper.sln --verify-no-changes --no-restore
+dotnet build LinkedIn.JobScraper.sln --configuration Release --no-restore -warnaserror
+dotnet test LinkedIn.JobScraper.sln --configuration Release --no-build
