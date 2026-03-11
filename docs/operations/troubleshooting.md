@@ -266,6 +266,43 @@ What to do:
    - `test-results.trx`
    - `coverage.cobertura.xml`
 
+### Symptom: `project-governance-gate` fails with `Could not resolve to a ProjectV2 with the number 1`
+
+Likely cause:
+
+- workflow token cannot access the canonical Project v2 (common with private user-owned projects when only `github.token` is used)
+
+What to do:
+
+1. Create/update repository secret `PROJECT_AUTOMATION_TOKEN`.
+2. Use a classic PAT with scopes:
+   - `repo`
+   - `read:org`
+   - `project`
+3. Re-run `Main PR Guard` workflow for the PR.
+4. Confirm project lookup succeeds and issue is linked with `Execution State=Done|Dropped`.
+
+Verification commands:
+
+- `gh project view 1 --owner mahdiahmadi1991 --format json`
+- `gh project item-list 1 --owner mahdiahmadi1991 -L 200 --format json`
+- `gh pr checks <pr-number>`
+
+### Symptom: Copilot reviewer is not assigned after PR creation
+
+Likely cause:
+
+- reviewer request failed or was not persisted on PR metadata
+- workflow token/repository settings prevented reviewer assignment
+
+What to do:
+
+1. Request Copilot reviewer explicitly:
+   - `gh api repos/<owner>/<repo>/pulls/<pr-number>/requested_reviewers -X POST -f reviewers[]=Copilot`
+2. Verify request persistence:
+   - `gh pr view <pr-number> --json reviewRequests --jq '.reviewRequests[].login'`
+3. Re-run `Main PR Guard` if needed.
+
 ## 7. When To Revalidate Assumptions
 
 Pause and revalidate before changing behavior if:
@@ -506,3 +543,15 @@ If any query returns rows, do not down-migrate. Restore from backup.
   - Failure pattern: adding `pull_request_review_thread` under `on:` made `main-pr-guard.yml` invalid in GitHub Actions for this repo, resulting in failed runs without jobs and blocked PR merge.
   - Stable fix: remove unsupported trigger and keep guard on supported events (`pull_request`, `pull_request_review`).
   - Guardrail: validate workflow-event compatibility against current GitHub Actions support before relying on new trigger types.
+
+- 2026-03-11: Main PR governance failed because workflow token could not access Project v2
+  - Failure pattern: `project-governance-gate` failed with `Could not resolve to a ProjectV2 with the number 1` although project existed.
+  - Root cause: default `github.token` lacked effective access to private user-owned project GraphQL lookup.
+  - Stable fix: run governance query with `PROJECT_AUTOMATION_TOKEN` (`repo`, `read:org`, `project`) and keep clear remediation message in workflow.
+  - Guardrail: configure `PROJECT_AUTOMATION_TOKEN` before first `develop -> main` release PR.
+
+- 2026-03-11: PR metadata updates did not auto-retrigger main guard
+  - Failure pattern: adding issue reference/labels after PR open did not re-run guard automatically, causing stale-failure confusion.
+  - Root cause: `main-pr-guard` was not listening to `pull_request` `edited|labeled|unlabeled` events.
+  - Stable fix: include `edited`, `labeled`, `unlabeled` in `pull_request` trigger types.
+  - Guardrail: for policy checks that depend on mutable PR metadata, always include metadata-change events.

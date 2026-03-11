@@ -62,7 +62,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          scripts/develop-policy-audit.sh \
+          bash scripts/develop-policy-audit.sh \
             --base-sha '${{ steps.range.outputs.base_sha }}' \
             --head-sha '${{ steps.range.outputs.head_sha }}' \
             --main-ref origin/main

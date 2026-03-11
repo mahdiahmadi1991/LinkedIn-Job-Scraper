@@ -7,7 +7,10 @@ on:
     types:
       - opened
       - reopened
+      - edited
       - synchronize
+      - labeled
+      - unlabeled
       - ready_for_review
   pull_request_review:
     types:
@@ -66,6 +69,7 @@ jobs:
           PROJECT_OWNER: mahdiahmadi1991
           PROJECT_NUMBER: "1"
         with:
+          github-token: ${{ secrets.PROJECT_AUTOMATION_TOKEN || github.token }}
           script: |
             const projectOwner = process.env.PROJECT_OWNER;
             const projectNumber = Number.parseInt(process.env.PROJECT_NUMBER ?? "", 10);
@@ -80,6 +84,15 @@ jobs:
               core.setFailed("PROJECT_OWNER/PROJECT_NUMBER are invalid in workflow configuration.");
               return;
             }
+
+            const failProjectAccess = (extraHint = "") => {
+              const hintSuffix = extraHint ? ` ${extraHint}` : "";
+              core.setFailed(
+                `Canonical project ${projectOwner}/${projectNumber} is not accessible to this workflow token.` +
+                  " Configure repository secret PROJECT_AUTOMATION_TOKEN with scopes: repo, read:org, project." +
+                  hintSuffix
+              );
+            };
 
             const issueReferences = new Set();
             const referenceText = `${pullRequest.title ?? ""}\n${pullRequest.body ?? ""}`;
@@ -125,25 +138,29 @@ jobs:
               }
             }
 
-            const projectLookup = await github.graphql(
-              `
-                query($owner: String!, $number: Int!) {
-                  user(login: $owner) {
-                    projectV2(number: $number) {
-                      id
-                      title
+            let projectLookup;
+            try {
+              projectLookup = await github.graphql(
+                `
+                  query($owner: String!, $number: Int!) {
+                    user(login: $owner) {
+                      projectV2(number: $number) {
+                        id
+                        title
+                      }
                     }
                   }
-                }
-              `,
-              { owner: projectOwner, number: projectNumber }
-            );
+                `,
+                { owner: projectOwner, number: projectNumber }
+              );
+            } catch (error) {
+              failProjectAccess(`Underlying error: ${error.message}`);
+              return;
+            }
 
             const project = projectLookup?.user?.projectV2;
             if (!project?.id) {
-              core.setFailed(
-                `Canonical project ${projectOwner}/${projectNumber} is not accessible to this workflow token.`
-              );
+              failProjectAccess();
               return;
             }
 
@@ -288,13 +305,13 @@ jobs:
             };
 
             if (context.eventName === "pull_request") {
-              const requestedReviewers = await github.rest.pulls.listRequestedReviewers({
+              const requestedReviewersBefore = await github.rest.pulls.listRequestedReviewers({
                 owner,
                 repo,
                 pull_number: pullNumber
               });
 
-              const copilotAlreadyRequested = requestedReviewers.data.users.some((user) =>
+              const copilotAlreadyRequested = requestedReviewersBefore.data.users.some((user) =>
                 isCopilotLogin(user.login)
               );
 
@@ -308,8 +325,29 @@ jobs:
                   });
                   core.info("Copilot review was requested automatically for this PR head.");
                 } catch (error) {
-                  core.warning(`Failed to request Copilot reviewer automatically: ${error.message}`);
+                  core.setFailed(
+                    `Failed to request Copilot reviewer automatically: ${error.message}. ` +
+                      "Request Copilot reviewer manually, then retrigger this workflow."
+                  );
+                  return;
                 }
+              }
+
+              const requestedReviewersAfter = await github.rest.pulls.listRequestedReviewers({
+                owner,
+                repo,
+                pull_number: pullNumber
+              });
+
+              const copilotRequestedNow = requestedReviewersAfter.data.users.some((user) =>
+                isCopilotLogin(user.login)
+              );
+
+              if (!copilotAlreadyRequested && !copilotRequestedNow) {
+                core.setFailed(
+                  "Copilot reviewer request was not persisted on the PR. Request Copilot manually, then retrigger the workflow."
+                );
+                return;
               }
             }
 

@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v.4.0.7] - 2026-03-11
+### Changed
+- Main PR guard now listens to PR metadata updates (`edited`, `labeled`, `unlabeled`) to avoid stale policy evaluation after title/body/label fixes.
+- Main PR project-governance lookup now uses `PROJECT_AUTOMATION_TOKEN` when configured and returns explicit remediation when Project v2 access is unavailable.
+- Copilot reviewer request flow now fails explicitly when reviewer assignment does not persist, instead of silently continuing.
+- Governance/troubleshooting docs now include preflight guidance for `PROJECT_AUTOMATION_TOKEN` usage from `.secrets/codex-production-access.env` and deterministic Copilot-request verification.
+- Develop policy audit workflow now invokes its script via `bash` to avoid permission-denied failures when executable bit drifts.
+
 ## [v.4.0.6] - 2026-03-11
 ### Changed
 - Documentation is now organized under canonical domain folders (`product`, `architecture`, `operations`, `governance`) with an explicit documentation map and placement rules.

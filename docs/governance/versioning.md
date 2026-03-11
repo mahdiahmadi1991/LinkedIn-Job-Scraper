@@ -109,8 +109,31 @@ This keeps version milestones visible in git history.
   - no unresolved (non-outdated) Copilot review threads
   - approval-gate behavior: event-driven fail-fast (no polling loops)
   - workflow triggers: `pull_request`, `pull_request_review`
+  - `pull_request` event types: `opened`, `reopened`, `edited`, `synchronize`, `labeled`, `unlabeled`, `ready_for_review`
   - on `pull_request` events, Copilot review is auto-requested when missing
+  - project governance lookups use `PROJECT_AUTOMATION_TOKEN` (if set) with fallback to `github.token`
 - Recommended GitHub branch protection on `main`:
   - require status check: `Main PR Guard / versioning-pr-guard`
-  - require status check: `Main PR Guard / project-governance-gate`
   - require status check: `Main PR Guard / copilot-review-gate`
+
+Note:
+
+- If canonical project is private user-owned, configure repository secret `PROJECT_AUTOMATION_TOKEN` with scopes `repo`, `read:org`, `project` to avoid project-governance lookup failures.
+- Keep `project-governance-gate` enabled in workflow even when not marked as required status check; it remains part of auto-merge policy enforcement.
+
+## Main Merge Runbook (Develop -> Main)
+
+1. Open PR from `develop` to `main`.
+2. Ensure PR references task issue(s) (`#<issue-number>` in title/body).
+3. Verify each referenced issue is `intake`-labeled, closed, and in project `Execution State=Done|Dropped`.
+4. Enable auto-merge with merge-commit strategy.
+5. Request Copilot reviewer and verify request is persisted on PR metadata.
+6. Ensure Copilot review exists and all Copilot threads are resolved.
+7. Do not perform manual immediate merge; let auto-merge complete after checks pass.
+
+CLI verification snippet:
+
+```bash
+gh pr view <pr-number> --json reviewRequests,reviews \
+  --jq '{requested:[.reviewRequests[].login], reviewedBy:[.reviews[].author.login]}'
+```

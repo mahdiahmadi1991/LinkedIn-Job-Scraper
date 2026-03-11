@@ -166,16 +166,21 @@ After implementation (feature/fix/bugfix) is finished, follow this exact sequenc
 - Copilot gate must pass before merge is allowed.
 - Copilot policy is one-time-per-PR: once Copilot reviewed at least once, Codex resolves/fixes raised issues and proceeds without requiring a second Copilot re-review.
 - If Copilot review is missing/pending for the latest PR head, Codex must proactively request/re-request Copilot review via API/CLI before asking for user action.
+- After requesting Copilot reviewer, Codex must verify request persistence on PR metadata (`reviewRequests`) and treat non-persistence as a workflow blocker with explicit remediation.
 - In emergency hotfix path, fix on the same `hotfix/<issue-number>-<slug>` PR branch and keep scope minimal.
 - PR merge strategy must be `Create a merge commit` (no squash, no rebase).
 - Main pipeline must validate `VERSION`/`CHANGELOG.md`; tag creation on `main` is fallback-only if a required version tag is unexpectedly missing.
 - Main PR guard checks must enforce:
   - `VERSION` + `CHANGELOG.md` presence
+  - PR references at least one task issue (`#<issue-number>` in title/body)
+  - referenced issue is intake-labeled, closed, linked to canonical project, and in `Execution State=Done|Dropped`
   - At least one Copilot review on the PR
   - No unresolved (non-outdated) Copilot review threads
   - Gate behavior is event-driven and fail-fast with no polling loops.
   - Workflow triggers should include `pull_request` and `pull_request_review` so review updates re-evaluate guard status automatically.
+  - `pull_request` trigger should include metadata-changing events (`edited`, `labeled`, `unlabeled`) to avoid stale policy evaluation.
   - On `pull_request` events, workflow should auto-request Copilot review when missing for the latest head.
+- For repositories using private user-owned Project v2, configure `PROJECT_AUTOMATION_TOKEN` repository secret with scopes `repo`, `read:org`, `project`; use it for project-governance checks to avoid GraphQL access failures.
 - After any emergency `hotfix/<issue-number>-<slug> -> main` merge, immediately cherry-pick the hotfix commit(s) into `develop` before starting new feature/fix work.
 
 8. Post-Main Sync Gate
