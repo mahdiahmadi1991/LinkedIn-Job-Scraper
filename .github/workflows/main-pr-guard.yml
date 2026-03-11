@@ -344,10 +344,10 @@ jobs:
               );
 
               if (!copilotAlreadyRequested && !copilotRequestedNow) {
-                core.setFailed(
-                  "Copilot reviewer request was not persisted on the PR. Request Copilot manually, then retrigger the workflow."
+                core.warning(
+                  "Copilot reviewer request was not persisted on PR metadata. " +
+                    "Proceeding to review-history check; if no Copilot review exists, the gate will fail."
                 );
-                return;
               }
             }
 
@@ -360,6 +360,23 @@ jobs:
 
             const copilotReviews = reviews.filter((review) => isCopilotLogin(review.user?.login));
             if (copilotReviews.length === 0) {
+              const requestedReviewers = await github.rest.pulls.listRequestedReviewers({
+                owner,
+                repo,
+                pull_number: pullNumber
+              });
+              const copilotRequested = requestedReviewers.data.users.some((user) =>
+                isCopilotLogin(user.login)
+              );
+
+              if (!copilotRequested) {
+                core.setFailed(
+                  "Copilot reviewer is neither assigned nor has submitted a review. " +
+                    "Assign Copilot reviewer manually, then retrigger the workflow."
+                );
+                return;
+              }
+
               core.setFailed(
                 "Copilot must review this PR at least once before merging to main. Review has been requested automatically."
               );
