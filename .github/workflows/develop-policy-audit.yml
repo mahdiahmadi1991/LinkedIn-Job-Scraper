@@ -1,0 +1,68 @@
+name: Develop Policy Audit
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+    inputs:
+      base_sha:
+        description: "Optional base SHA (defaults to push before SHA or HEAD^)"
+        required: false
+        type: string
+      head_sha:
+        description: "Optional head SHA (defaults to current HEAD)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: develop-policy-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Resolve Commit Range
+        id: range
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          INPUT_BASE='${{ inputs.base_sha }}'
+          INPUT_HEAD='${{ inputs.head_sha }}'
+
+          if [[ -n "$INPUT_HEAD" ]]; then
+            HEAD_SHA="$INPUT_HEAD"
+          else
+            HEAD_SHA="$(git rev-parse HEAD)"
+          fi
+
+          if [[ -n "$INPUT_BASE" ]]; then
+            BASE_SHA="$INPUT_BASE"
+          elif [[ '${{ github.event_name }}' == 'push' ]]; then
+            BASE_SHA='${{ github.event.before }}'
+          else
+            BASE_SHA="$(git rev-parse "$HEAD_SHA^" 2>/dev/null || true)"
+          fi
+
+          echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Run Develop Policy Audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts/develop-policy-audit.sh \
+            --base-sha '${{ steps.range.outputs.base_sha }}' \
+            --head-sha '${{ steps.range.outputs.head_sha }}' \
+            --main-ref origin/main
