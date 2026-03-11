@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v.4.0.8] - 2026-03-11
+### Fixed
+- Copilot gate no longer fails solely on missing reviewer-request persistence when a valid Copilot review already exists; it now blocks only when both assignment and review history are missing.
+
 ## [v.4.0.7] - 2026-03-11
 ### Changed
 - Main PR guard now listens to PR metadata updates (`edited`, `labeled`, `unlabeled`) to avoid stale policy evaluation after title/body/label fixes.
